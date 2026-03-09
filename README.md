@@ -32,3 +32,6 @@ A web UI for status, activity, health, and settings (Bridge ON/OFF, Kill switch)
 ## Spec
 
 See `SIGNALFORGE_BRIDGE_BLUEPRINT.md` in the parent BRIDGE folder for the full specification. Bridge does not write to `signals` or `signal_outcomes`; all state is in `bridge_*` tables.
+
+---
+*Deploy: Railway (master).*
