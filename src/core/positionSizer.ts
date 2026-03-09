@@ -3,6 +3,8 @@
  * Min 1 unit, max 2% risk; graduated reduction 50% after 3 losses; conviction scaling ±15%.
  */
 
+import { logInfo } from '../utils/logger.js';
+
 const MIN_UNITS = 1;
 
 function getPipValue(instrument: string, units: number): number {
@@ -51,9 +53,18 @@ export function calculateUnits(params: PositionSizerParams): number {
   const pipDist = getPipDistance(entry, stopLoss, instrument);
   if (pipDist <= 0) return MIN_UNITS;
 
-  const unitsPerPip = 1;
   const pipValuePerUnit = getPipValue(instrument, 1);
   const units = riskAmount / (pipDist * pipValuePerUnit);
   const rounded = Math.floor(Math.max(MIN_UNITS, units));
+  logInfo('Position size', {
+    equity,
+    engineWeight,
+    riskPct: effectiveRisk,
+    riskAmountTarget: riskAmount,
+    slPips: pipDist,
+    pipValuePerUnit,
+    riskPerUnit: pipDist * pipValuePerUnit,
+    units: rounded,
+  });
   return rounded;
 }

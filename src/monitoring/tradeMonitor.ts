@@ -1,11 +1,26 @@
 /**
  * Every 30s: sync open trades with OANDA; close if past max_hold_hours; update bridge_trade_log.
+ * On close: writes exit_price, pnl_dollars, result (win/loss/breakeven), closed_at, duration_minutes.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getOpenTrades, closeTrade } from '../connectors/oanda.js';
+import { getOpenTrades, closeTrade, getClosedTradeDetails } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import type { BridgeEngineRow } from '../types/config.js';
+
+function resultFromPnl(pnlDollars: number | null): 'win' | 'loss' | 'breakeven' {
+  if (pnlDollars == null) return 'breakeven';
+  if (pnlDollars > 0) return 'win';
+  if (pnlDollars < 0) return 'loss';
+  return 'breakeven';
+}
+
+function durationMinutes(signalReceivedAt: string, closedAt: string): number | null {
+  const a = new Date(signalReceivedAt).getTime();
+  const b = new Date(closedAt).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / 60000 * 100) / 100;
+}
 
 export async function runTradeMonitor(
   supabase: SupabaseClient,
@@ -31,14 +46,36 @@ export async function runTradeMonitor(
     const elapsed = Date.now() - new Date(openTime).getTime();
 
     if (!oandaIds.has(tid)) {
-      await supabase.from('bridge_trade_log').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', row.id);
-      recordClosedTrade('win');
+      const details = await getClosedTradeDetails(tid, openTime);
+      const closedAt = details.closedTime ?? new Date().toISOString();
+      const update: Record<string, unknown> = {
+        status: 'closed',
+        closed_at: closedAt,
+        exit_price: details.exitPrice,
+        pnl_dollars: details.pnlDollars,
+        result: resultFromPnl(details.pnlDollars),
+        duration_minutes: durationMinutes(openTime, closedAt),
+      };
+      await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
+      recordClosedTrade(resultFromPnl(details.pnlDollars));
       continue;
     }
     if (elapsed >= maxHold) {
-      await closeTrade(tid);
-      await supabase.from('bridge_trade_log').update({ status: 'closed', close_reason: 'max_hold', closed_at: new Date().toISOString() }).eq('id', row.id);
-      recordClosedTrade('breakeven');
+      const closeResult = await closeTrade(tid);
+      const fillTx = closeResult.orderFillTransaction;
+      const closedAt = fillTx?.time ?? new Date().toISOString();
+      const pnlDollars = fillTx?.pl != null ? parseFloat(fillTx.pl) : null;
+      const update: Record<string, unknown> = {
+        status: 'closed',
+        close_reason: 'max_hold',
+        closed_at: closedAt,
+        exit_price: fillTx?.price != null ? parseFloat(fillTx.price) : null,
+        pnl_dollars: pnlDollars,
+        result: resultFromPnl(pnlDollars),
+        duration_minutes: durationMinutes(openTime, closedAt),
+      };
+      await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
+      recordClosedTrade(resultFromPnl(pnlDollars));
     }
   }
 }

@@ -120,7 +120,13 @@ export interface PlaceOrderParams {
 }
 
 export interface PlaceOrderResult {
-  orderFillTransaction?: { id: string; tradeOpened?: { tradeID: string }; fill?: string };
+  orderFillTransaction?: {
+    id: string;
+    tradeOpened?: { tradeID: string; units?: string };
+    price?: string;
+    units?: string;
+    fill?: string;
+  };
   orderCancelTransaction?: { reason?: string };
 }
 
@@ -150,14 +156,58 @@ export async function placeMarketOrder(params: PlaceOrderParams, timeoutMs: numb
   return json;
 }
 
-export async function closeTrade(tradeId: string, units?: string): Promise<unknown> {
+export interface CloseTradeResult {
+  orderFillTransaction?: { price?: string; pl?: string; time?: string };
+  orderCancelTransaction?: { reason?: string };
+}
+
+export async function closeTrade(tradeId: string, units?: string): Promise<CloseTradeResult> {
   const body = units ? { units } : {};
   const res = await oandaFetch(
     `/v3/accounts/${OANDA_ACCOUNT_ID}/trades/${tradeId}/close`,
     { method: 'PUT', body: JSON.stringify(body) }
   );
   if (!res.ok) throw new Error(`OANDA close trade failed: ${res.status} ${await res.text()}`);
-  return res.json();
+  return res.json() as Promise<CloseTradeResult>;
+}
+
+export interface ClosedTradeDetails {
+  exitPrice: number | null;
+  pnlDollars: number | null;
+  closedTime: string | null;
+}
+
+/**
+ * Fetch close details for a trade that is no longer open (e.g. hit TP/SL).
+ * Uses transactions API: list by time range then find the ORDER_FILL that closed this trade.
+ */
+export async function getClosedTradeDetails(
+  tradeId: string,
+  fromTime: string
+): Promise<ClosedTradeDetails> {
+  const toTime = new Date().toISOString();
+  const res = await oandaFetch(
+    `/v3/accounts/${OANDA_ACCOUNT_ID}/transactions?from=${encodeURIComponent(fromTime)}&to=${encodeURIComponent(toTime)}&pageSize=100`
+  );
+  if (!res.ok) return { exitPrice: null, pnlDollars: null, closedTime: null };
+  const listJson = (await res.json()) as { pages?: string[] };
+  const pages = listJson.pages ?? [];
+  if (pages.length === 0) return { exitPrice: null, pnlDollars: null, closedTime: null };
+  const pageUrl = pages[0];
+  const path = pageUrl.startsWith('http') ? `${new URL(pageUrl).pathname}${new URL(pageUrl).search}` : pageUrl;
+  const pageRes = await oandaFetch(path.startsWith('/') ? path : `/${path}`);
+  if (!pageRes.ok) return { exitPrice: null, pnlDollars: null, closedTime: null };
+  const pageJson = (await pageRes.json()) as { transactions?: Array<{ type?: string; tradeClosed?: { tradeID?: string }; tradesClosed?: Array<{ tradeID?: string }>; price?: string; pl?: string; time?: string }> };
+  const transactions = pageJson.transactions ?? [];
+  const closeTx = transactions.find(
+    (t) =>
+      (t.type === 'ORDER_FILL' || t.type === 'TRADE_CLOSE') &&
+      (t.tradeClosed?.tradeID === tradeId || t.tradesClosed?.some((c) => c.tradeID === tradeId))
+  );
+  if (!closeTx) return { exitPrice: null, pnlDollars: null, closedTime: null };
+  const exitPrice = closeTx.price != null ? parseFloat(closeTx.price) : null;
+  const pnlDollars = closeTx.pl != null ? parseFloat(closeTx.pl) : null;
+  return { exitPrice, pnlDollars, closedTime: closeTx.time ?? null };
 }
 
 export function getAccountId(): string {

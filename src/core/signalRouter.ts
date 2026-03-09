@@ -183,10 +183,13 @@ export async function processSignal(
     }
     const fillTx = orderResult.orderFillTransaction;
     const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id;
+    const filledUnits = fillTx?.units != null ? Number(fillTx.units) : units;
+    const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
     const row = buildTradeLogRow(payload, 'EXECUTED', null, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument);
     (row as Record<string, unknown>).oanda_order_id = fillTx?.id;
     (row as Record<string, unknown>).oanda_trade_id = tradeId;
-    (row as Record<string, unknown>).units = units;
+    (row as Record<string, unknown>).units = filledUnits;
+    if (fillPrice != null) (row as Record<string, unknown>).fill_price = fillPrice;
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();
     const newCount = ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
