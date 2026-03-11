@@ -176,8 +176,8 @@ export async function processSignal(
     const orderResult = await placeMarketOrder({
       instrument: norm.oandaInstrument,
       units,
-      stopLossPrice: norm.stopLoss.toFixed(5),
-      takeProfitPrice: norm.takeProfit.toFixed(5),
+      stopLossPrice: norm.stopLoss.toFixed(norm.oandaInstrument.includes('JPY') ? 3 : 5),
+      takeProfitPrice: norm.takeProfit.toFixed(norm.oandaInstrument.includes('JPY') ? 3 : 5),
     }, config.maxOrderTimeoutMs);
     if (orderResult.orderCancelTransaction) {
       const cancelReason = orderResult.orderCancelTransaction.reason ?? 'Order cancelled';
