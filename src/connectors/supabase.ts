@@ -32,6 +32,8 @@ export type SignalInsertPayload = Record<string, unknown> & {
   entry_zone_high?: number;
   stop_loss?: number;
   take_profit?: number;
+  target_1?: number;
+  stop_loss_pips?: number;
   created_at?: string;
   regime?: string;
 };

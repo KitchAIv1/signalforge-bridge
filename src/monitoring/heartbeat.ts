@@ -3,16 +3,21 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getAccountSummary } from '../connectors/oanda.js';
+import { getAccountSummary, getPricing } from '../connectors/oanda.js';
 import type { AccountSummary } from '../connectors/oanda.js';
 import { logInfo } from '../utils/logger.js';
 import { sendAlert } from './alerter.js';
 
 let cachedAccount: AccountSummary | null = null;
 let consecutiveOandaFailures = 0;
+let cachedConversionRates: Record<string, number> = {};
 
 export function getCachedAccountSummary(): AccountSummary | null {
   return cachedAccount;
+}
+
+export function getCachedConversionRates(): Record<string, number> {
+  return cachedConversionRates;
 }
 
 export async function runHeartbeat(supabase: SupabaseClient): Promise<void> {
@@ -23,6 +28,12 @@ export async function runHeartbeat(supabase: SupabaseClient): Promise<void> {
     cachedAccount = summary;
     consecutiveOandaFailures = 0;
     oandaOk = true;
+    const rateQuotes = await getPricing('USD_JPY,USD_CAD,USD_CHF,GBP_USD,AUD_USD');
+    const rates: Record<string, number> = {};
+    for (const q of rateQuotes) {
+      rates[q.instrument] = (parseFloat(q.bid) + parseFloat(q.ask)) / 2;
+    }
+    cachedConversionRates = rates;
     await supabase.from('bridge_brokers').update({
       connection_status: 'connected',
       last_heartbeat_at: new Date().toISOString(),

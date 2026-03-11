@@ -18,6 +18,7 @@ export interface ValidationResult {
     entryPrice: number;
     stopLoss: number;
     takeProfit: number;
+    slPipsFromSignal: number | null;
     createdAt: string;
   };
 }
@@ -71,11 +72,19 @@ export function validateSignal(
   if (direction === 'SHORT' && stopLoss <= entryPrice) return { pass: false, reason: 'Stop-loss is in wrong direction' };
   if (Math.abs(entryPrice - stopLoss) < 1e-10) return { pass: false, reason: 'Stop-loss distance is zero' };
 
-  let takeProfit = payload.take_profit != null ? Number(payload.take_profit) : null;
-  if (takeProfit == null || Number.isNaN(takeProfit)) {
+  let takeProfit: number;
+  if (payload.target_1 != null && !Number.isNaN(Number(payload.target_1))) {
+    takeProfit = Number(payload.target_1);
+  } else if (payload.take_profit != null && !Number.isNaN(Number(payload.take_profit))) {
+    takeProfit = Number(payload.take_profit);
+  } else {
     const slDist = Math.abs(entryPrice - stopLoss);
     takeProfit = direction === 'LONG' ? entryPrice + slDist * defaultRiskReward : entryPrice - slDist * defaultRiskReward;
   }
+
+  const slPipsFromSignal = payload.stop_loss_pips != null && !Number.isNaN(Number(payload.stop_loss_pips))
+    ? Number(payload.stop_loss_pips)
+    : null;
 
   const createdAt = (payload.created_at ?? new Date().toISOString()).toString();
 
@@ -90,6 +99,7 @@ export function validateSignal(
       entryPrice,
       stopLoss,
       takeProfit,
+      slPipsFromSignal,
       createdAt,
     },
   };

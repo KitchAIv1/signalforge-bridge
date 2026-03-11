@@ -18,6 +18,7 @@ import { placeMarketOrder } from '../connectors/oanda.js';
 import { logInfo, logWarn } from '../utils/logger.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
+import { getCachedConversionRates } from '../monitoring/heartbeat.js';
 
 export interface RouterDeps {
   supabase: SupabaseClient;
@@ -29,6 +30,15 @@ export interface RouterDeps {
 
 function findEngine(engines: BridgeEngineRow[], engineId: string): BridgeEngineRow | undefined {
   return engines.find((e) => e.engine_id === engineId);
+}
+
+function getConversionRateForInstrument(instrument: string, rates: Record<string, number>): number {
+  const quote = instrument.length >= 7 ? instrument.slice(4, 7) : 'USD';
+  const RATE_KEYS: Record<string, string> = {
+    JPY: 'USD_JPY', CAD: 'USD_CAD', CHF: 'USD_CHF', GBP: 'GBP_USD', AUD: 'AUD_USD',
+  };
+  const rateKey = RATE_KEYS[quote];
+  return rateKey != null ? (rates[rateKey] ?? 0) : 0;
 }
 
 function buildTradeLogRow(
@@ -146,29 +156,21 @@ export async function processSignal(
     return;
   }
 
-  const units = norm.direction === 'LONG'
-    ? calculateUnits({
-        equity: cachedAccount?.equity ?? 0,
-        engineWeight: engine.weight,
-        riskPct: config.riskPerTradePct,
-        entry: norm.entryPrice,
-        stopLoss: norm.stopLoss,
-        instrument: norm.oandaInstrument,
-        consecutiveLosses: getConsecutiveLosses(),
-        graduatedThreshold: config.graduatedResponseThreshold,
-        confluenceScore: norm.confluenceScore,
-      })
-    : -calculateUnits({
-        equity: cachedAccount?.equity ?? 0,
-        engineWeight: engine.weight,
-        riskPct: config.riskPerTradePct,
-        entry: norm.entryPrice,
-        stopLoss: norm.stopLoss,
-        instrument: norm.oandaInstrument,
-        consecutiveLosses: getConsecutiveLosses(),
-        graduatedThreshold: config.graduatedResponseThreshold,
-        confluenceScore: norm.confluenceScore,
-      });
+  const conversionRate = getConversionRateForInstrument(norm.oandaInstrument, getCachedConversionRates());
+  const unitCount = calculateUnits({
+    equity: cachedAccount?.equity ?? 0,
+    engineWeight: engine.weight,
+    riskPct: config.riskPerTradePct,
+    entry: norm.entryPrice,
+    stopLoss: norm.stopLoss,
+    instrument: norm.oandaInstrument,
+    consecutiveLosses: getConsecutiveLosses(),
+    graduatedThreshold: config.graduatedResponseThreshold,
+    confluenceScore: norm.confluenceScore,
+    conversionRate,
+    slPipsOverride: norm.slPipsFromSignal ?? undefined,
+  });
+  const units = norm.direction === 'LONG' ? unitCount : -unitCount;
 
   try {
     const orderResult = await placeMarketOrder({
@@ -178,7 +180,11 @@ export async function processSignal(
       takeProfitPrice: norm.takeProfit.toFixed(5),
     }, config.maxOrderTimeoutMs);
     if (orderResult.orderCancelTransaction) {
-      await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', orderResult.orderCancelTransaction.reason ?? 'Order cancelled', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
+      const cancelReason = orderResult.orderCancelTransaction.reason ?? 'Order cancelled';
+      const blockReason = cancelReason === 'TAKE_PROFIT_ON_FILL_LOSS'
+        ? 'Target price already reached by market before execution'
+        : cancelReason;
+      await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', blockReason, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
       return;
     }
     const fillTx = orderResult.orderFillTransaction;
