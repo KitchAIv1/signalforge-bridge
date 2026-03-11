@@ -58,7 +58,7 @@ export function calculateUnits(params: PositionSizerParams): number {
   if (consecutiveLosses >= graduatedThreshold) effectiveRisk *= 0.5;
   if (confluenceScore >= 85) effectiveRisk *= 1.15;
   else if (confluenceScore < 75) effectiveRisk *= 0.85;
-  effectiveRisk = Math.min(effectiveRisk, 0.02);
+  effectiveRisk = Math.min(effectiveRisk, 0.03);
 
   const riskAmount = equity * engineWeight * effectiveRisk;
   const pipDist = params.slPipsOverride != null ? params.slPipsOverride : getPipDistance(entry, stopLoss, instrument);
