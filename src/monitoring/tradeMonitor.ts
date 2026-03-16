@@ -1,12 +1,19 @@
 /**
  * Every 30s: sync open trades with OANDA; close if past max_hold_hours; update bridge_trade_log.
  * On close: writes exit_price, pnl_dollars, result (win/loss/breakeven), closed_at, duration_minutes.
+ *
+ * P0 fix: Do not mark a trade closed when it's absent from OANDA open list if it was opened
+ * very recently. OANDA can have a brief propagation lag before a newly filled trade appears.
+ * Minimum age guard prevents false "closed" for trades like EUR_JPY 76 (2026-03-12).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getOpenTrades, closeTrade, getClosedTradeDetails } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import type { BridgeEngineRow } from '../types/config.js';
+
+/** Do not infer "closed" from absent open list if trade age < this (OANDA propagation lag). */
+const MIN_OPEN_AGE_MS = 60_000;
 
 function resultFromPnl(pnlDollars: number | null): 'win' | 'loss' | 'breakeven' {
   if (pnlDollars == null) return 'breakeven';
@@ -46,6 +53,7 @@ export async function runTradeMonitor(
     const elapsed = Date.now() - new Date(openTime).getTime();
 
     if (!oandaIds.has(tid)) {
+      if (elapsed < MIN_OPEN_AGE_MS) continue;
       const details = await getClosedTradeDetails(tid, openTime);
       const closedAt = details.closedTime ?? new Date().toISOString();
       const update: Record<string, unknown> = {

@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "test:connection": "tsx src/test/testOandaConnection.ts",
+    "audit:latency": "tsx scripts/audit/bridgeLatencyAudit.ts",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build"
   },
