@@ -34,7 +34,24 @@ async function main(): Promise<void> {
   if (engines.length === 0) {
     logInfo('No active engines; bridge waiting for signals.');
   }
-  const summary = await getAccountSummary();
+  let summary: Awaited<ReturnType<typeof getAccountSummary>>;
+  let startupAttempt = 0;
+  const MAX_STARTUP_ATTEMPTS = 5;
+  const STARTUP_RETRY_DELAY_MS = 5000;
+
+  while (true) {
+    try {
+      summary = await getAccountSummary();
+      break;
+    } catch (err) {
+      startupAttempt++;
+      if (startupAttempt >= MAX_STARTUP_ATTEMPTS) {
+        throw new Error(`OANDA unreachable after ${MAX_STARTUP_ATTEMPTS} attempts: ${String(err)}`);
+      }
+      logWarn(`OANDA startup check failed (attempt ${startupAttempt}/${MAX_STARTUP_ATTEMPTS}), retrying in ${STARTUP_RETRY_DELAY_MS}ms...`, { error: String(err) });
+      await new Promise<void>((resolve) => setTimeout(resolve, STARTUP_RETRY_DELAY_MS));
+    }
+  }
   initCircuitBreaker(config.killSwitch, summary.equity);
   updatePeakEquity(summary.equity);
   await runStartupReconciliation(supabase);

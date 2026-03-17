@@ -34,7 +34,13 @@ export async function runTradeMonitor(
   engines: BridgeEngineRow[],
   maxHoldHours: number = 4
 ): Promise<void> {
-  const oandaTrades = await getOpenTrades();
+  let oandaTrades: Awaited<ReturnType<typeof getOpenTrades>>;
+  try {
+    oandaTrades = await getOpenTrades();
+  } catch (err) {
+    console.error('[TradeMonitor] getOpenTrades failed — skipping cycle:', String(err));
+    return;
+  }
   const oandaIds = new Set(oandaTrades.map((t) => t.id));
 
   const { data: logOpen } = await supabase
