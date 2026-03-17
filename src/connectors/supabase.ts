@@ -11,8 +11,16 @@ function getRequiredEnv(name: string): string {
   return v;
 }
 
+let _client: SupabaseClient | null = null;
+
 export function getSupabaseClient(): SupabaseClient {
-  return createClient(getRequiredEnv('SUPABASE_URL'), getRequiredEnv('SUPABASE_SERVICE_KEY'));
+  if (!_client) {
+    _client = createClient(
+      getRequiredEnv('SUPABASE_URL'),
+      getRequiredEnv('SUPABASE_SERVICE_KEY')
+    );
+  }
+  return _client;
 }
 
 const SIGNAL_TABLE = process.env.SIGNAL_TABLE ?? 'signals';
@@ -42,24 +50,83 @@ export type OnSignalInsertCallback = (payload: SignalInsertPayload) => void | Pr
 
 /**
  * Subscribe to Realtime INSERT events on the signals table.
+ * Adds status callback and automatic reconnection on CHANNEL_ERROR, TIMED_OUT, CLOSED.
  * Returns a channel; call channel.unsubscribe() to stop.
  */
 export function subscribeToSignalInserts(
   supabase: SupabaseClient,
   onInsert: OnSignalInsertCallback
 ): RealtimeChannel {
-  const channel = supabase
-    .channel(`bridge:${SIGNAL_TABLE}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: SIGNAL_TABLE },
-      (payload) => {
-        const newRow = payload.new as SignalInsertPayload;
-        void Promise.resolve(onInsert(newRow)).catch((err) => {
-          console.error('Error in signal insert handler:', err);
-        });
-      }
-    )
-    .subscribe();
-  return channel;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let currentChannel: RealtimeChannel;
+  let attemptCount = 0;
+  const MAX_ATTEMPTS = 10;
+  const RECONNECT_DELAY_MS = 5000;
+
+  function clearReconnectTimer(): void {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  }
+
+  function createAndSubscribe(): RealtimeChannel {
+    const channelName = `bridge:${SIGNAL_TABLE}:${Date.now()}`;
+
+    const ch = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: SIGNAL_TABLE },
+        (payload) => {
+          const newRow = payload.new as SignalInsertPayload;
+          void Promise.resolve(onInsert(newRow)).catch((err) => {
+            console.error('[Bridge] Signal handler error:', err);
+          });
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          attemptCount = 0;
+          clearReconnectTimer();
+          console.log('[Bridge] Realtime subscription active ✅');
+          return;
+        }
+
+        if (
+          status === 'CHANNEL_ERROR' ||
+          status === 'TIMED_OUT' ||
+          status === 'CLOSED'
+        ) {
+          console.error(
+            `[Bridge] Realtime ${status}:`,
+            err?.message ?? 'no details'
+          );
+
+          if (attemptCount >= MAX_ATTEMPTS) {
+            console.error(
+              '[Bridge] Max reconnect attempts reached. Manual restart required.'
+            );
+            return;
+          }
+
+          attemptCount++;
+          console.log(
+            `[Bridge] Reconnecting in ${RECONNECT_DELAY_MS}ms ` +
+              `(attempt ${attemptCount}/${MAX_ATTEMPTS})...`
+          );
+
+          clearReconnectTimer();
+          reconnectTimer = setTimeout(() => {
+            void supabase.removeChannel(currentChannel).catch(() => {});
+            currentChannel = createAndSubscribe();
+          }, RECONNECT_DELAY_MS);
+        }
+      });
+
+    return ch;
+  }
+
+  currentChannel = createAndSubscribe();
+  return currentChannel;
 }

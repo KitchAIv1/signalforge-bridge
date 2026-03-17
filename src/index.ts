@@ -71,16 +71,46 @@ async function main(): Promise<void> {
     }).catch((err) => logWarn('processSignal error', { error: String(err) }));
   }
 
+  async function resetTradesToday(): Promise<void> {
+    await supabase
+      .from('bridge_engines')
+      .update({ trades_today: 0, updated_at: new Date().toISOString() })
+      .neq('engine_id', '');
+    logInfo('trades_today reset to 0 for all engines');
+  }
+
   function scheduleMidnightReset(): void {
     const now = new Date();
     const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
     const ms = next.getTime() - now.getTime();
+    logInfo(`Next trades_today reset in ${Math.round(ms / 60000)} minutes`);
     setTimeout(() => {
-      void supabase.from('bridge_engines').update({ trades_today: 0, updated_at: new Date().toISOString() }).neq('engine_id', '');
-      logInfo('Midnight UTC: reset trades_today');
+      void resetTradesToday();
       scheduleMidnightReset();
     }, ms);
   }
+
+  async function resetIfNeeded(): Promise<void> {
+    const { data } = await supabase
+      .from('bridge_engines')
+      .select('trades_today, updated_at')
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) return;
+
+    const row = data as { updated_at?: string };
+    const lastUpdate = row.updated_at ? new Date(row.updated_at) : null;
+    const todayUTC = new Date().toISOString().slice(0, 10);
+    const lastUpdateDate = lastUpdate?.toISOString().slice(0, 10);
+
+    if (lastUpdateDate !== todayUTC) {
+      logInfo('Startup: trades_today out of date — resetting');
+      await resetTradesToday();
+    }
+  }
+
+  await resetIfNeeded();
   scheduleMidnightReset();
   process.on('SIGINT', () => { channel.unsubscribe(); logInfo('Bridge shutdown'); process.exit(0); });
   process.on('SIGTERM', () => { channel.unsubscribe(); logInfo('Bridge shutdown'); process.exit(0); });
