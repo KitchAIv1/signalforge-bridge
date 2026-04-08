@@ -47,4 +47,15 @@ export interface BridgeTradeLogRow {
   pnl_dollars: number | null;
   signal_received_at: string;
   created_at: string;
+
+  fill_price: number | null;
+  exit_price: number | null;
+  stop_loss: number | null;
+  take_profit: number | null;
+  pnl_pips: number | null;
+  pnl_r: number | null;
+  lot_size: number | null;
+  slippage_pips: number | null;
+  close_reason: string | null;
+  duration_minutes: number | null;
 }

@@ -6,6 +6,11 @@ import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
 
 const PAGE_SIZE = 50;
+const TABLE_COL_COUNT = 17;
+
+const EXPANDED_TRADE_LOG_SELECT =
+  'id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, confluence_score, units, risk_amount, pnl_dollars, fill_price, exit_price, stop_loss, take_profit, pnl_pips, pnl_r, lot_size, slippage_pips, close_reason, duration_minutes, signal_received_at, created_at';
+
 const DECISIONS: { value: string; label: string }[] = [
   { value: '', label: 'All' },
   { value: 'EXECUTED', label: 'EXECUTED' },
@@ -15,26 +20,138 @@ const DECISIONS: { value: string; label: string }[] = [
 ];
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(iso).toLocaleString('en-GB', {
+    hour12: false,
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 function toCSV(rows: BridgeTradeLogRow[]): string {
-  const headers = ['Time', 'Engine', 'Pair', 'Direction', 'Decision', 'Reason', 'Latency (ms)', 'Status', 'Result', 'Created'];
-  const lines = rows.map((r) =>
+  const headers = [
+    'Time',
+    'Engine',
+    'Pair',
+    'Direction',
+    'Score',
+    'Decision',
+    'Reason',
+    'Fill',
+    'SL',
+    'TP',
+    'Exit',
+    'Lots',
+    'PnL $',
+    'Pips',
+    'R',
+    'Duration (min)',
+    'Close Reason',
+    'Status',
+    'Result',
+  ];
+  const lines = rows.map((row) =>
     [
-      formatTime(r.created_at),
-      r.engine_id,
-      r.pair,
-      r.direction,
-      r.decision,
-      (r.block_reason ?? '').replace(/"/g, '""'),
-      r.decision_latency_ms ?? '',
-      r.status,
-      r.result ?? '',
-      r.created_at,
+      row.created_at,
+      row.engine_id,
+      row.pair,
+      row.direction,
+      row.confluence_score ?? '',
+      row.decision,
+      (row.block_reason ?? '').replace(/"/g, '""'),
+      row.fill_price ?? '',
+      row.stop_loss ?? '',
+      row.take_profit ?? '',
+      row.exit_price ?? '',
+      row.lot_size ?? '',
+      row.pnl_dollars ?? '',
+      row.pnl_pips ?? '',
+      row.pnl_r ?? '',
+      row.duration_minutes ?? '',
+      (row.close_reason ?? '').replace(/"/g, '""'),
+      row.status,
+      row.result ?? '',
     ].join(',')
   );
   return [headers.join(','), ...lines].join('\n');
+}
+
+function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
+  const isExecuted = row.decision === 'EXECUTED';
+  const isWin = row.result === 'win';
+  const isLoss = row.result === 'loss';
+  const pnlColor = isWin ? 'text-emerald-600' : isLoss ? 'text-red-500' : 'text-slate-500';
+  const resultBadge = row.result
+    ? isWin
+      ? 'bg-emerald-100 text-emerald-700'
+      : isLoss
+        ? 'bg-red-100 text-red-700'
+        : 'bg-slate-100 text-slate-600'
+    : '';
+  const decisionBadge =
+    row.decision === 'EXECUTED'
+      ? 'bg-emerald-100 text-emerald-700'
+      : row.decision === 'BLOCKED'
+        ? 'bg-red-100 text-red-700'
+        : 'bg-amber-100 text-amber-700';
+
+  return (
+    <tr className="border-b border-slate-100 hover:bg-slate-50">
+      <td className="px-3 py-2 text-xs text-slate-600">{formatTime(row.created_at)}</td>
+      <td className="px-3 py-2 text-xs font-medium">{row.engine_id}</td>
+      <td className="px-3 py-2 text-xs">{row.pair}</td>
+      <td className="px-3 py-2 text-xs font-medium">
+        {row.direction === 'long' || row.direction === 'LONG' ? (
+          <span className="text-emerald-600">LONG</span>
+        ) : (
+          <span className="text-red-500">SHORT</span>
+        )}
+      </td>
+      <td className="px-3 py-2 text-xs">{row.confluence_score ?? '—'}</td>
+      <td className="px-3 py-2 text-xs">
+        <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${decisionBadge}`}>{row.decision}</span>
+      </td>
+      <td className="max-w-[160px] truncate px-3 py-2 text-xs text-slate-500" title={row.block_reason ?? ''}>
+        {row.block_reason ?? '—'}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {isExecuted && row.fill_price != null ? Number(row.fill_price).toFixed(5) : '—'}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {isExecuted && row.stop_loss != null ? Number(row.stop_loss).toFixed(5) : '—'}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {isExecuted && row.take_profit != null ? Number(row.take_profit).toFixed(5) : '—'}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {isExecuted && row.exit_price != null ? Number(row.exit_price).toFixed(5) : '—'}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {isExecuted && row.lot_size != null ? Number(row.lot_size).toFixed(2) : '—'}
+      </td>
+      <td className={`px-3 py-2 text-xs font-medium ${pnlColor}`}>
+        {row.pnl_dollars != null ? (row.pnl_dollars >= 0 ? '+' : '') + Number(row.pnl_dollars).toFixed(2) : '—'}
+      </td>
+      <td className={`px-3 py-2 text-xs ${pnlColor}`}>
+        {row.pnl_pips != null ? (row.pnl_pips >= 0 ? '+' : '') + Number(row.pnl_pips).toFixed(1) : '—'}
+      </td>
+      <td className={`px-3 py-2 text-xs ${pnlColor}`}>
+        {row.pnl_r != null ? (row.pnl_r >= 0 ? '+' : '') + Number(row.pnl_r).toFixed(2) + 'R' : '—'}
+      </td>
+      <td className="px-3 py-2 text-xs text-slate-500">
+        {row.duration_minutes != null ? Math.round(Number(row.duration_minutes)) + 'm' : '—'}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {row.result ? (
+          <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${resultBadge}`}>{row.result}</span>
+        ) : (
+          '—'
+        )}
+      </td>
+    </tr>
+  );
 }
 
 export default function ActivityPage() {
@@ -57,7 +174,7 @@ export default function ActivityPage() {
       const supabase = getSupabase();
       let q = supabase
         .from('bridge_trade_log')
-        .select('id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, confluence_score, units, risk_amount, pnl_dollars, signal_received_at, created_at')
+        .select(EXPANDED_TRADE_LOG_SELECT)
         .order('created_at', { ascending: false })
         .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
       if (decision) q = q.eq('decision', decision as DecisionType);
@@ -97,7 +214,7 @@ export default function ActivityPage() {
     (async () => {
       let q = supabase
         .from('bridge_trade_log')
-        .select('id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, created_at')
+        .select(EXPANDED_TRADE_LOG_SELECT)
         .order('created_at', { ascending: false })
         .limit(5000);
       if (decision) q = q.eq('decision', decision as DecisionType);
@@ -152,57 +269,37 @@ export default function ActivityPage() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full min-w-[800px] text-left text-sm">
+        <table className="w-full min-w-[1600px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-              <th className="px-4 py-2 font-medium">Time</th>
-              <th className="px-4 py-2 font-medium">Engine</th>
-              <th className="px-4 py-2 font-medium">Pair</th>
-              <th className="px-4 py-2 font-medium">Decision</th>
-              <th className="px-4 py-2 font-medium">Reason</th>
-              <th className="px-4 py-2 font-medium">Latency</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Result</th>
+              <th className="px-3 py-2 text-xs font-medium">Time</th>
+              <th className="px-3 py-2 text-xs font-medium">Engine</th>
+              <th className="px-3 py-2 text-xs font-medium">Pair</th>
+              <th className="px-3 py-2 text-xs font-medium">Dir</th>
+              <th className="px-3 py-2 text-xs font-medium">Score</th>
+              <th className="px-3 py-2 text-xs font-medium">Decision</th>
+              <th className="px-3 py-2 text-xs font-medium">Reason</th>
+              <th className="px-3 py-2 text-xs font-medium">Fill</th>
+              <th className="px-3 py-2 text-xs font-medium">SL</th>
+              <th className="px-3 py-2 text-xs font-medium">TP</th>
+              <th className="px-3 py-2 text-xs font-medium">Exit</th>
+              <th className="px-3 py-2 text-xs font-medium">Lots</th>
+              <th className="px-3 py-2 text-xs font-medium">P&L $</th>
+              <th className="px-3 py-2 text-xs font-medium">Pips</th>
+              <th className="px-3 py-2 text-xs font-medium">R</th>
+              <th className="px-3 py-2 text-xs font-medium">Duration</th>
+              <th className="px-3 py-2 text-xs font-medium">Result</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && !loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={TABLE_COL_COUNT} className="px-4 py-8 text-center text-slate-500">
                   No activity
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="border-b border-slate-100">
-                  <td className="px-4 py-2 text-slate-700">{formatTime(row.created_at)}</td>
-                  <td className="px-4 py-2 font-medium">{row.engine_id}</td>
-                  <td className="px-4 py-2">{row.pair}</td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                        row.decision === 'EXECUTED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : row.decision === 'BLOCKED'
-                            ? 'bg-red-100 text-red-800'
-                            : row.decision === 'SKIPPED'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {row.decision}
-                    </span>
-                  </td>
-                  <td className="max-w-[220px] truncate px-4 py-2 text-slate-600" title={row.block_reason ?? undefined}>
-                    {row.block_reason ?? '—'}
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {row.decision_latency_ms != null ? `${row.decision_latency_ms} ms` : '—'}
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">{row.status}</td>
-                  <td className="px-4 py-2 text-slate-600">{row.result ?? '—'}</td>
-                </tr>
-              ))
+              rows.map((row) => <ActivityTradeTableRow key={row.id} row={row} />)
             )}
           </tbody>
         </table>
