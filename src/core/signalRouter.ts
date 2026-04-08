@@ -64,7 +64,7 @@ function buildTradeLogRow(
     entry_zone_high: payload.entry_zone_high ?? null,
     entry_price: entryPrice,
     stop_loss: payload.stop_loss,
-    take_profit: payload.take_profit ?? null,
+    take_profit: payload.take_profit ?? payload.target_1 ?? null,
     signal_received_at: payload.created_at ?? new Date().toISOString(),
     decision,
     block_reason: blockReason,
