@@ -184,7 +184,10 @@ export async function processSignal(
       const blockReason = cancelReason === 'TAKE_PROFIT_ON_FILL_LOSS'
         ? 'Target price already reached by market before execution'
         : cancelReason;
-      await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', blockReason, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
+      await supabase.from('bridge_trade_log').insert({
+        ...buildTradeLogRow(payload, 'BLOCKED', blockReason, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument),
+        units,
+      });
       return;
     }
     const fillTx = orderResult.orderFillTransaction;
@@ -203,7 +206,10 @@ export async function processSignal(
     logInfo('Trade executed', { signalId, engineId: norm.engineId, pair: norm.oandaInstrument, units, tradeId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', `OANDA error: ${msg}`, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
+    await supabase.from('bridge_trade_log').insert({
+      ...buildTradeLogRow(payload, 'BLOCKED', `OANDA error: ${msg}`, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument),
+      units,
+    });
     logWarn('Order failed', { signalId, error: msg });
   }
 }
