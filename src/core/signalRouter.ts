@@ -119,10 +119,12 @@ export async function processSignal(
   }
 
   const openTrades = await getOpenTradesFromLog();
-  if (isDuplicate(norm.pair, norm.direction, config.deduplicationWindowMs)) {
-    await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'DEDUPLICATED', 'Duplicate within window', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
-    return;
-  }
+  // === DEDUP DISABLED FOR TESTING (2026-04-08) ===
+  // if (isDuplicate(norm.pair, norm.direction, config.deduplicationWindowMs)) {
+  //   await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'DEDUPLICATED', 'Duplicate within window', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
+  //   return;
+  // }
+  // === END DEDUP DISABLED ===
   if (hasOpenOppositePosition(openTrades, norm.oandaInstrument, norm.direction)) {
     await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', 'Open opposite position', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
     return;
