@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import type { OmegaShadowSignalRow } from '@/lib/types';
 import { OmegaShadowRecentSignalRow } from '@/components/omega/OmegaShadowRecentSignalRow';
 
@@ -8,12 +11,15 @@ interface OmegaShadowRecentSignalsProps {
 export function OmegaShadowRecentSignals({
   signals,
 }: OmegaShadowRecentSignalsProps) {
-  const previewCount = Math.min(20, signals.length);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const totalSignals = signals.length;
+  const showing = Math.min(visibleCount, totalSignals);
+  const visibleRows = signals.slice(0, showing);
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
-        Recent signals — last {previewCount}
+        Recent signals
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -31,11 +37,27 @@ export function OmegaShadowRecentSignals({
             </tr>
           </thead>
           <tbody>
-            {signals.slice(0, 20).map((row) => (
+            {visibleRows.map((row) => (
               <OmegaShadowRecentSignalRow key={row.id} row={row} />
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="mt-3 flex flex-col items-center gap-2 border-t border-slate-100 pt-3">
+        <div className="text-xs text-slate-500">
+          Showing {totalSignals === 0 ? 0 : showing} of {totalSignals} signals
+        </div>
+        {visibleCount < totalSignals && (
+          <button
+            type="button"
+            onClick={() =>
+              setVisibleCount((prev) => Math.min(prev + 20, totalSignals))
+            }
+            className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Show more
+          </button>
+        )}
       </div>
     </div>
   );
