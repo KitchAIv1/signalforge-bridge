@@ -8,6 +8,7 @@ const links = [
   { href: '/activity', label: 'Activity' },
   { href: '/health', label: 'Health' },
   { href: '/settings', label: 'Settings' },
+  { href: '/omega', label: 'Omega Shadow' },
 ];
 
 export function Nav() {

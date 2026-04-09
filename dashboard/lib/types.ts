@@ -59,3 +59,57 @@ export interface BridgeTradeLogRow {
   close_reason: string | null;
   duration_minutes: number | null;
 }
+
+export interface OmegaShadowSignalRow {
+  id: string;
+  pattern_id: string;
+  fired_at: string;
+  pair: string;
+  timeframe: string;
+  direction: 'long' | 'short';
+  entry_price: number;
+  sl_price: number;
+  tp_1r_price: number;
+  tp_2r_price: number;
+  tp_3r_price: number;
+  r_size_raw: number;
+  spread_pips: number;
+  spread_r: number;
+  session: string;
+  regime: string;
+  atr14_raw: number;
+  centroid_distance: number;
+  confidence: number;
+  resolved_at: string | null;
+  final_outcome: 'tp1r' | 'tp2r' | 'tp3r' | 'sl' | 'expired' | null;
+  mfe_r: number | null;
+  mae_r: number | null;
+  mfe_pips: number | null;
+  mae_pips: number | null;
+  time_to_mfe_bars: number | null;
+  sl_hit: boolean | null;
+  tp_1r_hit: boolean | null;
+  tp_2r_hit: boolean | null;
+  tp_3r_hit: boolean | null;
+  sl_hit_bar: number | null;
+  tp_1r_hit_bar: number | null;
+  created_at: string;
+}
+
+export interface OmegaWeeklyReportRow {
+  id: string;
+  week_start: string;
+  week_end: string;
+  signals_fired: number;
+  signals_resolved: number;
+  r1_hit_rate: number | null;
+  r2_hit_rate: number | null;
+  sl_hit_rate: number | null;
+  avg_mfe_r: number | null;
+  avg_mae_r: number | null;
+  avg_time_to_mfe_bars: number | null;
+  by_session: Record<string, { r1_rate: number; n: number }> | null;
+  by_regime: Record<string, { r1_rate: number; n: number }> | null;
+  optimal_tp_r: number | null;
+  created_at: string;
+}
