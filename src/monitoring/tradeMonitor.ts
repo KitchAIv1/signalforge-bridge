@@ -11,67 +11,24 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getOpenTrades, closeTrade, getClosedTradeDetails } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import type { BridgeEngineRow } from '../types/config.js';
-
-function pipSize(pair: string | null): number {
-  if (!pair) return 0.0001;
-  return pair.includes('JPY') ? 0.01 : 0.0001;
-}
+import { computeDerivedFields, resultFromPnl } from './tradeMonitorHelpers.js';
+import {
+  cleanupOrphanedTrailStates,
+  closeTrailStop,
+  ensureTrailStopState,
+  isTrailStopEngine,
+  runTrailingStopCheck,
+} from './trailingStopMonitor.js';
+import { getTrailEnabled } from './trailingStopSupport.js';
 
 /** Do not infer "closed" from absent open list if trade age < this (OANDA propagation lag). */
 const MIN_OPEN_AGE_MS = 60_000;
-
-function resultFromPnl(pnlDollars: number | null): 'win' | 'loss' | 'breakeven' {
-  if (pnlDollars == null) return 'breakeven';
-  if (pnlDollars > 0) return 'win';
-  if (pnlDollars < 0) return 'loss';
-  return 'breakeven';
-}
 
 function durationMinutes(signalReceivedAt: string, closedAt: string): number | null {
   const a = new Date(signalReceivedAt).getTime();
   const b = new Date(closedAt).getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) return null;
   return Math.round((b - a) / 60000 * 100) / 100;
-}
-
-function computeDerivedFields(
-  row: Record<string, unknown>,
-  exitPrice: number | null,
-  pnlDollars: number | null
-): Record<string, unknown> {
-  const fillPrice = row.fill_price != null ? Number(row.fill_price) : null;
-  const stopLoss = row.stop_loss != null ? Number(row.stop_loss) : null;
-  const units = row.units != null ? Math.abs(Number(row.units)) : null;
-  const entryPrice = row.entry_price != null ? Number(row.entry_price) : null;
-  const pair = (row.pair as string) ?? null;
-  const pip = pipSize(pair);
-
-  if (fillPrice == null || exitPrice == null || stopLoss == null || units == null || pip === 0) {
-    return {};
-  }
-
-  const pnlPips = (exitPrice - fillPrice) / pip;
-  const signedPnlPips = Math.round(pnlPips * 10) / 10;
-
-  const slDistancePips = Math.abs(fillPrice - stopLoss) / pip;
-  const riskAmount = slDistancePips * pip * units;
-  const pnlR =
-    riskAmount > 0 && pnlDollars != null
-      ? Math.round((pnlDollars / riskAmount) * 100) / 100
-      : null;
-
-  const slippagePips =
-    entryPrice != null ? Math.round((Math.abs(fillPrice - entryPrice) / pip) * 10) / 10 : null;
-
-  const lotSize = Math.round((units / 100000) * 10000) / 10000;
-
-  return {
-    pnl_pips: signedPnlPips,
-    pnl_r: pnlR,
-    slippage_pips: slippagePips,
-    lot_size: lotSize,
-    risk_amount: riskAmount > 0 ? Math.round(riskAmount * 100) / 100 : null,
-  };
 }
 
 export async function runTradeMonitor(
@@ -88,9 +45,15 @@ export async function runTradeMonitor(
   }
   const oandaIds = new Set(oandaTrades.map((t) => t.id));
 
+  if (getTrailEnabled()) {
+    await cleanupOrphanedTrailStates(supabase);
+  }
+
   const { data: logOpen } = await supabase
     .from('bridge_trade_log')
-    .select('id, oanda_trade_id, engine_id, signal_received_at, pair, fill_price, stop_loss, units, entry_price')
+    .select(
+      'id, oanda_trade_id, engine_id, signal_received_at, pair, direction, fill_price, stop_loss, units, entry_price'
+    )
     .eq('status', 'open')
     .not('oanda_trade_id', 'is', null);
 
@@ -141,6 +104,17 @@ export async function runTradeMonitor(
       };
       await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
       recordClosedTrade(resultFromPnl(pnlDollars));
+      continue;
+    }
+
+    if (isTrailStopEngine(row.engine_id as string) && oandaIds.has(tid)) {
+      const logRow = row as Record<string, unknown>;
+      await ensureTrailStopState(supabase, logRow);
+      const trail = await runTrailingStopCheck(supabase, logRow, tid);
+      if (trail.shouldClose) {
+        await closeTrailStop(supabase, tid, row.id as string, logRow, trail.reason);
+        continue;
+      }
     }
   }
 }

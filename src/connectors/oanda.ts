@@ -1,6 +1,6 @@
 /**
  * OANDA v20 REST client. Token from OANDA_API_TOKEN env only.
- * Methods: getAccountSummary, getOpenTrades, getPricing, placeMarketOrder, closeTrade.
+ * Methods: getAccountSummary, getOpenTrades, getPricing, placeMarketOrder, closeTrade, fetchLatestM5Candle.
  */
 
 const OANDA_TOKEN = process.env.OANDA_API_TOKEN;
@@ -110,6 +110,47 @@ export async function getPricing(instruments: string): Promise<PriceQuote[]> {
     ask: p.asks?.[0]?.price ?? p.closeoutAsk ?? '0',
     spread: (parseFloat(p.asks?.[0]?.price ?? '0') - parseFloat(p.bids?.[0]?.price ?? '0')).toFixed(5),
   }));
+}
+
+/** Last fully formed M5 bar: with count=2 OANDA returns [second-latest, latest]; index 0 is the last complete closed bar before the current bucket. */
+export interface LatestM5Candle {
+  high: number;
+  low: number;
+  close: number;
+  time: string;
+}
+
+function parseMidCandleStick(raw: {
+  time?: string;
+  mid?: { h?: string; l?: string; c?: string };
+}): LatestM5Candle | null {
+  const mid = raw.mid;
+  const timeVal = raw.time;
+  if (!mid?.h || !mid?.l || !mid?.c || !timeVal) return null;
+  const high = parseFloat(mid.h);
+  const low = parseFloat(mid.l);
+  const close = parseFloat(mid.c);
+  if (!Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) return null;
+  return { high, low, close, time: timeVal };
+}
+
+/**
+ * Mid M5 candles for an OANDA instrument (e.g. AUD_USD). Never throws; returns null on error or malformed payload.
+ */
+export async function fetchLatestM5Candle(instrument: string): Promise<LatestM5Candle | null> {
+  try {
+    const name = instrument?.trim();
+    if (!name) return null;
+    const path = `/v3/instruments/${encodeURIComponent(name)}/candles?granularity=M5&price=M&count=2`;
+    const res = await oandaFetch(path);
+    if (!res.ok) return null;
+    const json = (await res.json()) as { candles?: Array<{ time?: string; mid?: { h?: string; l?: string; c?: string } }> };
+    const series = json.candles ?? [];
+    if (series.length < 2) return null;
+    return parseMidCandleStick(series[0] ?? {});
+  } catch {
+    return null;
+  }
 }
 
 export interface PlaceOrderParams {
