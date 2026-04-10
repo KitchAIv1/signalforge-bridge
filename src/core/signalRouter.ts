@@ -175,11 +175,18 @@ export async function processSignal(
   const units = norm.direction === 'LONG' ? unitCount : -unitCount;
 
   try {
+    const TRAIL_STOP_ENGINES = ['charlie', 'charlie_shadow'];
+    const useTrailStop = TRAIL_STOP_ENGINES.includes(norm.engineId);
+
     const orderResult = await placeMarketOrder({
       instrument: norm.oandaInstrument,
       units,
       stopLossPrice: norm.stopLoss.toFixed(norm.oandaInstrument.includes('JPY') ? 3 : 5),
-      takeProfitPrice: norm.takeProfit.toFixed(norm.oandaInstrument.includes('JPY') ? 3 : 5),
+      ...(useTrailStop
+        ? {}
+        : {
+            takeProfitPrice: norm.takeProfit.toFixed(norm.oandaInstrument.includes('JPY') ? 3 : 5),
+          }),
     }, config.maxOrderTimeoutMs);
     if (orderResult.orderCancelTransaction) {
       const cancelReason = orderResult.orderCancelTransaction.reason ?? 'Order cancelled';
