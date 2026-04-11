@@ -21,6 +21,9 @@ import {
   trailStopRowExists,
 } from './trailingStopSupport.js';
 
+const candleFetchFailures = new Map<string, number>();
+const CANDLE_FAILURE_ALERT_THRESHOLD = 5;
+
 export function isTrailStopEngine(engineId: string): boolean {
   if (!getTrailEnabled()) return false;
   return getTrailEngineIds().includes(engineId);
@@ -77,9 +80,28 @@ export async function runTrailingStopCheck(
   const fillPrice = Number(row.fill_price);
   const candle = await fetchLatestM5Candle(instrument);
   if (!candle) {
-    console.warn('[TrailStop] Candle fetch failed for', instrument);
+    const failures = (candleFetchFailures.get(oandaTradeId) ?? 0) + 1;
+    candleFetchFailures.set(oandaTradeId, failures);
+    if (failures >= CANDLE_FAILURE_ALERT_THRESHOLD) {
+      console.error(
+        '[TrailStop] ALERT: Candle fetch failed',
+        failures,
+        'consecutive times for trade',
+        oandaTradeId,
+        'pair=',
+        instrument,
+        '— trail stop NOT executing'
+      );
+    } else {
+      console.warn(
+        '[TrailStop] Candle fetch failed for',
+        instrument,
+        `(attempt ${failures}/${CANDLE_FAILURE_ALERT_THRESHOLD})`
+      );
+    }
     return NO_TRAIL_CLOSE;
   }
+  candleFetchFailures.delete(oandaTradeId);
 
   const { favorable, adverse } = favorableAndAdverse(state.direction, fillPrice, candle);
   if (adverse >= state.sl_distance && !state.trail_activated) {

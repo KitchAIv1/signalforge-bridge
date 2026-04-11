@@ -134,23 +134,46 @@ function parseMidCandleStick(raw: {
   return { high, low, close, time: timeVal };
 }
 
+const CANDLE_FETCH_MAX_ATTEMPTS = 3;
+const CANDLE_FETCH_RETRY_DELAY_MS = 1000;
+
+async function fetchM5CandleAttempt(instrument: string): Promise<LatestM5Candle | null> {
+  const name = instrument?.trim();
+  if (!name) return null;
+  const path = `/v3/instruments/${encodeURIComponent(
+    name
+  )}/candles?granularity=M5&price=M&count=2`;
+  const res = await oandaFetch(path);
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    candles?: Array<{
+      time?: string;
+      mid?: { h?: string; l?: string; c?: string };
+    }>;
+  };
+  const series = json.candles ?? [];
+  if (series.length < 2) return null;
+  return parseMidCandleStick(series[0] ?? {});
+}
+
 /**
- * Mid M5 candles for an OANDA instrument (e.g. AUD_USD). Never throws; returns null on error or malformed payload.
+ * Mid M5 candles for an OANDA instrument (e.g. AUD_USD). Never throws; returns null after all attempts fail.
  */
 export async function fetchLatestM5Candle(instrument: string): Promise<LatestM5Candle | null> {
-  try {
-    const name = instrument?.trim();
-    if (!name) return null;
-    const path = `/v3/instruments/${encodeURIComponent(name)}/candles?granularity=M5&price=M&count=2`;
-    const res = await oandaFetch(path);
-    if (!res.ok) return null;
-    const json = (await res.json()) as { candles?: Array<{ time?: string; mid?: { h?: string; l?: string; c?: string } }> };
-    const series = json.candles ?? [];
-    if (series.length < 2) return null;
-    return parseMidCandleStick(series[0] ?? {});
-  } catch {
-    return null;
+  for (let attempt = 1; attempt <= CANDLE_FETCH_MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await fetchM5CandleAttempt(instrument);
+      if (result !== null) return result;
+      if (attempt < CANDLE_FETCH_MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, CANDLE_FETCH_RETRY_DELAY_MS));
+      }
+    } catch {
+      if (attempt < CANDLE_FETCH_MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, CANDLE_FETCH_RETRY_DELAY_MS));
+      }
+    }
   }
+  return null;
 }
 
 export interface PlaceOrderParams {
