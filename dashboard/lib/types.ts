@@ -113,3 +113,38 @@ export interface OmegaWeeklyReportRow {
   optimal_tp_r: number | null;
   created_at: string;
 }
+
+/** GBPUSD scalper shadow — rebuild_shadow_signals (Supabase). */
+export interface RebuildShadowSignalRow {
+  id: string;
+  created_at: string;
+  signal_time?: string | null;
+  fired_at?: string | null;
+  session: string | null;
+  direction: string;
+  entry_price: number;
+  take_profit?: number | null;
+  tp_price?: number | null;
+  stop_loss?: number | null;
+  sl_price?: number | null;
+  r_size_pips?: number | null;
+  r_size_raw?: number | null;
+  pattern_distance?: number | null;
+  resolved_at: string | null;
+  final_outcome?: string | null;
+  tp_hit?: boolean | null;
+  tp_1r_hit?: boolean | null;
+  r1_hit?: boolean | null;
+  exit_within_bar1?: boolean | null;
+  exit_bar?: number | null;
+  pnl_r?: number | null;
+}
+
+export interface RebuildWeeklyReportRow {
+  id: string;
+  created_at: string;
+  week_start?: string | null;
+  week_end?: string | null;
+  summary_json?: unknown;
+  [key: string]: unknown;
+}
