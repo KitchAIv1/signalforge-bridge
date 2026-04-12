@@ -17,7 +17,10 @@ export function getSlMultiplier(): number {
   return parseFloat(process.env.TRAIL_STOP_SL_MULTIPLIER ?? '1.5');
 }
 
-export function getTrailDistanceMultiplier(): number {
+export function getTrailDistanceMultiplier(engineId?: string): number {
+  if (engineId === 'omega') {
+    return parseFloat(process.env.TRAIL_STOP_TRAIL_DISTANCE_OMEGA ?? '0.5');
+  }
   return parseFloat(process.env.TRAIL_STOP_TRAIL_DISTANCE ?? '1.5');
 }
 
@@ -27,6 +30,7 @@ export function getActivationR(): number {
 
 export interface TrailState {
   oanda_trade_id: string;
+  engine_id: string;
   pair: string;
   direction: string;
   peak_favorable: number;
@@ -50,6 +54,7 @@ export function toTrailState(raw: Record<string, unknown>): TrailState | null {
   if (oid == null || typeof oid !== 'string') return null;
   return {
     oanda_trade_id: oid,
+    engine_id: String(raw.engine_id ?? ''),
     pair: String(raw.pair ?? ''),
     direction: String(raw.direction ?? ''),
     peak_favorable: Number(raw.peak_favorable ?? 0),
@@ -91,7 +96,8 @@ export function computeTrailInsertFields(row: Record<string, unknown>): {
   const rSizeRaw = Math.abs(fillPrice - stopLoss);
   if (!Number.isFinite(rSizeRaw) || rSizeRaw <= 0) return null;
   const slMultiplier = getSlMultiplier();
-  const trailDistanceR = getTrailDistanceMultiplier();
+  const engineIdForTrail = row.engine_id != null ? String(row.engine_id) : undefined;
+  const trailDistanceR = getTrailDistanceMultiplier(engineIdForTrail);
   const activationR = getActivationR();
   return {
     rSizeRaw,

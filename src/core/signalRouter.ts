@@ -175,7 +175,9 @@ export async function processSignal(
   const units = norm.direction === 'LONG' ? unitCount : -unitCount;
 
   try {
-    const TRAIL_STOP_ENGINES = ['charlie', 'charlie_shadow'];
+    const TRAIL_STOP_ENGINES = [
+      'charlie', 'charlie_shadow', 'omega',
+    ];
     const useTrailStop = TRAIL_STOP_ENGINES.includes(norm.engineId);
 
     const orderResult = await placeMarketOrder({
