@@ -19,7 +19,7 @@ export function useOmegaShadowData() {
         .from('omega_shadow_signals')
         .select('*')
         .order('fired_at', { ascending: false })
-        .limit(200),
+        .limit(500),
       supabase
         .from('omega_shadow_weekly_report')
         .select('*')
