@@ -40,7 +40,10 @@ function layer1PerTrade(input: RiskCheckInput): RiskCheckResult {
 }
 
 function layer2PerSession(input: RiskCheckInput): RiskCheckResult {
-  if (input.engineTradesToday >= input.engineMaxDailyTrades) return { pass: false, reason: 'Engine daily trade limit reached' };
+  if (
+    input.engineMaxDailyTrades > 0 &&
+    input.engineTradesToday >= input.engineMaxDailyTrades
+  ) return { pass: false, reason: 'Engine daily trade limit reached' };
   if (input.globalTradesToday >= 24) return { pass: false, reason: 'Global daily trade limit reached' };
   return { pass: true };
 }
