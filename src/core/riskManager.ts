@@ -49,7 +49,10 @@ function layer2PerSession(input: RiskCheckInput): RiskCheckResult {
 }
 
 function layer3Portfolio(input: RiskCheckInput): RiskCheckResult {
-  if (input.openPositionsSamePair >= input.config.maxPerPairPositions) {
+  if (
+    input.engineId !== 'omega' &&
+    input.openPositionsSamePair >= input.config.maxPerPairPositions
+  ) {
     return { pass: false, reason: `Max per-pair positions (${input.config.maxPerPairPositions}) reached` };
   }
   if (input.correlatedOverLimit) return { pass: false, reason: 'Correlation cap exceeded' };
