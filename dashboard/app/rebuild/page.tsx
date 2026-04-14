@@ -10,6 +10,7 @@ import { RebuildShadowSessionTable } from '@/components/rebuild/RebuildShadowSes
 import { RebuildShadowRBucketTable } from '@/components/rebuild/RebuildShadowRBucketTable';
 import { RebuildShadowRecentTable } from '@/components/rebuild/RebuildShadowRecentTable';
 import { RebuildShadowDailyChart } from '@/components/rebuild/RebuildShadowDailyChart';
+import { RebuildSimulatedPnL } from '@/components/rebuild/RebuildSimulatedPnL';
 
 export default function RebuildShadowPage() {
   const { signals, loading } = useRebuildShadowData();
@@ -32,6 +33,7 @@ export default function RebuildShadowPage() {
         <RebuildShadowSessionTable rows={derived.sessionRows} />
         <RebuildShadowRBucketTable rows={derived.rBucketRows} />
       </div>
+      <RebuildSimulatedPnL signals={signals} />
       <RebuildShadowRecentTable signals={signals} />
       <RebuildShadowDailyChart series={derived.dailySeries} />
       <div className="text-xs text-slate-400 pb-4">
