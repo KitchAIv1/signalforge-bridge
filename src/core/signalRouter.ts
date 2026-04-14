@@ -125,7 +125,10 @@ export async function processSignal(
   //   return;
   // }
   // === END DEDUP DISABLED ===
-  if (hasOpenOppositePosition(openTrades, norm.oandaInstrument, norm.direction)) {
+  if (
+    norm.engineId !== 'omega' &&
+    hasOpenOppositePosition(openTrades, norm.oandaInstrument, norm.direction)
+  ) {
     await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', 'Open opposite position', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
     return;
   }
