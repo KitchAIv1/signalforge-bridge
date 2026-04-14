@@ -55,7 +55,8 @@ function layer3Portfolio(input: RiskCheckInput): RiskCheckResult {
   ) {
     return { pass: false, reason: `Max per-pair positions (${input.config.maxPerPairPositions}) reached` };
   }
-  if (input.correlatedOverLimit) return { pass: false, reason: 'Correlation cap exceeded' };
+  if (input.engineId !== 'omega' && input.correlatedOverLimit)
+    return { pass: false, reason: 'Correlation cap exceeded' };
   if (!input.cachedAccount) return { pass: false, reason: 'No cached account summary' };
   return { pass: true };
 }
