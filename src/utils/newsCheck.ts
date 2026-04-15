@@ -29,7 +29,7 @@ export async function getNewsWindowEvent(
       )
       .lte(
         'event_datetime_utc',
-        now.toISOString()
+        new Date(now.getTime() + NEWS_WINDOW_PRE_MINUTES * 60_000).toISOString()
       )
       .order('event_datetime_utc', { ascending: true })
       .limit(5);
