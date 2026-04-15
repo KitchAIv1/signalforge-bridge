@@ -33,6 +33,7 @@ export function OmegaShadowRecentSignals({
               <th className="text-right pb-2 pr-3">Spread/R</th>
               <th className="text-right pb-2 pr-3">R (pips)</th>
               <th className="text-right pb-2 pr-3">MFE</th>
+              <th className="text-left pb-2 pr-3">News</th>
               <th className="text-right pb-2">Outcome</th>
             </tr>
           </thead>

@@ -49,6 +49,13 @@ export function OmegaShadowRecentSignalRow({
       <td className="py-1.5 pr-3 text-right text-slate-600">
         {row.mfe_r !== null ? `${omegaR2(row.mfe_r)}R` : '—'}
       </td>
+      <td className="py-1.5 pr-3">
+        {row.during_news_event ? (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+            {row.during_news_event}
+          </span>
+        ) : null}
+      </td>
       <td
         className={`py-1.5 text-right ${outcomeClassName(row.final_outcome)}`}
       >

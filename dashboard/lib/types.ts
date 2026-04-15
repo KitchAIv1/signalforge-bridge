@@ -92,6 +92,7 @@ export interface OmegaShadowSignalRow {
   tp_2r_hit: boolean | null;
   tp_3r_hit: boolean | null;
   sl_hit_bar: number | null;
+  during_news_event?: string | null;
   tp_1r_hit_bar: number | null;
   created_at: string;
 }
@@ -138,6 +139,7 @@ export interface RebuildShadowSignalRow {
   exit_within_bar1?: boolean | null;
   exit_bar?: number | null;
   pnl_r?: number | null;
+  during_news_event?: string | null;
 }
 
 export interface RebuildWeeklyReportRow {

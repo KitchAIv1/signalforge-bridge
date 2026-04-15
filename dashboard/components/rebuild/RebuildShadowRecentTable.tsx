@@ -43,6 +43,7 @@ export function RebuildShadowRecentTable({ signals }: RebuildShadowRecentTablePr
               <th className="text-right pb-2 pr-2">Distance</th>
               <th className="text-left pb-2 pr-2">Outcome</th>
               <th className="text-right pb-2 pr-2">Exit bar</th>
+              <th className="text-left pb-2 pr-2">News</th>
               <th className="text-right pb-2">P&L R</th>
             </tr>
           </thead>
@@ -80,6 +81,13 @@ export function RebuildShadowRecentTable({ signals }: RebuildShadowRecentTablePr
                   </td>
                   <td className="text-right py-1.5 pr-2">
                     {s.exit_bar != null ? String(s.exit_bar) : '—'}
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    {s.during_news_event ? (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                        {s.during_news_event}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="text-right py-1.5">
                     {s.pnl_r != null ? `${omegaR2(s.pnl_r)}R` : '—'}
