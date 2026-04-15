@@ -19,6 +19,7 @@ import { logInfo, logWarn } from '../utils/logger.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
+import { getNewsWindowEvent } from '../utils/newsCheck.js';
 
 export interface RouterDeps {
   supabase: SupabaseClient;
@@ -159,6 +160,36 @@ export async function processSignal(
   if (!riskResult.pass) {
     await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', riskResult.reason ?? 'Risk check failed', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument));
     return;
+  }
+
+  // News window logging — Omega and Rebuild only
+  // Logs the news event context WITHOUT blocking execution
+  // newsBlackoutEnabled in bridge_config controls this check
+  // Shadow data continues accumulating for intelligence building
+  const NEWS_TAGGED_ENGINES = ['omega', 'engine_rebuild'];
+  if (config.newsBlackoutEnabled && NEWS_TAGGED_ENGINES.includes(norm.engineId)) {
+    const newsEvent = await getNewsWindowEvent(norm.oandaInstrument);
+    if (newsEvent) {
+      logInfo('News window detected — signal will execute with tag', {
+        signalId,
+        engineId: norm.engineId,
+        pair: norm.oandaInstrument,
+        newsEvent,
+      });
+      // Tag: insert a log row noting news window context
+      // Decision is NOTE not BLOCKED — trade still executes
+      await supabase.from('bridge_trade_log').insert(
+        buildTradeLogRow(
+          payload,
+          'EXECUTED',
+          `NEWS_WINDOW: ${newsEvent}`,
+          decisionLatencyMs,
+          cachedAccount?.equity ?? null,
+          openTrades.length,
+          norm.oandaInstrument
+        )
+      );
+    }
   }
 
   const conversionRate = getConversionRateForInstrument(norm.oandaInstrument, getCachedConversionRates());
