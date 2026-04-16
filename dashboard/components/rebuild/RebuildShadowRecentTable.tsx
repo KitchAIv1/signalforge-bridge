@@ -40,11 +40,11 @@ export function RebuildShadowRecentTable({ signals }: RebuildShadowRecentTablePr
               <th className="text-right pb-2 pr-2">TP</th>
               <th className="text-right pb-2 pr-2">SL</th>
               <th className="text-right pb-2 pr-2">R pips</th>
-              <th className="text-right pb-2 pr-2">Distance</th>
-              <th className="text-left pb-2 pr-2">Outcome</th>
-              <th className="text-right pb-2 pr-2">Exit bar</th>
-              <th className="text-left pb-2 pr-2">News</th>
-              <th className="text-right pb-2">P&L R</th>
+              <th className="text-right pb-2 pr-4">Distance</th>
+              <th className="text-left pb-2 pr-4 min-w-[100px]">Outcome</th>
+              <th className="text-right pb-2 pr-4">Exit bar</th>
+              <th className="text-left pb-2 pr-4 min-w-[80px]">News</th>
+              <th className="text-right pb-2 min-w-[48px]">P&L R</th>
             </tr>
           </thead>
           <tbody>
@@ -66,10 +66,10 @@ export function RebuildShadowRecentTable({ signals }: RebuildShadowRecentTablePr
                   <td className="text-right py-1.5 pr-2">
                     {rebuildRPips(s) != null ? omegaR2(rebuildRPips(s)!) : '—'}
                   </td>
-                  <td className="text-right py-1.5 pr-2">
+                  <td className="text-right py-1.5 pr-4">
                     {s.pattern_distance != null ? omegaR2(Number(s.pattern_distance)) : '—'}
                   </td>
-                  <td className="py-1.5 pr-2">
+                  <td className="py-1.5 pr-4 min-w-[100px]">
                     <span className={rebuildOutcomeTextClass(typeof oc === 'string' ? oc : null)}>
                       {oc ?? '—'}
                     </span>
@@ -79,10 +79,10 @@ export function RebuildShadowRecentTable({ signals }: RebuildShadowRecentTablePr
                       </span>
                     )}
                   </td>
-                  <td className="text-right py-1.5 pr-2">
+                  <td className="text-right py-1.5 pr-4">
                     {s.exit_bar != null ? String(s.exit_bar) : '—'}
                   </td>
-                  <td className="py-1.5 pr-2">
+                  <td className="py-1.5 pr-4 min-w-[80px]">
                     {s.during_news_event ? (
                       <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                         {s.during_news_event}

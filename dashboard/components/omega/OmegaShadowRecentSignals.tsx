@@ -31,10 +31,10 @@ export function OmegaShadowRecentSignals({
               <th className="text-left pb-2 pr-3">Regime</th>
               <th className="text-right pb-2 pr-3">Conf</th>
               <th className="text-right pb-2 pr-3">Spread/R</th>
-              <th className="text-right pb-2 pr-3">R (pips)</th>
-              <th className="text-right pb-2 pr-3">MFE</th>
-              <th className="text-left pb-2 pr-3">News</th>
-              <th className="text-right pb-2">Outcome</th>
+              <th className="text-right pb-2 pr-4">R (pips)</th>
+              <th className="text-right pb-2 pr-4">MFE</th>
+              <th className="text-left pb-2 pr-4 min-w-[80px]">News</th>
+              <th className="text-right pb-2 min-w-[64px]">Outcome</th>
             </tr>
           </thead>
           <tbody>

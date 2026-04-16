@@ -45,11 +45,11 @@ export function OmegaShadowRecentSignalRow({
       >
         {(row.spread_r * 100).toFixed(0)}%
       </td>
-      <td className="py-1.5 pr-3 text-right text-slate-600">{rPips}</td>
-      <td className="py-1.5 pr-3 text-right text-slate-600">
+      <td className="py-1.5 pr-4 text-right text-slate-600">{rPips}</td>
+      <td className="py-1.5 pr-4 text-right text-slate-600">
         {row.mfe_r !== null ? `${omegaR2(row.mfe_r)}R` : '—'}
       </td>
-      <td className="py-1.5 pr-3">
+      <td className="py-1.5 pr-4 min-w-[80px]">
         {row.during_news_event ? (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
             {row.during_news_event}
