@@ -278,6 +278,38 @@ export async function processSignal(
     (row as Record<string, unknown>).oanda_trade_id = tradeId;
     (row as Record<string, unknown>).units = filledUnits;
     if (fillPrice != null) (row as Record<string, unknown>).fill_price = fillPrice;
+    // ── Omega SL mirror for trail stop sizing ──────────────────
+    // When omega direction is inverted by resolveOmegaDirection,
+    // norm.stopLoss stays as the original signal SL (wrong side).
+    // bridge_trade_log.stop_loss feeds computeTrailInsertFields:
+    //   rSizeRaw = Math.abs(fillPrice - stopLoss)
+    // With wrong-side SL and fill near original SL → rSizeRaw≈0
+    // → trail_distance≈0 → instant trail_sl_hit (Trade 1108: 12s)
+    //
+    // Fix: mirror SL to correct side of fill using signal rSize.
+    // Covers both inversion directions:
+    //   LONG signal → SHORT execution: mirroredSL above fill
+    //   SHORT signal → LONG execution: mirroredSL below fill
+    //
+    // OANDA order unaffected — omega in TRAIL_STOP_ENGINES,
+    // no stopLossPrice ever sent to OANDA for omega.
+    // Position sizing unaffected — uses slPipsOverride from signal.
+    // signalValidation unaffected — runs before direction mutation.
+    if (norm.engineId === 'omega' && fillPrice != null) {
+      const signalRSize = Math.abs(norm.entryPrice - norm.stopLoss);
+      const mirroredSL = norm.direction === 'SHORT'
+        ? fillPrice + signalRSize   // SHORT: SL above fill
+        : fillPrice - signalRSize;  // LONG:  SL below fill
+      (row as Record<string, unknown>).stop_loss = mirroredSL;
+      console.log(
+        '[Omega] SL mirrored for trail sizing',
+        'direction=', norm.direction,
+        'fill=', fillPrice,
+        'signalRSize=', signalRSize,
+        'mirroredSL=', mirroredSL.toFixed(5)
+      );
+    }
+    // ── End Omega SL mirror ─────────────────────────────────────
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();
     const newCount = ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
