@@ -49,7 +49,8 @@ function buildTradeLogRow(
   decisionLatencyMs: number | null,
   equity: number | null,
   openCount: number,
-  oandaPair?: string
+  oandaPair?: string,
+  directionOverride?: string
 ): Record<string, unknown> {
   const entryPrice = payload.entry_zone_low != null && payload.entry_zone_high != null
     ? (Number(payload.entry_zone_low) + Number(payload.entry_zone_high)) / 2
@@ -58,7 +59,7 @@ function buildTradeLogRow(
     signal_id: payload.id,
     engine_id: payload.engine_id ?? payload.provider_id,
     pair: oandaPair ?? payload.pair,
-    direction: payload.direction,
+    direction: directionOverride ?? payload.direction,
     confluence_score: payload.confluence_score,
     regime: payload.regime ?? null,
     entry_zone_low: payload.entry_zone_low ?? null,
@@ -75,6 +76,20 @@ function buildTradeLogRow(
     account_equity_at_signal: equity,
     open_positions_count: openCount,
   };
+}
+
+function resolveOmegaDirection(
+  engineId: string,
+  signalDirection: string
+): string {
+  if (engineId !== 'omega') return signalDirection;
+  const override = (
+    process.env.OMEGA_DIRECTION_OVERRIDE ?? 'long'
+  ).toLowerCase();
+  if (override === 'short') {
+    return signalDirection === 'LONG' ? 'SHORT' : 'LONG';
+  }
+  return signalDirection;
 }
 
 export async function processSignal(
@@ -192,7 +207,21 @@ export async function processSignal(
     }
   }
 
-  const conversionRate = getConversionRateForInstrument(norm.oandaInstrument, getCachedConversionRates());
+  const effectiveDirection = resolveOmegaDirection(
+    norm.engineId,
+    norm.direction
+  );
+
+  // Mutate norm.direction so ALL downstream code
+  // (trail log, bridge_trade_log direction column)
+  // uses the correct execution direction automatically.
+  // This does not affect the engine or shadow signals.
+  norm.direction = effectiveDirection as typeof norm.direction;
+
+  const conversionRate = getConversionRateForInstrument(
+    norm.oandaInstrument,
+    getCachedConversionRates()
+  );
   const unitCount = calculateUnits({
     equity: cachedAccount?.equity ?? 0,
     engineWeight: engine.weight,
@@ -243,7 +272,8 @@ export async function processSignal(
     const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id;
     const filledUnits = fillTx?.units != null ? Number(fillTx.units) : units;
     const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
-    const row = buildTradeLogRow(payload, 'EXECUTED', null, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument);
+    const row = buildTradeLogRow(payload, 'EXECUTED', null, decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument,
+      norm.direction);
     (row as Record<string, unknown>).oanda_order_id = fillTx?.id;
     (row as Record<string, unknown>).oanda_trade_id = tradeId;
     (row as Record<string, unknown>).units = filledUnits;
