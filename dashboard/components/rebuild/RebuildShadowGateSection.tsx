@@ -1,6 +1,12 @@
 import type { RebuildDerivedStats } from '@/lib/rebuildShadowAggregates';
-import { REBUILD_MIN_RESOLVED_GATES, REBUILD_SESSION_TP_FLOOR } from '@/lib/rebuildShadowConstants';
-import { omegaPct } from '@/lib/omegaShadowFormat';
+import {
+  REBUILD_FILTERED_MIN_SIGNALS,
+  REBUILD_GATE_FILTERED_TP,
+  REBUILD_GATE_FILTERED_PNL_R,
+  REBUILD_FILTERED_SESSION_TP_FLOOR,
+  REBUILD_FILTERED_SESSION_MIN_N,
+} from '@/lib/rebuildShadowConstants';
+import { omegaPct, omegaR2 } from '@/lib/omegaShadowFormat';
 import { OmegaShadowGateRow } from '@/components/omega/OmegaShadowGateRow';
 
 interface RebuildShadowGateSectionProps {
@@ -9,75 +15,84 @@ interface RebuildShadowGateSectionProps {
 
 export function RebuildShadowGateSection({ derived }: RebuildShadowGateSectionProps) {
   const {
-    resolvedCount,
-    r1Rate,
-    tpRate,
-    bar1Rate,
-    gateResolved,
-    gateR1,
-    gateTp,
-    gateBar1,
-    gateSessionTp,
+    filteredResolvedCount,
+    filteredTpRate,
+    filteredAvgPnlR,
+    gateFilteredSignals,
+    gateFilteredTp,
+    gateFilteredPnlR,
+    gateFilteredSessionTp,
   } = derived;
-  const ratesReady = resolvedCount >= 10;
+
+  const ready = filteredResolvedCount >= 10;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">
-        Phase 4 gate tracker
+        Phase 4 gate tracker — filtered signals
       </div>
-      <div className="text-xs text-slate-400 mb-3">Gates (all must pass)</div>
+      <div className="text-xs text-slate-400 mb-3">
+        All gates evaluated on filtered signals only
+        (hours 7,9,14,15,19 UTC blocked · R 7–10 pip blocked · news blocked)
+      </div>
 
+      {/* Progress bar toward 150 filtered signals */}
       <div className="mb-4">
         <div className="flex justify-between text-xs text-slate-500 mb-1">
-          <span>
-            {resolvedCount}/{REBUILD_MIN_RESOLVED_GATES} resolved
-          </span>
-          <span>minimum</span>
+          <span>{filteredResolvedCount} / {REBUILD_FILTERED_MIN_SIGNALS} filtered resolved</span>
+          <span>OOS validation target</span>
         </div>
         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full bg-slate-800 transition-all"
             style={{
-              width: `${Math.min(100, (resolvedCount / REBUILD_MIN_RESOLVED_GATES) * 100)}%`,
+              width: `${Math.min(100,
+                (filteredResolvedCount / REBUILD_FILTERED_MIN_SIGNALS) * 100
+              )}%`,
             }}
           />
         </div>
       </div>
 
       <OmegaShadowGateRow
-        label="Resolved signals ≥ 100"
-        current={`${resolvedCount} / ${REBUILD_MIN_RESOLVED_GATES}`}
-        threshold="100"
-        met={gateResolved}
+        label={`Filtered resolved signals ≥ ${REBUILD_FILTERED_MIN_SIGNALS}`}
+        current={`${filteredResolvedCount} / ${REBUILD_FILTERED_MIN_SIGNALS}`}
+        threshold={String(REBUILD_FILTERED_MIN_SIGNALS)}
+        met={gateFilteredSignals}
       />
       <OmegaShadowGateRow
-        label="R1 hit rate ≥ 60%"
-        current={r1Rate !== null ? omegaPct(r1Rate) : '—'}
-        threshold="60%"
-        met={gateR1}
-        pending={!ratesReady}
+        label={`Filtered TP rate ≥ ${omegaPct(REBUILD_GATE_FILTERED_TP)}`}
+        current={filteredTpRate !== null ? omegaPct(filteredTpRate) : '—'}
+        threshold={omegaPct(REBUILD_GATE_FILTERED_TP)}
+        met={gateFilteredTp}
+        pending={!ready}
       />
       <OmegaShadowGateRow
-        label="TP rate ≥ 60%"
-        current={tpRate !== null ? omegaPct(tpRate) : '—'}
-        threshold="60%"
-        met={gateTp}
-        pending={!ratesReady}
+        label={`Filtered avg P&L R ≥ ${omegaR2(REBUILD_GATE_FILTERED_PNL_R)}R`}
+        current={filteredAvgPnlR !== null ? `${omegaR2(filteredAvgPnlR)}R` : '—'}
+        threshold={`${omegaR2(REBUILD_GATE_FILTERED_PNL_R)}R`}
+        met={gateFilteredPnlR}
+        pending={!ready}
       />
       <OmegaShadowGateRow
-        label="Bar-1 hit rate ≥ 55%"
-        current={bar1Rate !== null ? omegaPct(bar1Rate) : '—'}
-        threshold="55%"
-        met={gateBar1}
-        pending={!ratesReady}
+        label={`No filtered session n≥${REBUILD_FILTERED_SESSION_MIN_N} below ${omegaPct(REBUILD_FILTERED_SESSION_TP_FLOOR)} TP`}
+        current={
+          gateFilteredSessionTp == null
+            ? `insufficient n (need session n≥${REBUILD_FILTERED_SESSION_MIN_N})`
+            : gateFilteredSessionTp
+            ? 'all sessions passing'
+            : 'session below floor'
+        }
+        threshold="all sessions"
+        met={gateFilteredSessionTp}
+        pending={gateFilteredSessionTp === null}
       />
       <OmegaShadowGateRow
-        label={`No session n>20 with TP < ${omegaPct(REBUILD_SESSION_TP_FLOOR)}`}
-        current={gateSessionTp == null ? 'insufficient' : gateSessionTp ? 'passing' : 'failing'}
-        threshold="all segments"
-        met={gateSessionTp}
-        pending={!gateResolved}
+        label="Out-of-sample week validated (manual)"
+        current="pending — requires week 2 data"
+        threshold="manual confirm"
+        met={null}
+        pending={true}
       />
     </div>
   );

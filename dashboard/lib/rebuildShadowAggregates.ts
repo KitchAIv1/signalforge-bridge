@@ -1,13 +1,23 @@
 import type { RebuildShadowSignalRow } from '@/lib/types';
 import {
-  REBUILD_GATE_BAR1,
-  REBUILD_GATE_R1,
-  REBUILD_GATE_TP,
+  REBUILD_BLOCKED_HOURS_UTC,
+  REBUILD_FILTERED_R_MIN_PIPS,
+  REBUILD_FILTERED_R_MAX_PIPS,
+  REBUILD_FILTERED_MIN_SIGNALS,
+  REBUILD_GATE_FILTERED_TP,
+  REBUILD_GATE_FILTERED_PNL_R,
+  REBUILD_FILTERED_SESSION_TP_FLOOR,
+  REBUILD_FILTERED_SESSION_MIN_N,
   REBUILD_MIN_RESOLVED_GATES,
-  REBUILD_SESSION_MIN_N,
   REBUILD_SESSION_ORDER,
-  REBUILD_SESSION_TP_FLOOR,
 } from '@/lib/rebuildShadowConstants';
+
+/** Retired Phase 4 thresholds — still used for legacy gate fields on derived stats. */
+const LEGACY_GATE_R1 = 0.6;
+const LEGACY_GATE_TP = 0.6;
+const LEGACY_GATE_BAR1 = 0.55;
+const LEGACY_SESSION_TP_FLOOR = 0.45;
+const LEGACY_SESSION_MIN_N = 20;
 
 export interface RebuildSessionRow {
   session: string;
@@ -52,6 +62,20 @@ export interface RebuildDerivedStats {
   gateTp: boolean | null;
   gateBar1: boolean | null;
   gateSessionTp: boolean | null;
+  // Filtered stats (blocked hours + medium R + news removed)
+  filteredSignals: RebuildShadowSignalRow[];
+  filteredResolved: RebuildShadowSignalRow[];
+  filteredResolvedCount: number;
+  filteredTpRate: number | null;
+  filteredAvgPnlR: number | null;
+  filteredNetPnlR: number;
+  filteredAvgMfeR: number | null;
+  filteredSignalsPerDay: number | null;
+  // Filtered gates
+  gateFilteredSignals: boolean;
+  gateFilteredTp: boolean | null;
+  gateFilteredPnlR: boolean | null;
+  gateFilteredSessionTp: boolean | null;
 }
 
 export function rebuildSignalTime(s: RebuildShadowSignalRow): string {
@@ -76,6 +100,25 @@ export function rebuildIsR1Hit(s: RebuildShadowSignalRow): boolean {
 
 export function rebuildIsBar1(s: RebuildShadowSignalRow): boolean {
   return s.exit_within_bar1 === true;
+}
+
+export function isRebuildFilteredOut(s: RebuildShadowSignalRow): boolean {
+  // Hour gate
+  const t = s.signal_time ?? s.fired_at ?? s.created_at;
+  if (t) {
+    const hour = new Date(t).getUTCHours();
+    if ((REBUILD_BLOCKED_HOURS_UTC as readonly number[]).includes(hour)) return true;
+  }
+  // R bucket gate — medium (7-10 pips) excluded
+  const pips = rebuildRPips(s);
+  if (
+    pips !== null &&
+    pips > REBUILD_FILTERED_R_MIN_PIPS &&
+    pips <= REBUILD_FILTERED_R_MAX_PIPS
+  ) return true;
+  // News gate
+  if (s.during_news_event != null && s.during_news_event !== '') return true;
+  return false;
 }
 
 export function normalizeRebuildSession(raw: string | null): string {
@@ -184,10 +227,10 @@ function sessionTpGate(signals: RebuildShadowSignalRow[]): boolean | null {
     const resolved = resolvedAll.filter(
       (s) => normalizeRebuildSession(s.session) === sessionLabel
     );
-    if (resolved.length <= REBUILD_SESSION_MIN_N) continue;
+    if (resolved.length <= LEGACY_SESSION_MIN_N) continue;
     const tp = resolved.filter((s) => rebuildIsTpHit(s)).length;
     const tpR = tp / resolved.length;
-    if (tpR < REBUILD_SESSION_TP_FLOOR) return false;
+    if (tpR < LEGACY_SESSION_TP_FLOOR) return false;
   }
   return true;
 }
@@ -214,6 +257,46 @@ function buildDailySeries(resolved: RebuildShadowSignalRow[]): RebuildDailyPoint
   });
 }
 
+function avgMfeR(signals: RebuildShadowSignalRow[]): number | null {
+  const withMfe = signals.filter((s) => {
+    const v = (s as unknown as Record<string, unknown>).mfe_r;
+    return typeof v === 'number' && Number.isFinite(v);
+  });
+  if (withMfe.length === 0) return null;
+  return (
+    withMfe.reduce(
+      (acc, s) => acc + ((s as unknown as Record<string, unknown>).mfe_r as number),
+      0
+    ) / withMfe.length
+  );
+}
+
+function filteredSessionTpGate(filtered: RebuildShadowSignalRow[]): boolean | null {
+  const resolved = filtered.filter((s) => s.resolved_at != null);
+  if (resolved.length < 1) return null;
+  let hasEnoughSession = false;
+  for (const sessionLabel of REBUILD_SESSION_ORDER) {
+    const inSession = resolved.filter(
+      (s) => normalizeRebuildSession(s.session) === sessionLabel
+    );
+    if (inSession.length <= REBUILD_FILTERED_SESSION_MIN_N) continue;
+    hasEnoughSession = true;
+    const tp = inSession.filter((s) => rebuildIsTpHit(s)).length;
+    if (tp / inSession.length < REBUILD_FILTERED_SESSION_TP_FLOOR) return false;
+  }
+  return hasEnoughSession ? true : null;
+}
+
+function signalsPerDay(signals: RebuildShadowSignalRow[]): number | null {
+  if (signals.length === 0) return null;
+  const times = signals
+    .map((s) => s.signal_time ?? s.fired_at ?? s.created_at)
+    .filter(Boolean)
+    .map((t) => new Date(t as string).toISOString().slice(0, 10));
+  const uniqueDays = new Set(times).size;
+  return uniqueDays > 0 ? signals.length / uniqueDays : null;
+}
+
 export function computeRebuildDerivedStats(signals: RebuildShadowSignalRow[]): RebuildDerivedStats {
   const resolved = signals.filter((s) => s.resolved_at != null);
   const pending = signals.filter((s) => s.resolved_at == null);
@@ -221,6 +304,13 @@ export function computeRebuildDerivedStats(signals: RebuildShadowSignalRow[]): R
   const nRes = resolved.length;
   const enough = nRes >= REBUILD_MIN_RESOLVED_GATES;
   const ratesReady = nRes >= 10;
+
+  const filteredAll = signals.filter((s) => !isRebuildFilteredOut(s));
+  const filteredRes = filteredAll.filter((s) => s.resolved_at != null);
+  const filtRoll = rollupResolved(filteredRes);
+  const filtN = filteredRes.length;
+  const filtMfe = avgMfeR(filteredRes);
+  const filtPerDay = signalsPerDay(filteredAll);
 
   return {
     total: signals.length,
@@ -236,9 +326,26 @@ export function computeRebuildDerivedStats(signals: RebuildShadowSignalRow[]): R
     rBucketRows: buildRBucketRows(signals),
     dailySeries: buildDailySeries(resolved),
     gateResolved: nRes >= REBUILD_MIN_RESOLVED_GATES,
-    gateR1: !ratesReady ? null : roll.r1Rate !== null && roll.r1Rate >= REBUILD_GATE_R1,
-    gateTp: !ratesReady ? null : roll.tpRate !== null && roll.tpRate >= REBUILD_GATE_TP,
-    gateBar1: !ratesReady ? null : roll.bar1Rate !== null && roll.bar1Rate >= REBUILD_GATE_BAR1,
+    gateR1: !ratesReady ? null : roll.r1Rate !== null && roll.r1Rate >= LEGACY_GATE_R1,
+    gateTp: !ratesReady ? null : roll.tpRate !== null && roll.tpRate >= LEGACY_GATE_TP,
+    gateBar1: !ratesReady ? null : roll.bar1Rate !== null && roll.bar1Rate >= LEGACY_GATE_BAR1,
     gateSessionTp: !enough ? null : sessionTpGate(signals),
+    filteredSignals: filteredAll,
+    filteredResolved: filteredRes,
+    filteredResolvedCount: filtN,
+    filteredTpRate: filtRoll.tpRate,
+    filteredAvgPnlR: filtRoll.avgPnlR,
+    filteredNetPnlR: filtRoll.netPnlR,
+    filteredAvgMfeR: filtMfe,
+    filteredSignalsPerDay: filtPerDay,
+    gateFilteredSignals: filtN >= REBUILD_FILTERED_MIN_SIGNALS,
+    gateFilteredTp:
+      filtN < 10 ? null : filtRoll.tpRate !== null && filtRoll.tpRate >= REBUILD_GATE_FILTERED_TP,
+    gateFilteredPnlR:
+      filtN < 10
+        ? null
+        : filtRoll.avgPnlR !== null && filtRoll.avgPnlR >= REBUILD_GATE_FILTERED_PNL_R,
+    gateFilteredSessionTp:
+      filtN < REBUILD_FILTERED_SESSION_MIN_N ? null : filteredSessionTpGate(filteredAll),
   };
 }
