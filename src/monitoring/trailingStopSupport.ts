@@ -71,7 +71,7 @@ export function favorableAndAdverse(
   fillPrice: number,
   candle: { high: number; low: number }
 ): { favorable: number; adverse: number } {
-  if (direction === 'long') {
+  if (direction.toLowerCase() === 'long') {
     return {
       favorable: candle.high - fillPrice,
       adverse: fillPrice - candle.low,
