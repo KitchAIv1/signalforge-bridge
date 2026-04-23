@@ -196,6 +196,31 @@ export async function processSignal(
     config.maxCorrelatedExposure
   );
   const globalTradesToday = engines.reduce((s, e) => s + e.trades_today, 0);
+  // Engine Rebuild execution filter — runs before
+  // risk checks so hour/R blocked signals never
+  // reach correlation checker
+  const rebuildBlock = shouldBlockRebuild(
+    norm.engineId,
+    payload.stop_loss_pips as number | null,
+    payload.created_at as string | null
+  );
+  if (rebuildBlock.blocked) {
+    const blockRow = buildTradeLogRow(
+      payload,
+      'BLOCKED',
+      rebuildBlock.reason,
+      decisionLatencyMs,
+      cachedAccount?.equity ?? null,
+      openTrades.length,
+      norm.oandaInstrument
+    );
+    await supabase.from('bridge_trade_log').insert(blockRow);
+    console.log(
+      `[Bridge] Rebuild BLOCKED — ${rebuildBlock.reason}`
+    );
+    return;
+  }
+
   const riskResult = runRiskChecks({
     config,
     cachedAccount,
@@ -257,32 +282,6 @@ export async function processSignal(
   // uses the correct execution direction automatically.
   // This does not affect the engine or shadow signals.
   norm.direction = effectiveDirection as typeof norm.direction;
-
-  // Engine Rebuild execution filter
-  // Hour gate: blocks Asian (00-06 UTC) + destructive hours
-  // R gate: blocks medium R bucket (7-10 pips)
-  // Shadow writes unaffected — only live execution gated
-  const rebuildBlock = shouldBlockRebuild(
-    norm.engineId,
-    payload.stop_loss_pips as number | null,
-    payload.created_at as string | null
-  );
-  if (rebuildBlock.blocked) {
-    const blockRow = buildTradeLogRow(
-      payload,
-      'BLOCKED',
-      rebuildBlock.reason,
-      decisionLatencyMs,
-      cachedAccount?.equity ?? null,
-      openTrades.length,
-      norm.oandaInstrument
-    );
-    await supabase.from('bridge_trade_log').insert(blockRow);
-    console.log(
-      `[Bridge] Rebuild BLOCKED — ${rebuildBlock.reason}`
-    );
-    return;
-  }
 
   const conversionRate = getConversionRateForInstrument(
     norm.oandaInstrument,
