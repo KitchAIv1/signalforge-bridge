@@ -179,6 +179,7 @@ export async function fetchLatestM5Candle(instrument: string): Promise<LatestM5C
 export interface PlaceOrderParams {
   instrument: string;
   units: number;
+  priceBound?: string;
   stopLossPrice?: string;
   takeProfitPrice?: string;
 }
@@ -202,6 +203,9 @@ export async function placeMarketOrder(params: PlaceOrderParams, timeoutMs: numb
       units: String(params.units),
       timeInForce: 'FOK',
       positionFill: 'DEFAULT',
+      ...(params.priceBound && {
+        priceBound: params.priceBound,
+      }),
       ...(params.stopLossPrice && {
         stopLossOnFill: { price: params.stopLossPrice, timeInForce: 'GTC' as const },
       }),
@@ -272,6 +276,39 @@ export async function getClosedTradeDetails(
   const exitPrice = closeTx.price != null ? parseFloat(closeTx.price) : null;
   const pnlDollars = closeTx.pl != null ? parseFloat(closeTx.pl) : null;
   return { exitPrice, pnlDollars, closedTime: closeTx.time ?? null };
+}
+
+export async function patchTradeTPSL(
+  tradeId: string,
+  takeProfitPrice: string,
+  stopLossPrice: string
+): Promise<void> {
+  try {
+    await oandaFetch(
+      `/v3/accounts/${OANDA_ACCOUNT_ID}/trades/${tradeId}/orders`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          takeProfit: {
+            price: takeProfitPrice,
+            timeInForce: 'GTC',
+          },
+          stopLoss: {
+            price: stopLossPrice,
+            timeInForce: 'GTC',
+          },
+        }),
+      }
+    );
+    console.log(
+      `[OANDA] Trade ${tradeId} TP/SL patched — ` +
+      `TP=${takeProfitPrice} SL=${stopLossPrice}`
+    );
+  } catch (err) {
+    console.error(
+      `[OANDA] patchTradeTPSL failed for trade ${tradeId}:`, err
+    );
+  }
 }
 
 export function getAccountId(): string {

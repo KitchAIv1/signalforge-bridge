@@ -14,7 +14,7 @@ import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDed
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
 import { calculateUnits } from './positionSizer.js';
-import { placeMarketOrder } from '../connectors/oanda.js';
+import { patchTradeTPSL, placeMarketOrder } from '../connectors/oanda.js';
 import { logInfo, logWarn } from '../utils/logger.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
@@ -90,6 +90,46 @@ function resolveOmegaDirection(
     return signalDirection === 'LONG' ? 'SHORT' : 'LONG';
   }
   return signalDirection;
+}
+
+function shouldBlockRebuild(
+  engineId: string,
+  stopLossPips: number | null | undefined,
+  signalCreatedAt: string | null | undefined
+): { blocked: boolean; reason: string | null } {
+  if (engineId !== 'engine_rebuild') {
+    return { blocked: false, reason: null };
+  }
+
+  // Hour gate — covers bad GBPUSD hours AND Asian session
+  // Asian session (00-06 UTC) + known destructive hours
+  const hourUtc = signalCreatedAt
+    ? new Date(signalCreatedAt).getUTCHours()
+    : new Date().getUTCHours();
+
+  const BLOCKED_HOURS = [0, 1, 2, 3, 4, 5, 6, 7, 9, 14, 15, 19];
+  if (BLOCKED_HOURS.includes(hourUtc)) {
+    return {
+      blocked: true,
+      reason: `REBUILD_HOUR_BLOCK: hour ${hourUtc} UTC`,
+    };
+  }
+
+  // R bucket gate — medium R noise band 7-10 pips
+  const rPipNum = stopLossPips == null ? null : Number(stopLossPips);
+  if (
+    rPipNum != null &&
+    !Number.isNaN(rPipNum) &&
+    rPipNum > 7 &&
+    rPipNum <= 10
+  ) {
+    return {
+      blocked: true,
+      reason: `REBUILD_R_BLOCK: medium R ${rPipNum.toFixed(1)} pips`,
+    };
+  }
+
+  return { blocked: false, reason: null };
 }
 
 export async function processSignal(
@@ -218,6 +258,32 @@ export async function processSignal(
   // This does not affect the engine or shadow signals.
   norm.direction = effectiveDirection as typeof norm.direction;
 
+  // Engine Rebuild execution filter
+  // Hour gate: blocks Asian (00-06 UTC) + destructive hours
+  // R gate: blocks medium R bucket (7-10 pips)
+  // Shadow writes unaffected — only live execution gated
+  const rebuildBlock = shouldBlockRebuild(
+    norm.engineId,
+    payload.stop_loss_pips as number | null,
+    payload.created_at as string | null
+  );
+  if (rebuildBlock.blocked) {
+    const blockRow = buildTradeLogRow(
+      payload,
+      'BLOCKED',
+      rebuildBlock.reason,
+      decisionLatencyMs,
+      cachedAccount?.equity ?? null,
+      openTrades.length,
+      norm.oandaInstrument
+    );
+    await supabase.from('bridge_trade_log').insert(blockRow);
+    console.log(
+      `[Bridge] Rebuild BLOCKED — ${rebuildBlock.reason}`
+    );
+    return;
+  }
+
   const conversionRate = getConversionRateForInstrument(
     norm.oandaInstrument,
     getCachedConversionRates()
@@ -243,20 +309,36 @@ export async function processSignal(
     ];
     const useTrailStop = TRAIL_STOP_ENGINES.includes(norm.engineId);
 
-    const orderResult = await placeMarketOrder({
-      instrument: norm.oandaInstrument,
-      units,
-      ...(useTrailStop
-        ? {}
-        : {
-            stopLossPrice: norm.stopLoss.toFixed(
-              norm.oandaInstrument.includes('JPY') ? 3 : 5
-            ),
-            takeProfitPrice: norm.takeProfit.toFixed(
-              norm.oandaInstrument.includes('JPY') ? 3 : 5
-            ),
-          }),
-    }, config.maxOrderTimeoutMs);
+    // Rebuild: 2-pip priceBound caps slippage at entry
+    const pipSize = norm.oandaInstrument.includes('JPY')
+      ? 0.01
+      : 0.0001;
+    const decimals = norm.oandaInstrument.includes('JPY')
+      ? 3
+      : 5;
+    const priceBoundValue =
+      norm.engineId === 'engine_rebuild'
+        ? norm.direction === 'LONG'
+          ? (norm.entryPrice + 2 * pipSize).toFixed(decimals)
+          : (norm.entryPrice - 2 * pipSize).toFixed(decimals)
+        : undefined;
+
+    const orderResult = await placeMarketOrder(
+      {
+        instrument: norm.oandaInstrument,
+        units,
+        ...(priceBoundValue != null && {
+          priceBound: priceBoundValue,
+        }),
+        ...(useTrailStop
+          ? {}
+          : {
+              stopLossPrice: norm.stopLoss.toFixed(decimals),
+              takeProfitPrice: norm.takeProfit.toFixed(decimals),
+            }),
+      },
+      config.maxOrderTimeoutMs
+    );
     if (orderResult.orderCancelTransaction) {
       const cancelReason = orderResult.orderCancelTransaction.reason ?? 'Order cancelled';
       const blockReason = cancelReason === 'TAKE_PROFIT_ON_FILL_LOSS'
@@ -310,6 +392,34 @@ export async function processSignal(
       );
     }
     // ── End Omega SL mirror ─────────────────────────────────────
+    // Rebuild: recompute TP and SL anchored to actual fill price
+    // Eliminates spread displacement between signal and fill
+    if (norm.engineId === 'engine_rebuild' && fillPrice != null) {
+      const rebuildDecimals = norm.oandaInstrument.includes('JPY')
+        ? 3
+        : 5;
+      // rSizeRaw derived from fill price and original SL distance
+      const rSizeRaw = Math.abs(fillPrice - norm.stopLoss);
+      const correctedSL =
+        norm.direction === 'LONG'
+          ? fillPrice - rSizeRaw
+          : fillPrice + rSizeRaw;
+      const correctedTP =
+        norm.direction === 'LONG'
+          ? fillPrice + rSizeRaw * 1.5
+          : fillPrice - rSizeRaw * 1.5;
+
+      if (tradeId != null) {
+        await patchTradeTPSL(
+          tradeId,
+          correctedTP.toFixed(rebuildDecimals),
+          correctedSL.toFixed(rebuildDecimals)
+        );
+        // Update row so bridge_trade_log records corrected levels
+        (row as Record<string, unknown>).take_profit = correctedTP;
+        (row as Record<string, unknown>).stop_loss = correctedSL;
+      }
+    }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();
     const newCount = ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
