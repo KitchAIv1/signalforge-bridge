@@ -159,7 +159,7 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
-  const [decision, setDecision] = useState('');
+  const [decision, setDecision] = useState('EXECUTED');
   const [engine, setEngine] = useState('');
   const [engines, setEngines] = useState<string[]>([]);
 
