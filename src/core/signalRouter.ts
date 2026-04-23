@@ -301,6 +301,13 @@ export async function processSignal(
     slPipsOverride: norm.slPipsFromSignal ?? undefined,
   });
   const units = norm.direction === 'LONG' ? unitCount : -unitCount;
+  // Engine Rebuild only: hard cap at 500,000 units
+  // Prevents oversizing on tiny-stop scalper signals
+  // Direction sign preserved. No effect on other engines.
+  const finalUnits = norm.engineId === 'engine_rebuild'
+    ? (units < 0 ? -1 : 1) *
+      Math.min(Math.abs(units), 500_000)
+    : units;
 
   try {
     const TRAIL_STOP_ENGINES = [
@@ -325,7 +332,7 @@ export async function processSignal(
     const orderResult = await placeMarketOrder(
       {
         instrument: norm.oandaInstrument,
-        units,
+        units: finalUnits,
         ...(priceBoundValue != null && {
           priceBound: priceBoundValue,
         }),
