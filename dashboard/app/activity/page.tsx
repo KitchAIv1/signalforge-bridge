@@ -271,7 +271,18 @@ export default function ActivityPage() {
         <EngineControls />
       </div>
 
-      <AUDUSDChart />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <AUDUSDChart
+          symbol="OANDA:AUDUSD"
+          interval="5"
+          height={380}
+        />
+        <AUDUSDChart
+          symbol="OANDA:GBPUSD"
+          interval="5"
+          height={380}
+        />
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1600px] text-left text-sm">

@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 
 const TV_SCRIPT_URL = 'https://s3.tradingview.com/tv.js';
 const TV_SCRIPT_DATA_ATTR = 'data-audusd-tv-embed';
-const CHART_CONTAINER_ID = 'tv_audusd_chart';
 
 export interface AUDUSDChartProps {
   symbol?: string;
@@ -67,6 +66,7 @@ export function AUDUSDChart({
 }: AUDUSDChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<{ remove?: () => void } | null>(null);
+  const containerId = `tv_chart_${(symbol).replace(/[^a-z0-9]/gi, '_')}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +88,7 @@ export function AUDUSDChart({
           hide_top_toolbar: false,
           hide_legend: false,
           save_image: false,
-          container_id: CHART_CONTAINER_ID,
+          container_id: containerId,
         });
         if (cancelled) {
           if (typeof widget.remove === 'function') widget.remove();
@@ -105,21 +105,23 @@ export function AUDUSDChart({
         widgetRef.current.remove();
       }
       widgetRef.current = null;
-      const el = document.getElementById(CHART_CONTAINER_ID);
+      const el = document.getElementById(containerId);
       if (el) el.innerHTML = '';
       removeOurTradingViewScript();
     };
-  }, [symbol, interval, height]);
+  }, [symbol, interval, height, containerId]);
 
   return (
     <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2">
-        <span className="text-sm font-semibold text-slate-900">AUD/USD · M5</span>
+        <span className="text-sm font-semibold text-slate-900">
+          {symbol.replace('OANDA:', '')} · M{interval}
+        </span>
         <span className="text-xs text-slate-400">TradingView</span>
       </div>
       <div
         ref={containerRef}
-        id={CHART_CONTAINER_ID}
+        id={containerId}
         className="w-full"
         style={{ height }}
       />
