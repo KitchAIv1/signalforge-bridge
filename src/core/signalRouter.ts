@@ -80,13 +80,11 @@ function buildTradeLogRow(
 
 function resolveOmegaDirection(
   engineId: string,
-  signalDirection: string
+  signalDirection: string,
+  omegaDirection: string
 ): string {
   if (engineId !== 'omega') return signalDirection;
-  const override = (
-    process.env.OMEGA_DIRECTION_OVERRIDE ?? 'long'
-  ).toLowerCase();
-  if (override === 'short') {
+  if (omegaDirection.toLowerCase() === 'short') {
     return signalDirection === 'LONG' ? 'SHORT' : 'LONG';
   }
   return signalDirection;
@@ -158,9 +156,50 @@ export async function processSignal(
     return;
   }
 
+  // Live engine control — reads paused_engines and
+  // omega_direction fresh per signal from bridge_config.
+  // Two targeted reads — one per control key.
+  // Falls back safely if rows missing or DB error.
+  const [pausedRow, dirRow] = await Promise.all([
+    supabase
+      .from('bridge_config')
+      .select('config_value')
+      .eq('config_key', 'paused_engines')
+      .single(),
+    supabase
+      .from('bridge_config')
+      .select('config_value')
+      .eq('config_key', 'omega_direction')
+      .single(),
+  ]);
+  const pausedEngines: string[] =
+    Array.isArray(pausedRow.data?.config_value)
+      ? (pausedRow.data.config_value as string[])
+      : [];
+  const omegaDirection: string =
+    typeof dirRow.data?.config_value === 'string'
+      ? dirRow.data.config_value
+      : (process.env.OMEGA_DIRECTION_OVERRIDE ?? 'long');
+
   const engine = findEngine(engines, norm.engineId);
   if (!engine || !engine.is_active) {
     await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', engine ? 'Engine inactive' : 'Unregistered engine', decisionLatencyMs, null, 0, norm.oandaInstrument));
+    return;
+  }
+
+  // Dashboard engine pause check
+  if (pausedEngines.includes(norm.engineId)) {
+    await supabase.from('bridge_trade_log').insert(
+      buildTradeLogRow(
+        payload,
+        'BLOCKED',
+        'ENGINE_PAUSED',
+        decisionLatencyMs,
+        null,
+        0,
+        norm.oandaInstrument
+      )
+    );
     return;
   }
 
@@ -274,7 +313,8 @@ export async function processSignal(
 
   const effectiveDirection = resolveOmegaDirection(
     norm.engineId,
-    norm.direction
+    norm.direction,
+    omegaDirection
   );
 
   // Mutate norm.direction so ALL downstream code

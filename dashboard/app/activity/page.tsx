@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { EngineControls } from '@/components/EngineControls';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
@@ -267,6 +268,8 @@ export default function ActivityPage() {
           Export CSV
         </button>
       </div>
+
+      <EngineControls />
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1600px] text-left text-sm">
