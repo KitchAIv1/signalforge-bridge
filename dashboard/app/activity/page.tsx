@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { EngineControls } from '@/components/EngineControls';
+import { AUDUSDChart } from '@/components/AUDUSDChart';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
@@ -269,6 +270,8 @@ export default function ActivityPage() {
         </button>
         <EngineControls />
       </div>
+
+      <AUDUSDChart />
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1600px] text-left text-sm">
