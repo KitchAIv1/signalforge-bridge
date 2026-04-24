@@ -236,40 +236,43 @@ export default function ActivityPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900">Activity</h1>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={decision}
-          onChange={(e) => setDecision(e.target.value)}
-          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800"
-        >
-          {DECISIONS.map((d) => (
-            <option key={d.value} value={d.value}>
-              Decision: {d.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={engine}
-          onChange={(e) => setEngine(e.target.value)}
-          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800"
-        >
-          <option value="">All engines</option>
-          {engines.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={handleExportCSV}
-          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Export CSV
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={decision}
+            onChange={(e) => setDecision(e.target.value)}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800"
+          >
+            {DECISIONS.map((d) => (
+              <option key={d.value} value={d.value}>
+                Decision: {d.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={engine}
+            onChange={(e) => setEngine(e.target.value)}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800"
+          >
+            <option value="">All engines</option>
+            {engines.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Export CSV
+          </button>
+        </div>
+        <div className="w-full md:w-auto md:min-w-[220px] md:max-w-[260px]">
+          <EngineControls />
+        </div>
       </div>
-
-      <EngineControls />
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full min-w-[1600px] text-left text-sm">
