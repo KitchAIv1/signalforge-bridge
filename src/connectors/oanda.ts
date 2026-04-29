@@ -283,31 +283,43 @@ export async function patchTradeTPSL(
   takeProfitPrice: string,
   stopLossPrice: string
 ): Promise<void> {
-  try {
+  // RC1 fix: retry once on failure — never silently drop TP placement
+  // A missing TP order leaves the trade unprotected on OANDA
+  const body = JSON.stringify({
+    takeProfit: { price: takeProfitPrice, timeInForce: 'GTC' },
+    stopLoss: { price: stopLossPrice, timeInForce: 'GTC' },
+  });
+  const attempt = async (attemptNum: number): Promise<void> => {
     await oandaFetch(
       `/v3/accounts/${OANDA_ACCOUNT_ID}/trades/${tradeId}/orders`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({
-          takeProfit: {
-            price: takeProfitPrice,
-            timeInForce: 'GTC',
-          },
-          stopLoss: {
-            price: stopLossPrice,
-            timeInForce: 'GTC',
-          },
-        }),
-      }
+      { method: 'PUT', body }
     );
     console.log(
-      `[OANDA] Trade ${tradeId} TP/SL patched — ` +
+      `[OANDA] Trade ${tradeId} TP/SL patched (attempt ${attemptNum}) — ` +
       `TP=${takeProfitPrice} SL=${stopLossPrice}`
     );
-  } catch (err) {
+  };
+  try {
+    await attempt(1);
+  } catch (err1) {
     console.error(
-      `[OANDA] patchTradeTPSL failed for trade ${tradeId}:`, err
+      `[OANDA] patchTradeTPSL attempt 1 failed for trade ${tradeId}:`,
+      err1
     );
+    // Wait 500ms then retry once
+    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      await attempt(2);
+    } catch (err2) {
+      // Both attempts failed — log CRITICAL so it is visible in Railway
+      console.error(
+        `[OANDA] CRITICAL: patchTradeTPSL both attempts failed ` +
+        `for trade ${tradeId}. Trade has no TP order on OANDA. ` +
+        `TP=${takeProfitPrice} SL=${stopLossPrice}`,
+        err2
+      );
+      // Do NOT throw — bridge must continue processing other signals
+    }
   }
 }
 
