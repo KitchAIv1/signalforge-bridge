@@ -6,6 +6,7 @@ import { AUDUSDChart } from '@/components/AUDUSDChart';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
+import { EngineStatusIndicator } from '@/components/EngineStatusIndicator';
 
 const PAGE_SIZE = 50;
 const TABLE_COL_COUNT = 17;
@@ -268,6 +269,7 @@ export default function ActivityPage() {
         >
           Export CSV
         </button>
+        <EngineStatusIndicator />
         <EngineControls />
       </div>
 
