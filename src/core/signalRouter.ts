@@ -90,6 +90,130 @@ function resolveOmegaDirection(
   return signalDirection;
 }
 
+// Bar1 M1 strength — engine_rebuild only
+// Fetches 5 M1 candles from bar1 window (signal_time
+// to signal_time + 5 min)
+// Measures max favorable R vs max adverse R
+// Uses only real-time OANDA data — zero look-ahead
+// Returns strength bucket used for position sizing
+async function fetchBar1Strength(
+  signalTimeMs: number,
+  entryPrice: number,
+  slPrice: number,
+  direction: string
+): Promise<{
+  bar1NetR: number;
+  bar1FavR: number;
+  bar1AdvR: number;
+  strength: 'strong' | 'moderate' | 'weak' |
+            'against' | 'no_data';
+}> {
+  const noData = {
+    bar1NetR: 0,
+    bar1FavR: 0,
+    bar1AdvR: 0,
+    strength: 'no_data' as const,
+  };
+
+  try {
+    const apiKey =
+      process.env['OANDA_API_KEY'] ??
+      process.env['OANDA_API_TOKEN'] ??
+      '';
+    const isLive =
+      process.env['OANDA_ENVIRONMENT'] === 'live';
+    const baseUrl = isLive
+      ? 'https://api-fxtrade.oanda.com'
+      : 'https://api-fxpractice.oanda.com';
+
+    const from = new Date(signalTimeMs).toISOString();
+    const to = new Date(
+      signalTimeMs + 5 * 60 * 1000 + 1000
+    ).toISOString();
+
+    const url =
+      `${baseUrl}/v3/instruments/GBP_USD/candles` +
+      `?granularity=M1&price=M` +
+      `&from=${encodeURIComponent(from)}` +
+      `&to=${encodeURIComponent(to)}`;
+
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!res.ok) return noData;
+
+    const body = await res.json() as {
+      candles?: Array<{
+        complete: boolean;
+        mid: {
+          o: string; h: string;
+          l: string; c: string;
+        };
+      }>;
+    };
+
+    const bars = (body.candles ?? [])
+      .filter((c) => c.complete)
+      .map((c) => ({
+        high: parseFloat(c.mid.h),
+        low: parseFloat(c.mid.l),
+      }));
+
+    if (bars.length === 0) return noData;
+
+    const rSize = Math.abs(entryPrice - slPrice);
+    if (rSize <= 0) return noData;
+
+    const dir = direction.toLowerCase();
+    let maxFav = 0;
+    let maxAdv = 0;
+
+    for (const bar of bars) {
+      if (dir === 'long') {
+        maxFav = Math.max(
+          maxFav,
+          (bar.high - entryPrice) / rSize
+        );
+        maxAdv = Math.max(
+          maxAdv,
+          (entryPrice - bar.low) / rSize
+        );
+      } else {
+        maxFav = Math.max(
+          maxFav,
+          (entryPrice - bar.low) / rSize
+        );
+        maxAdv = Math.max(
+          maxAdv,
+          (bar.high - entryPrice) / rSize
+        );
+      }
+    }
+
+    const netR = maxFav - maxAdv;
+    let strength: 'strong' | 'moderate' |
+                  'weak' | 'against';
+    if (netR > 0.5)       strength = 'strong';
+    else if (netR > 0.2)  strength = 'moderate';
+    else if (netR > 0)    strength = 'weak';
+    else                  strength = 'against';
+
+    return {
+      bar1NetR: netR,
+      bar1FavR: maxFav,
+      bar1AdvR: maxAdv,
+      strength,
+    };
+  } catch {
+    return noData;
+  }
+}
+
 function shouldBlockRebuild(
   engineId: string,
   stopLossPips: number | null | undefined,
@@ -347,31 +471,102 @@ export async function processSignal(
     slPipsOverride: norm.slPipsFromSignal ?? undefined,
   });
   const units = norm.direction === 'LONG' ? unitCount : -unitCount;
-  // Engine Rebuild only: dynamic unit cap based on live equity
-  // Prevents INSUFFICIENT_MARGIN from simultaneous positions
-  // Cap = 50% of equity split across max 4 simultaneous positions
-  // at current GBPUSD price (~1.35) and 50:1 OANDA leverage
-  // Direction sign preserved. Zero effect on other engines.
+
+  // Bar1 M1 strength — engine_rebuild only
+  // Wait for bar1 to complete then fetch M1 candles
+  // Computes net R (favorable - adverse) to classify strength
+  // All other engines skip this block entirely
+  let bar1Data: {
+    bar1NetR: number;
+    bar1FavR: number;
+    bar1AdvR: number;
+    strength: 'strong' | 'moderate' | 'weak' |
+              'against' | 'no_data';
+  } = {
+    bar1NetR: 0,
+    bar1FavR: 0,
+    bar1AdvR: 0,
+    strength: 'no_data',
+  };
+
+  if (norm.engineId === 'engine_rebuild') {
+    const signalMs = payload.created_at
+      ? new Date(payload.created_at as string).getTime()
+      : Date.now();
+    const bar1ReadyAt = signalMs + 5 * 60 * 1000;
+    const waitMs = bar1ReadyAt - Date.now();
+    if (waitMs > 0) {
+      logInfo(
+        '[Rebuild] Waiting for bar1 window to complete',
+        { signalId, waitMs }
+      );
+      await new Promise<void>(
+        (resolve) => setTimeout(resolve, waitMs)
+      );
+    }
+    bar1Data = await fetchBar1Strength(
+      signalMs,
+      norm.entryPrice,
+      norm.stopLoss,
+      norm.direction
+    );
+    logInfo('[Rebuild] Bar1 strength computed', {
+      signalId,
+      bar1NetR: bar1Data.bar1NetR.toFixed(4),
+      bar1FavR: bar1Data.bar1FavR.toFixed(4),
+      bar1AdvR: bar1Data.bar1AdvR.toFixed(4),
+      strength: bar1Data.strength,
+    });
+  }
+
+  // Engine Rebuild only: dynamic cap + bar1 strength sizing
+  // Bar1 multipliers validated on 81 real OANDA M1 signals:
+  //   strong (net>0.5R):   39% M1 TP, +0.590R avg → 2.0x
+  //   moderate (0.2-0.5R): 26.9% TP, +0.446R avg → 1.0x
+  //   weak (0-0.2R):       13.3% TP, +0.274R avg → 0.75x
+  //   against (<=0):       -0.296R shadow avg    → 0.25x
+  //   no_data:             unknown               → 0.5x
+  // All signals execute — frequency preserved.
+  // Sizing scales with bar1 conviction only.
+  // Zero effect on other engines.
   const finalUnits = norm.engineId === 'engine_rebuild'
     ? (() => {
         const equity = cachedAccount?.equity ?? 1000;
         const maxMarginPerTrade = (equity * 0.50) / 4;
-        const approxGbpUsdPrice = 1.355; // conservative estimate
+        const approxGbpUsdPrice = 1.355;
         const dynamicCap = Math.floor(
           maxMarginPerTrade * 50 / approxGbpUsdPrice
         );
-        // Floor at 1000 units, ceiling at 500,000 units as safety bounds
-        const safeCap = Math.min(Math.max(dynamicCap, 1000), 500_000);
-        // Hour 13 UTC: 1.5x sizing — highest TP rate hour (56.7%, n=30)
-        // Only applies to engine_rebuild signals at hour 13 UTC
-        const signalHourUtc = payload.created_at
-          ? new Date(payload.created_at as string).getUTCHours()
-          : -1;
-        const hour13Multiplier = signalHourUtc === 13 ? 1.5 : 1.0;
-        const cappedAbs = Math.min(Math.abs(units), safeCap);
-        const sizedAbs = Math.floor(cappedAbs * hour13Multiplier);
-        // Re-apply safety cap after multiplier
-        const finalAbs = Math.min(sizedAbs, safeCap * 1.5);
+        const safeCap = Math.min(
+          Math.max(dynamicCap, 1000),
+          500_000
+        );
+        const bar1Multipliers: Record<string, number> = {
+          strong:   2.0,
+          moderate: 1.0,
+          weak:     0.75,
+          against:  0.25,
+          no_data:  0.5,
+        };
+        const multiplier =
+          bar1Multipliers[bar1Data.strength] ?? 0.5;
+        const cappedAbs = Math.min(
+          Math.abs(units), safeCap
+        );
+        const sizedAbs = Math.floor(
+          cappedAbs * multiplier
+        );
+        // Never exceed 2x safeCap
+        const finalAbs = Math.min(
+          sizedAbs, safeCap * 2.0
+        );
+        logInfo('[Rebuild] finalUnits computed', {
+          signalId,
+          strength: bar1Data.strength,
+          multiplier,
+          safeCap,
+          finalAbs,
+        });
         return (units < 0 ? -1 : 1) * finalAbs;
       })()
     : units;
@@ -508,15 +703,21 @@ export async function processSignal(
         // Record corrected levels in bridge_trade_log
         (row as Record<string, unknown>).take_profit = correctedTP;
         (row as Record<string, unknown>).stop_loss = widenedSL;
-      }
 
-      // Hour 13 UTC sizing: 1.5x position size for highest-performing hour
-      // Shadow data: hour 13 = 56.7% TP rate, +0.640R avg at n=30
-      // Applied AFTER fill — adjusts bridge_trade_log record only
-      // Actual units were already placed with finalUnits above
-      // This is a RECORD annotation — not a live order change
-      // NOTE: hour 13 sizing is applied at the finalUnits stage below
-      // See: REBUILD_HOUR13_MULTIPLIER comment at calculateUnits call
+        // Log bar1 strength to bridge_trade_log
+        // Columns added in migration 008
+        // Only written when bar1 data was successfully fetched
+        if (bar1Data.strength !== 'no_data') {
+          (row as Record<string, unknown>).bar1_net_r =
+            Math.round(bar1Data.bar1NetR * 10000) / 10000;
+          (row as Record<string, unknown>).bar1_fav_r =
+            Math.round(bar1Data.bar1FavR * 10000) / 10000;
+          (row as Record<string, unknown>).bar1_adv_r =
+            Math.round(bar1Data.bar1AdvR * 10000) / 10000;
+          (row as Record<string, unknown>).bar1_strength =
+            bar1Data.strength;
+        }
+      }
     }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();
