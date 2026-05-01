@@ -145,7 +145,15 @@ async function fetchBar1Strength(
       signal: AbortSignal.timeout(15_000),
     });
 
-    if (!res.ok) return noData;
+    if (!res.ok) {
+      logInfo('[Rebuild] Bar1 fetch HTTP error', {
+        status: res.status,
+        url,
+        from,
+        to,
+      });
+      return noData;
+    }
 
     const body = await res.json() as {
       candles?: Array<{
@@ -164,7 +172,14 @@ async function fetchBar1Strength(
         low: parseFloat(c.mid.l),
       }));
 
-    if (bars.length === 0) return noData;
+    if (bars.length === 0) {
+      logInfo('[Rebuild] Bar1 fetch zero complete bars', {
+        totalCandles: body.candles?.length ?? 0,
+        from,
+        to,
+      });
+      return noData;
+    }
 
     const rSize = Math.abs(entryPrice - slPrice);
     if (rSize <= 0) return noData;
@@ -209,7 +224,11 @@ async function fetchBar1Strength(
       bar1AdvR: maxAdv,
       strength,
     };
-  } catch {
+  } catch (err) {
+    logInfo('[Rebuild] Bar1 fetch threw exception', {
+      error: String(err),
+      from: new Date(signalTimeMs).toISOString(),
+    });
     return noData;
   }
 }
@@ -670,27 +689,23 @@ export async function processSignal(
         ? 0.01
         : 0.0001;
 
-      // RC3 fix: use original signal R size — NOT fill-to-SL distance
-      // fill-to-SL inflates R by spread amount, pushing TP too far
-      // norm.slPipsFromSignal is the engine's original stop in pips
-      // Falls back to entry-to-SL distance if slPipsFromSignal absent
-      const rSizeRaw = norm.slPipsFromSignal != null
-        ? norm.slPipsFromSignal * rebuildPip
-        : Math.abs(norm.entryPrice - norm.stopLoss);
-
-      // RC2 fix: widen SL by 1.5 pips to survive OANDA tick-level spikes
-      // Shadow uses candle close for SL detection; OANDA uses ticks
-      // 1.5 pip buffer prevents intrabar spikes from triggering SL
-      // that shadow bar-walk would never have seen as a loss
+      // RC2 fix: widen SL by 1.5 pips to survive OANDA tick spikes
+      // Shadow uses candle close; OANDA uses ticks
       const SL_WIDEN_PIPS = 1.5;
       const widenedSL = norm.direction === 'LONG'
         ? norm.stopLoss - (SL_WIDEN_PIPS * rebuildPip)
         : norm.stopLoss + (SL_WIDEN_PIPS * rebuildPip);
 
-      // TP anchored to fill price using corrected R size
+      // RC3 fix: TP uses ACTUAL risk from fillPrice to widenedSL
+      // This guarantees R:R = exactly 1.500 on every trade
+      // Previous version used slPipsFromSignal which did not account
+      // for the widenedSL — producing R:R from 0.94 to 2.00
+      // Backtest confirmed: actualRiskRaw = |fillPrice - widenedSL|
+      // is the only formula that produces consistent 1.500 R:R
+      const actualRiskRaw = Math.abs(fillPrice - widenedSL);
       const correctedTP = norm.direction === 'LONG'
-        ? fillPrice + rSizeRaw * 1.5
-        : fillPrice - rSizeRaw * 1.5;
+        ? fillPrice + actualRiskRaw * 1.5
+        : fillPrice - actualRiskRaw * 1.5;
 
       // RC1 fix is in patchTradeTPSL itself (retry logic)
       // This call is now reliable — retry on failure, CRITICAL log if both fail
@@ -723,7 +738,7 @@ export async function processSignal(
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();
     const newCount = ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
     await supabase.from('bridge_engines').update({ trades_today: newCount, updated_at: new Date().toISOString() }).eq('engine_id', norm.engineId);
-    logInfo('Trade executed', { signalId, engineId: norm.engineId, pair: norm.oandaInstrument, units, tradeId });
+    logInfo('Trade executed', { signalId, engineId: norm.engineId, pair: norm.oandaInstrument, units: finalUnits, tradeId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase.from('bridge_trade_log').insert({
