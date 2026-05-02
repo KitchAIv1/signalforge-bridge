@@ -14,7 +14,11 @@ import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDed
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
 import { calculateUnits } from './positionSizer.js';
-import { patchTradeTPSL, placeMarketOrder } from '../connectors/oanda.js';
+import { patchTradeTPSL } from '../connectors/oanda.js';
+import {
+  parseRebuildBoundsRetryFlag,
+  placeMarketOrderWithRebuildBoundsRetry,
+} from './rebuildBoundsRetryOrder.js';
 import { logInfo, logWarn } from '../utils/logger.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
@@ -305,11 +309,11 @@ export async function processSignal(
     return;
   }
 
-  // Live engine control — reads paused_engines and
-  // omega_direction fresh per signal from bridge_config.
-  // Two targeted reads — one per control key.
+  // Live engine control — reads paused_engines, omega_direction, and
+  // rebuild_bounds_retry fresh per signal from bridge_config.
+  // Targeted reads — one per control key.
   // Falls back safely if rows missing or DB error.
-  const [pausedRow, dirRow] = await Promise.all([
+  const [pausedRow, dirRow, boundsRetryRow] = await Promise.all([
     supabase
       .from('bridge_config')
       .select('config_value')
@@ -320,6 +324,11 @@ export async function processSignal(
       .select('config_value')
       .eq('config_key', 'omega_direction')
       .single(),
+    supabase
+      .from('bridge_config')
+      .select('config_value')
+      .eq('config_key', 'rebuild_bounds_retry')
+      .single(),
   ]);
   const pausedEngines: string[] =
     Array.isArray(pausedRow.data?.config_value)
@@ -329,6 +338,9 @@ export async function processSignal(
     typeof dirRow.data?.config_value === 'string'
       ? dirRow.data.config_value
       : (process.env.OMEGA_DIRECTION_OVERRIDE ?? 'long');
+  const rebuildBoundsRetryEnabled = parseRebuildBoundsRetryFlag(
+    boundsRetryRow.data?.config_value
+  );
 
   const engine = findEngine(engines, norm.engineId);
   if (!engine || !engine.is_active) {
@@ -596,36 +608,22 @@ export async function processSignal(
     ];
     const useTrailStop = TRAIL_STOP_ENGINES.includes(norm.engineId);
 
-    // Rebuild: 2-pip priceBound caps slippage at entry
-    const pipSize = norm.oandaInstrument.includes('JPY')
-      ? 0.01
-      : 0.0001;
-    const decimals = norm.oandaInstrument.includes('JPY')
-      ? 3
-      : 5;
-    const priceBoundValue =
-      norm.engineId === 'engine_rebuild'
-        ? norm.direction === 'LONG'
-          ? (norm.entryPrice + 2 * pipSize).toFixed(decimals)
-          : (norm.entryPrice - 2 * pipSize).toFixed(decimals)
-        : undefined;
-
-    const orderResult = await placeMarketOrder(
-      {
-        instrument: norm.oandaInstrument,
-        units: finalUnits,
-        ...(priceBoundValue != null && {
-          priceBound: priceBoundValue,
-        }),
-        ...(useTrailStop
-          ? {}
-          : {
-              stopLossPrice: norm.stopLoss.toFixed(decimals),
-              takeProfitPrice: norm.takeProfit.toFixed(decimals),
-            }),
-      },
-      config.maxOrderTimeoutMs
-    );
+    // Rebuild: 2-pip priceBound (see rebuildBoundsRetryOrder); optional
+    // second attempt without priceBound when config + BOUNDS_VIOLATION.
+    const { orderResult, retriedWithoutPriceBound } =
+      await placeMarketOrderWithRebuildBoundsRetry({
+        norm,
+        finalUnits,
+        useTrailStop,
+        maxOrderTimeoutMs: config.maxOrderTimeoutMs,
+        rebuildBoundsRetryEnabled,
+      });
+    if (retriedWithoutPriceBound) {
+      logInfo('[Rebuild] priceBound retry after BOUNDS_VIOLATION', {
+        signalId,
+        secondCancelled: Boolean(orderResult.orderCancelTransaction),
+      });
+    }
     if (orderResult.orderCancelTransaction) {
       const cancelReason = orderResult.orderCancelTransaction.reason ?? 'Order cancelled';
       const blockReason = cancelReason === 'TAKE_PROFIT_ON_FILL_LOSS'
