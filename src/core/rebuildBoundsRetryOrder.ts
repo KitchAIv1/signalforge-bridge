@@ -82,14 +82,16 @@ export async function placeMarketOrderWithRebuildBoundsRetry(params: {
     rebuildBoundsRetryEnabled &&
     priceBoundFormatted != null
   ) {
-    // Wait 500ms — momentary spread spikes typically
-    // resolve within seconds. Retry with SAME priceBound.
-    // If spread still elevated: OANDA rejects again
-    // (correct — keeps NFP protection intact).
-    // If spread normalised: fills within 2-pip cap
-    // (correct — captures the signal).
+    // Wait 1500ms — M1 simulation confirmed that
+    // 2-pip priceBound is the correct bound.
+    // Wider bounds produce worse fills and push TP
+    // beyond reachable range within 30-min hold.
+    // 1500ms gives spread more time to normalise
+    // below 2 pips after momentary spike.
+    // NFP sustained spreads (8-15 pip) remain blocked
+    // correctly — 1500ms does not normalize those.
     await new Promise<void>(
-      (resolve) => setTimeout(resolve, 500)
+      (resolve) => setTimeout(resolve, 1500)
     );
     retriedWithoutPriceBound = true;
     orderResult = await placeMarketOrder(
