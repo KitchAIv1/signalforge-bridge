@@ -576,7 +576,14 @@ export async function processSignal(
           strong:   2.0,
           moderate: 1.0,
           weak:     0.75,
-          against:  0.25,
+          // Raised from 0.25 to 0.5:
+          // 6 of 12 winning trades were against-bar1
+          // and all won in trending macro regime.
+          // 0.25x was too small (~$25 risk) to matter.
+          // 0.5x doubles win capture while still
+          // providing 50% size reduction vs base.
+          // Validated via M1 simulation May 4 2026.
+          against:  0.5,
           no_data:  0.5,
         };
         const multiplier =
