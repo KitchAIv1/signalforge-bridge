@@ -131,15 +131,15 @@ async function fetchBar1Strength(
       : 'https://api-fxpractice.oanda.com';
 
     const from = new Date(signalTimeMs).toISOString();
-    const to = new Date(
-      signalTimeMs + 5 * 60 * 1000 + 1000
-    ).toISOString();
-
+    // count=5 replaces from+to window.
+    // from+to caused HTTP 400 on every fetch —
+    // OANDA rejects when to lands on M1 boundary.
+    // count=5 confirmed pattern from oanda.ts line 145
+    // (fetchM5CandleAttempt uses count=2 successfully).
     const url =
       `${baseUrl}/v3/instruments/GBP_USD/candles` +
-      `?granularity=M1&price=M` +
-      `&from=${encodeURIComponent(from)}` +
-      `&to=${encodeURIComponent(to)}`;
+      `?granularity=M1&price=M&count=5` +
+      `&from=${encodeURIComponent(from)}`;
 
     const res = await fetch(url, {
       headers: {
@@ -154,7 +154,7 @@ async function fetchBar1Strength(
         status: res.status,
         url,
         from,
-        to,
+        m1Count: 5,
       });
       return noData;
     }
@@ -180,7 +180,7 @@ async function fetchBar1Strength(
       logInfo('[Rebuild] Bar1 fetch zero complete bars', {
         totalCandles: body.candles?.length ?? 0,
         from,
-        to,
+        m1Count: 5,
       });
       return noData;
     }
