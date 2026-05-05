@@ -107,6 +107,7 @@ interface PendingNewsEventPayload {
   forecast_value?: unknown;
   actual_value?: unknown;
   beat_miss?: unknown;
+  affected_pairs?: string[] | null;
 }
 
 export async function runNewsAutoDetect(supabase: SupabaseClient): Promise<void> {
@@ -128,6 +129,7 @@ export async function runNewsAutoDetect(supabase: SupabaseClient): Promise<void>
         'forecast_value',
         'actual_value',
         'beat_miss',
+        'affected_pairs',
       ].join(', ')
     )
     .lte('event_datetime_utc', nowIso)
@@ -210,6 +212,55 @@ export async function runNewsAutoDetect(supabase: SupabaseClient): Promise<void>
           .eq('id', eventRowWrap.id);
       }
 
+      // ── AUTO-FLIP OMEGA DIRECTION ─────────────────────────────
+      // Conditions: confirmed direction (not volatile), HIGH or
+      // MEDIUM confidence, AUD_USD-relevant event, direction
+      // differs from current bridge_config value.
+      // When all conditions met: UPDATE bridge_config so Fix 1
+      // flip detector fires on next Omega signal → auto-closes
+      // opposing positions → exploitation multiplier activates.
+      const isAudUsdRelevant =
+        Array.isArray(eventRowWrap.affected_pairs) &&
+        (eventRowWrap.affected_pairs as string[]).some(
+          (p) => p.replace('_', '').toUpperCase() === 'AUDUSD'
+        );
+
+      const shouldFlipDirection =
+        directionMarked !== 'volatile' &&
+        detectionConfidenceHydrated !== 'LOW' &&
+        isAudUsdRelevant;
+
+      const directionConflict =
+        shouldFlipDirection &&
+        directionFromBridge.toLowerCase() !== directionMarked;
+
+      if (shouldFlipDirection) {
+        if (directionConflict) {
+          await supabase
+            .from('bridge_config')
+            .update({
+              config_value: directionMarked,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('config_key', 'omega_direction');
+          console.log(
+            `[NewsAutoDetect] Direction flip: ` +
+            `${directionFromBridge.toLowerCase()} → ${directionMarked}` +
+            ` | Event: ${eventRowWrap.event_name}` +
+            ` | pip_move: ${pipMoveRaw.toFixed(1)}` +
+            ` | confidence: ${detectionConfidenceHydrated}`
+          );
+        } else {
+          console.log(
+            `[NewsAutoDetect] Direction confirmed — no flip needed: ` +
+            `${directionMarked}` +
+            ` | Event: ${eventRowWrap.event_name}` +
+            ` | pip_move: ${pipMoveRaw.toFixed(1)}`
+          );
+        }
+      }
+      // ── END AUTO-FLIP ─────────────────────────────────────────
+
       await supabase.from('news_event_log').insert({
         news_event_id: eventRowWrap.id,
         event_name: eventRowWrap.event_name,
@@ -220,7 +271,7 @@ export async function runNewsAutoDetect(supabase: SupabaseClient): Promise<void>
         direction_detected: directionMarked,
         detection_confidence: detectionConfidenceHydrated,
         current_override: directionFromBridge,
-        conflict_detected: false,
+        conflict_detected: directionConflict,
         trades_blocked: 0,
         trades_allowed: 0,
         net_r_during_window: null,
