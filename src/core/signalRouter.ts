@@ -23,7 +23,7 @@ import { logInfo, logWarn } from '../utils/logger.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
-import { getNewsWindowEvent } from '../utils/newsCheck.js';
+import { getNewsWindowEvent, type NewsWindowResult } from '../utils/newsCheck.js';
 
 /** Last effective omega_direction (same source as resolveOmegaDirection). Used to detect DB/env flips. */
 let cachedOmegaDirection: string | null = null;
@@ -499,33 +499,47 @@ export async function processSignal(
     return;
   }
 
-  // News window logging — Omega and Rebuild only
-  // Logs the news event context WITHOUT blocking execution
-  // newsBlackoutEnabled in bridge_config controls this check
-  // Shadow data continues accumulating for intelligence building
   const NEWS_TAGGED_ENGINES = ['omega', 'engine_rebuild'];
+  let newsResult: NewsWindowResult | null = null;
   if (config.newsBlackoutEnabled && NEWS_TAGGED_ENGINES.includes(norm.engineId)) {
-    const newsEvent = await getNewsWindowEvent(norm.oandaInstrument);
-    if (newsEvent) {
-      logInfo('News window detected — signal will execute with tag', {
-        signalId,
-        engineId: norm.engineId,
-        pair: norm.oandaInstrument,
-        newsEvent,
-      });
-      // Tag: insert a log row noting news window context
-      // Decision is NOTE not BLOCKED — trade still executes
-      await supabase.from('bridge_trade_log').insert(
-        buildTradeLogRow(
-          payload,
-          'EXECUTED',
-          `NEWS_WINDOW: ${newsEvent}`,
-          decisionLatencyMs,
-          cachedAccount?.equity ?? null,
-          openTrades.length,
-          norm.oandaInstrument
-        )
-      );
+    const newsOverride =
+      norm.engineId === 'omega' ? omegaDirection.toLowerCase() : 'long';
+    newsResult = await getNewsWindowEvent(norm.oandaInstrument, newsOverride);
+
+    if (newsResult !== null) {
+      const exploitMultiplierActive = newsResult.exploitationActive ? 1.5 : 1.0;
+
+      if (newsResult.blockReason !== null) {
+        logInfo('News intelligence block', {
+          signalId,
+          engineId: norm.engineId,
+          blockReason: newsResult.blockReason,
+          eventName: newsResult.eventName,
+          exploitationActive: newsResult.exploitationActive,
+        });
+        await supabase.from('bridge_trade_log').insert(
+          buildTradeLogRow(
+            payload,
+            'BLOCKED',
+            newsResult.blockReason,
+            decisionLatencyMs,
+            cachedAccount?.equity ?? null,
+            openTrades.length,
+            norm.oandaInstrument
+          )
+        );
+        return;
+      }
+
+      if (newsResult.exploitationActive) {
+        logInfo('News exploitation active', {
+          signalId,
+          engineId: norm.engineId,
+          eventName: newsResult.eventName,
+          postEventDirection: newsResult.postEventDirection,
+          exploitMultiplier: exploitMultiplierActive,
+        });
+      }
     }
   }
 
@@ -612,7 +626,26 @@ export async function processSignal(
     conversionRate,
     slPipsOverride: norm.slPipsFromSignal ?? undefined,
   });
-  const units = norm.direction === 'LONG' ? unitCount : -unitCount;
+  let units = norm.direction === 'LONG' ? unitCount : -unitCount;
+
+  const omegaNewsExploitMult =
+    config.newsBlackoutEnabled &&
+    norm.engineId === 'omega' &&
+    newsResult !== null &&
+    newsResult.exploitationActive
+      ? 1.5
+      : 1.0;
+  const omegaNewsReduceMult =
+    config.newsBlackoutEnabled &&
+    norm.engineId === 'omega' &&
+    newsResult !== null &&
+    newsResult.preEventAction === 'REDUCE' &&
+    newsResult.inPreWindow
+      ? 0.5
+      : 1.0;
+  if (norm.engineId === 'omega') {
+    units = Math.round(units * omegaNewsExploitMult * omegaNewsReduceMult);
+  }
 
   // Bar1 M1 strength — engine_rebuild only
   // Wait for bar1 to complete then fetch M1 candles

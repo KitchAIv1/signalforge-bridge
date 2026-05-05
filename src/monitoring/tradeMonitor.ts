@@ -20,9 +20,12 @@ import {
   runTrailingStopCheck,
 } from './trailingStopMonitor.js';
 import { getTrailEnabled } from './trailingStopSupport.js';
+import { runNewsAutoDetect } from '../utils/newsAutoDetect.js';
 
 /** Do not infer "closed" from absent open list if trade age < this (OANDA propagation lag). */
 const MIN_OPEN_AGE_MS = 60_000;
+
+let newsDetectCycleCount = 0;
 
 function durationMinutes(signalReceivedAt: string, closedAt: string): number | null {
   const a = new Date(signalReceivedAt).getTime();
@@ -36,6 +39,13 @@ export async function runTradeMonitor(
   engines: BridgeEngineRow[],
   maxHoldHours: number = 4
 ): Promise<void> {
+  newsDetectCycleCount += 1;
+  if (newsDetectCycleCount % 10 === 0) {
+    await runNewsAutoDetect(supabase).catch((runErr) =>
+      console.error('[NewsAutoDetect] failed:', String(runErr))
+    );
+  }
+
   let oandaTrades: Awaited<ReturnType<typeof getOpenTrades>>;
   try {
     oandaTrades = await getOpenTrades();
