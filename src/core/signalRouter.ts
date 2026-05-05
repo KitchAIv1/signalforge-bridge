@@ -14,7 +14,7 @@ import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDed
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
 import { calculateUnits } from './positionSizer.js';
-import { patchTradeTPSL } from '../connectors/oanda.js';
+import { closeTrade, patchTradeTPSL } from '../connectors/oanda.js';
 import {
   parseRebuildBoundsRetryFlag,
   placeMarketOrderWithRebuildBoundsRetry,
@@ -24,6 +24,9 @@ import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
 import { getNewsWindowEvent } from '../utils/newsCheck.js';
+
+/** Last effective omega_direction (same source as resolveOmegaDirection). Used to detect DB/env flips. */
+let cachedOmegaDirection: string | null = null;
 
 export interface RouterDeps {
   supabase: SupabaseClient;
@@ -92,6 +95,60 @@ function resolveOmegaDirection(
     return signalDirection === 'LONG' ? 'SHORT' : 'LONG';
   }
   return signalDirection;
+}
+
+async function closeAllOpenOmegaPositions(
+  supabase: SupabaseClient,
+  opposingDirection: string
+): Promise<void> {
+  try {
+    const normalizedOppose = opposingDirection.toLowerCase();
+    const { data: openTradeRows } = await supabase
+      .from('bridge_trade_log')
+      .select('id, oanda_trade_id, direction')
+      .eq('engine_id', 'omega')
+      .eq('status', 'open')
+      .ilike('direction', normalizedOppose)
+      .not('oanda_trade_id', 'is', null);
+
+    if (openTradeRows == null || openTradeRows.length === 0) {
+      logInfo('[Omega] No opposing positions to close', {
+        opposingDirection: normalizedOppose,
+      });
+      return;
+    }
+
+    logInfo('[Omega] Auto-closing opposing positions on flip', {
+      count: openTradeRows.length,
+      opposingDirection: normalizedOppose,
+    });
+
+    for (const logRow of openTradeRows) {
+      const oid = logRow.oanda_trade_id as string;
+      try {
+        await closeTrade(oid);
+        await supabase
+          .from('bridge_trade_log')
+          .update({
+            status: 'closed',
+            close_reason: 'direction_flip_auto_close',
+            closed_at: new Date().toISOString(),
+          })
+          .eq('id', logRow.id);
+        logInfo('[Omega] Auto-closed opposing trade', {
+          oanda_trade_id: oid,
+          direction: logRow.direction,
+        });
+      } catch (flipErr: unknown) {
+        console.error('[Omega] Failed to auto-close trade', {
+          oanda_trade_id: oid,
+          error: String(flipErr),
+        });
+      }
+    }
+  } catch (err: unknown) {
+    console.error('[Omega] closeAllOpenOmegaPositions failed', String(err));
+  }
 }
 
 // Bar1 M1 strength — engine_rebuild only
@@ -472,6 +529,21 @@ export async function processSignal(
     }
   }
 
+  if (norm.engineId === 'omega') {
+    const currentOverride = omegaDirection.toLowerCase();
+    if (
+      cachedOmegaDirection !== null &&
+      cachedOmegaDirection !== currentOverride
+    ) {
+      logInfo('[Omega] Direction flip detected', {
+        from: cachedOmegaDirection,
+        to: currentOverride,
+      });
+      await closeAllOpenOmegaPositions(supabase, cachedOmegaDirection);
+    }
+    cachedOmegaDirection = currentOverride;
+  }
+
   const effectiveDirection = resolveOmegaDirection(
     norm.engineId,
     norm.direction,
@@ -483,6 +555,45 @@ export async function processSignal(
   // uses the correct execution direction automatically.
   // This does not affect the engine or shadow signals.
   norm.direction = effectiveDirection as typeof norm.direction;
+
+  // Safety net: opposing Omega legs still open (auto-close lag / failure).
+  if (norm.engineId === 'omega') {
+    const opposingDir =
+      norm.direction.toLowerCase() === 'long' ? 'short' : 'long';
+    const { data: opposingTradeRows } = await supabase
+      .from('bridge_trade_log')
+      .select('id, oanda_trade_id')
+      .eq('engine_id', 'omega')
+      .eq('status', 'open')
+      .ilike('direction', opposingDir)
+      .not('oanda_trade_id', 'is', null)
+      .limit(1);
+
+    if (opposingTradeRows != null && opposingTradeRows.length > 0) {
+      const blockerOandaId =
+        opposingTradeRows[0].oanda_trade_id as string;
+      const blockMsg =
+        `OMEGA_OPPOSING_POSITION: ` +
+        `${opposingDir} trade ${blockerOandaId} ` +
+        `still open — blocking to prevent OANDA netting`;
+      logInfo('[Omega] Blocked — opposing position open', {
+        signalId,
+        blockReason: blockMsg,
+      });
+      await supabase.from('bridge_trade_log').insert(
+        buildTradeLogRow(
+          payload,
+          'BLOCKED',
+          blockMsg,
+          decisionLatencyMs,
+          cachedAccount?.equity ?? null,
+          openTrades.length,
+          norm.oandaInstrument
+        )
+      );
+      return;
+    }
+  }
 
   const conversionRate = getConversionRateForInstrument(
     norm.oandaInstrument,
