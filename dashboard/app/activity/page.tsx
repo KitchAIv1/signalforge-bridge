@@ -7,6 +7,7 @@ import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
 import { EngineStatusIndicator } from '@/components/EngineStatusIndicator';
+import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 
 const PAGE_SIZE = 50;
 const TABLE_COL_COUNT = 17;
@@ -165,6 +166,7 @@ export default function ActivityPage() {
   const [decision, setDecision] = useState('EXECUTED');
   const [engine, setEngine] = useState('');
   const [engines, setEngines] = useState<string[]>([]);
+  const { omegaDir } = useEngineControlsState();
 
   const fetchEngines = useCallback(async () => {
     const supabase = getSupabase();
@@ -269,7 +271,7 @@ export default function ActivityPage() {
         >
           Export CSV
         </button>
-        <EngineStatusIndicator />
+        <EngineStatusIndicator omegaDir={omegaDir} />
         <EngineControls />
       </div>
 

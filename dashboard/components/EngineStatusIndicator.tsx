@@ -12,8 +12,16 @@ interface EngineStatus {
   currentHourUtc: number;
 }
 
+interface EngineStatusIndicatorProps {
+  omegaDir?: 'long' | 'short';
+}
+
 const REBUILD_BLOCKED_HOURS = [0,1,2,3,4,5,6,7,9,10,14,15,19,20,21];
-const OMEGA_BLOCKED_HOURS: number[] = []; // Omega has no hour block
+// Omega — engine-side filters (NY session filtered in engine,
+// signals never reach bridge from these hours)
+const OMEGA_NY_HOURS = [15, 16, 17, 18, 19]; // tagSession() NY
+const OMEGA_LAYER3A_HOUR = 20; // Layer 3A: always SHORT
+// Hours 0-14, 21-23 are active (Asian/London/Overlap)
 
 function getRebuildStatus(hourUtc: number): EngineStatus {
   const isBlocked = REBUILD_BLOCKED_HOURS.includes(hourUtc);
@@ -60,16 +68,58 @@ function getRebuildStatus(hourUtc: number): EngineStatus {
   };
 }
 
-function getOmegaStatus(hourUtc: number): EngineStatus {
+function getOmegaStatus(
+  hourUtc: number,
+  dir: 'long' | 'short'
+): EngineStatus {
   const isWeekend = [0, 6].includes(new Date().getUTCDay());
+
+  if (isWeekend) {
+    return {
+      engineId: 'omega',
+      label: 'Omega',
+      pair: 'AUDUSD',
+      isBlocked: true,
+      reason: 'Weekend — forex market closed',
+      nextCleanHour: null,
+      currentHourUtc: hourUtc,
+    };
+  }
+
+  const isNY = OMEGA_NY_HOURS.includes(hourUtc);
+  const isLayer3A = hourUtc === OMEGA_LAYER3A_HOUR;
+  const dirLabel = dir === 'long' ? '↑ LONG' : '↓ SHORT';
+
+  if (isNY) {
+    return {
+      engineId: 'omega',
+      label: 'Omega',
+      pair: 'AUDUSD',
+      isBlocked: true,
+      reason: 'Engine filter: NY session (15–19 UTC)',
+      nextCleanHour: 21,
+      currentHourUtc: hourUtc,
+    };
+  }
+
+  if (isLayer3A) {
+    return {
+      engineId: 'omega',
+      label: 'Omega',
+      pair: 'AUDUSD',
+      isBlocked: false,
+      reason: '⚡ Layer 3A: hour 20 UTC — SHORT override',
+      nextCleanHour: null,
+      currentHourUtc: hourUtc,
+    };
+  }
+
   return {
     engineId: 'omega',
     label: 'Omega',
     pair: 'AUDUSD',
-    isBlocked: isWeekend,
-    reason: isWeekend
-      ? 'Weekend — forex market closed'
-      : 'Active — fires every M5',
+    isBlocked: false,
+    reason: `Active ${dirLabel} — fires every M5`,
     nextCleanHour: null,
     currentHourUtc: hourUtc,
   };
@@ -95,7 +145,9 @@ function StatusPill({ status }: { status: EngineStatus }) {
   );
 }
 
-export function EngineStatusIndicator() {
+export function EngineStatusIndicator({
+  omegaDir = 'long',
+}: EngineStatusIndicatorProps) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(new Date());
 
@@ -109,7 +161,7 @@ export function EngineStatusIndicator() {
   const timeStr = `${String(hourUtc).padStart(2,'0')}:${String(minuteUtc).padStart(2,'0')} UTC`;
 
   const rebuildStatus = getRebuildStatus(hourUtc);
-  const omegaStatus = getOmegaStatus(hourUtc);
+  const omegaStatus = getOmegaStatus(hourUtc, omegaDir);
 
   const anyBlocked = rebuildStatus.isBlocked || omegaStatus.isBlocked;
 
@@ -174,6 +226,53 @@ export function EngineStatusIndicator() {
               <p className="text-xs text-slate-600">
                 {omegaStatus.reason}
               </p>
+              {omegaStatus.isBlocked && omegaStatus.nextCleanHour !== null && (
+                <p className="mt-1 text-xs text-slate-400">
+                  Next active window: {String(omegaStatus.nextCleanHour)
+                    .padStart(2,'0')}:00 UTC
+                </p>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">
+                Omega hour grid (UTC)
+              </p>
+              <div className="grid grid-cols-12 gap-0.5">
+                {Array.from({ length: 24 }, (_, h) => {
+                  const isNY = OMEGA_NY_HOURS.includes(h);
+                  const isL3A = h === OMEGA_LAYER3A_HOUR;
+                  const current = h === hourUtc;
+                  return (
+                    <div
+                      key={h}
+                      title={`Hour ${h}:00 UTC — ${
+                        isNY ? 'NY session (engine filter)'
+                          : isL3A ? 'Layer 3A: SHORT override'
+                          : 'Active'
+                      }`}
+                      className={`
+                        flex h-5 items-center justify-center rounded 
+                        text-[9px] font-medium
+                        ${current ? 'ring-1 ring-slate-800' : ''}
+                        ${isNY
+                          ? 'bg-red-200 text-red-700'
+                          : isL3A
+                            ? 'bg-amber-200 text-amber-800'
+                            : 'bg-emerald-200 text-emerald-700'
+                        }
+                      `}
+                    >
+                      {h}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-1 flex gap-2 text-[9px] text-slate-400">
+                <span>🟥 NY filter</span>
+                <span>🟨 Layer 3A (SHORT)</span>
+                <span>🟩 Active</span>
+              </div>
             </div>
 
             <div>
