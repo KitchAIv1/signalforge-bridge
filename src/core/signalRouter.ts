@@ -730,8 +730,30 @@ export async function processSignal(
           against:  0.5,
           no_data:  0.5,
         };
+
+        // Omega direction alignment weight.
+        // Empirical basis (bridge data Apr30-May5 2026):
+        //   67% of Rebuild wins aligned with Omega dir.
+        //   71% of misaligned losses flip to wins.
+        //   Aligned wins avg +$234 vs +$183 misaligned.
+        //   Net +$542 improvement on 8 misaligned trades.
+        // Default 1.0x when omega_direction not set —
+        // prevents stale direction amplifying bad signals.
+        // Applied ON TOP of bar1 multiplier.
+        const rebuildSignalDir =
+          norm.direction.toLowerCase();
+        const omegaDir =
+          omegaDirection.toLowerCase();
+        const omegaAlignmentMultiplier: number =
+          omegaDir !== 'long' && omegaDir !== 'short'
+            ? 1.0 // not set — neutral
+            : rebuildSignalDir === omegaDir
+              ? 1.25 // aligned — boost
+              : 0.75; // misaligned — reduce
+
         const multiplier =
-          bar1Multipliers[bar1Data.strength] ?? 0.5;
+          (bar1Multipliers[bar1Data.strength] ?? 0.5)
+          * omegaAlignmentMultiplier;
         const cappedAbs = Math.min(
           Math.abs(units), safeCap
         );
@@ -745,7 +767,12 @@ export async function processSignal(
         logInfo('[Rebuild] finalUnits computed', {
           signalId,
           strength: bar1Data.strength,
-          multiplier,
+          bar1Multiplier:
+            bar1Multipliers[bar1Data.strength] ?? 0.5,
+          omegaDir,
+          rebuildDir: rebuildSignalDir,
+          alignmentMultiplier: omegaAlignmentMultiplier,
+          combinedMultiplier: multiplier,
           safeCap,
           finalAbs,
         });
