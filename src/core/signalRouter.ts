@@ -19,6 +19,10 @@ import {
   parseRebuildBoundsRetryFlag,
   placeMarketOrderWithRebuildBoundsRetry,
 } from './rebuildBoundsRetryOrder.js';
+import {
+  isRebuildHourUtcBlocked,
+  parseRebuildHourGateEnabled,
+} from './rebuildHourGate.js';
 import { logInfo, logWarn } from '../utils/logger.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
@@ -297,26 +301,19 @@ async function fetchBar1Strength(
 function shouldBlockRebuild(
   engineId: string,
   stopLossPips: number | null | undefined,
-  signalCreatedAt: string | null | undefined
+  signalCreatedAt: string | null | undefined,
+  rebuildHourGateEnabled: boolean
 ): { blocked: boolean; reason: string | null } {
   if (engineId !== 'engine_rebuild') {
     return { blocked: false, reason: null };
   }
 
   // Hour gate — covers bad GBPUSD hours AND Asian session
-  // Asian session (00-06 UTC) + known destructive hours
   const hourUtc = signalCreatedAt
     ? new Date(signalCreatedAt).getUTCHours()
     : new Date().getUTCHours();
 
-  // Blocked hours — data validated from shadow signal analysis:
-  // 0-7: Asian session + pre-London (structural underperformance)
-  // 9: London open whipsaw
-  // 10: confirmed negative -0.195R avg n=18
-  // 14,15: London close dead zone
-  // 19,20,21: late NY / Asian open — 0% TP confirmed
-  const BLOCKED_HOURS = [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 14, 15, 19, 20, 21];
-  if (BLOCKED_HOURS.includes(hourUtc)) {
+  if (isRebuildHourUtcBlocked(hourUtc, rebuildHourGateEnabled)) {
     return {
       blocked: true,
       reason: `REBUILD_HOUR_BLOCK: hour ${hourUtc} UTC`,
@@ -366,11 +363,14 @@ export async function processSignal(
     return;
   }
 
-  // Live engine control — reads paused_engines, omega_direction, and
-  // rebuild_bounds_retry fresh per signal from bridge_config.
-  // Targeted reads — one per control key.
-  // Falls back safely if rows missing or DB error.
-  const [pausedRow, dirRow, boundsRetryRow] = await Promise.all([
+  // Live engine control — reads paused_engines, omega_direction,
+  // rebuild_bounds_retry, rebuild_hour_gate_enabled fresh per signal.
+  const [
+    pausedRow,
+    dirRow,
+    boundsRetryRow,
+    hourGateRow,
+  ] = await Promise.all([
     supabase
       .from('bridge_config')
       .select('config_value')
@@ -386,6 +386,11 @@ export async function processSignal(
       .select('config_value')
       .eq('config_key', 'rebuild_bounds_retry')
       .single(),
+    supabase
+      .from('bridge_config')
+      .select('config_value')
+      .eq('config_key', 'rebuild_hour_gate_enabled')
+      .maybeSingle(),
   ]);
   const pausedEngines: string[] =
     Array.isArray(pausedRow.data?.config_value)
@@ -397,6 +402,9 @@ export async function processSignal(
       : (process.env.OMEGA_DIRECTION_OVERRIDE ?? 'long');
   const rebuildBoundsRetryEnabled = parseRebuildBoundsRetryFlag(
     boundsRetryRow.data?.config_value
+  );
+  const rebuildHourGateEnabled = parseRebuildHourGateEnabled(
+    hourGateRow.data?.config_value
   );
 
   const engine = findEngine(engines, norm.engineId);
@@ -459,7 +467,8 @@ export async function processSignal(
   const rebuildBlock = shouldBlockRebuild(
     norm.engineId,
     payload.stop_loss_pips as number | null,
-    payload.created_at as string | null
+    payload.created_at as string | null,
+    rebuildHourGateEnabled
   );
   if (rebuildBlock.blocked) {
     const blockRow = buildTradeLogRow(

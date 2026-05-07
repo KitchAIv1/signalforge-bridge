@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useEngineControlsState } from '@/hooks/useEngineControlsState';
+import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
+import { RebuildHourGateSwitch } from '@/components/RebuildHourGateSwitch';
 
 const LIVE_ENGINE_ROWS = [
   { id: 'omega', display: 'Omega' },
@@ -11,6 +13,7 @@ const LIVE_ENGINE_ROWS = [
 ] as const;
 
 export function EngineControls() {
+  const hourGateCtrl = useRebuildHourGate();
   const {
     pausedIds,
     omegaDir,
@@ -49,8 +52,12 @@ export function EngineControls() {
       </button>
 
       {dropdownOpen ? (
-        <div className="absolute right-0 top-full z-50 mt-1 w-64 border border-slate-200 bg-white shadow-md">
-          {loadError ? <p className="px-2.5 py-1.5 text-sm text-red-600">{loadError}</p> : null}
+        <div className="absolute right-0 top-full z-50 mt-1 w-max min-w-[16rem] max-w-[calc(100vw-1rem)] border border-slate-200 bg-white shadow-md md:min-w-[18rem]">
+          {loadError || hourGateCtrl.loadError ? (
+            <p className="px-2.5 py-1.5 text-sm text-red-600">
+              {loadError ?? hourGateCtrl.loadError}
+            </p>
+          ) : null}
           <ul className="w-full">
             {LIVE_ENGINE_ROWS.map((row) => {
               const paused = pausedIds.includes(row.id);
@@ -91,7 +98,7 @@ export function EngineControls() {
                         </button>
                       </div>
                     ) : row.id === 'engine_rebuild' ? (
-                      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+                      <div className="flex min-w-0 max-w-[11rem] flex-1 flex-wrap items-center justify-end gap-1.5 sm:max-w-none">
                         <button
                           type="button"
                           onClick={() => void togglePause(row.id, row.display)}
@@ -117,6 +124,11 @@ export function EngineControls() {
                           <span className="md:hidden">{rebuildRetry ? 'R+' : 'R−'}</span>
                           <span className="hidden md:inline">{rebuildRetry ? '↻ Retry ON' : '↻ Retry OFF'}</span>
                         </button>
+                        <RebuildHourGateSwitch
+                          hourGateEnabled={hourGateCtrl.hourGateEnabled}
+                          busy={hourGateCtrl.busy}
+                          onToggle={() => void hourGateCtrl.toggleHourGate()}
+                        />
                       </div>
                     ) : (
                       <div className="flex flex-1 justify-end">
@@ -142,12 +154,12 @@ export function EngineControls() {
           {lastSyncedUtc ? (
             <p className="px-2.5 py-1.5 text-sm text-slate-500">Last synced: {lastSyncedUtc}</p>
           ) : null}
-          {toast ? (
+          {toast || hourGateCtrl.toast ? (
             <p
               className="border-t border-slate-200 px-2.5 py-1.5 text-sm text-emerald-800"
               role="status"
             >
-              {toast}
+              {toast ?? hourGateCtrl.toast}
             </p>
           ) : null}
         </div>
