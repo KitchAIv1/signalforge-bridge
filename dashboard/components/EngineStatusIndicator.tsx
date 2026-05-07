@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { REBUILD_BLOCKED_HOURS_UTC } from '@/lib/rebuildHourBlockedHoursUtc';
 
 interface EngineStatus {
   engineId: string;
@@ -14,56 +15,73 @@ interface EngineStatus {
 
 interface EngineStatusIndicatorProps {
   omegaDir?: 'long' | 'short';
+  rebuildHourGateEnabled?: boolean;
 }
-
-const REBUILD_BLOCKED_HOURS = [0,1,2,3,4,5,6,7,9,10,14,15,19,20,21];
 // Omega — engine-side filters (NY session filtered in engine,
 // signals never reach bridge from these hours)
 const OMEGA_NY_HOURS = [15, 16, 17, 18, 19]; // tagSession() NY
 const OMEGA_LAYER3A_HOUR = 20; // Layer 3A: always SHORT
+
+const REBUILD_BLOCK_REASONS: Record<number, string> = {
+  0: 'Asian session',
+  1: 'Asian session',
+  2: 'Asian session',
+  3: 'Asian session',
+  4: 'Asian session',
+  5: 'Asian session',
+  6: 'Asian session',
+  7: 'Pre-London spread',
+  9: 'London open whipsaw',
+  10: 'Confirmed negative edge',
+  14: 'London close dead zone',
+  15: 'London close dead zone',
+  19: 'Late NY / Asian open',
+  20: 'Late NY dead zone',
+  21: 'Late NY dead zone',
+};
 // Hours 0-14, 21-23 are active (Asian/London/Overlap)
 
-function getRebuildStatus(hourUtc: number): EngineStatus {
-  const isBlocked = REBUILD_BLOCKED_HOURS.includes(hourUtc);
-
-  let nextClean: number | null = null;
+function nextCleanRebuildHourUtc(
+  hourUtc: number,
+  hourGateEnabled: boolean
+): number | null {
+  if (!hourGateEnabled) return null;
+  if (!REBUILD_BLOCKED_HOURS_UTC.includes(hourUtc)) return null;
   for (let i = 1; i <= 24; i++) {
     const h = (hourUtc + i) % 24;
-    if (!REBUILD_BLOCKED_HOURS.includes(h)) {
-      nextClean = h;
-      break;
-    }
+    if (!REBUILD_BLOCKED_HOURS_UTC.includes(h)) return h;
   }
+  return null;
+}
 
-  const blockReasons: Record<number, string> = {
-    0: 'Asian session',
-    1: 'Asian session',
-    2: 'Asian session',
-    3: 'Asian session',
-    4: 'Asian session',
-    5: 'Asian session',
-    6: 'Asian session',
-    7: 'Pre-London spread',
-    9: 'London open whipsaw',
-    10: 'Confirmed negative edge',
-    14: 'London close dead zone',
-    15: 'London close dead zone',
-    19: 'Late NY / Asian open',
-    20: 'Late NY dead zone',
-    21: 'Late NY dead zone',
-  };
+function getRebuildStatus(
+  hourUtc: number,
+  hourGateEnabled: boolean
+): EngineStatus {
+  const inBlockedList =
+    REBUILD_BLOCKED_HOURS_UTC.includes(hourUtc);
+  const isBlocked = hourGateEnabled && inBlockedList;
+  const nextCleanHour = nextCleanRebuildHourUtc(hourUtc, hourGateEnabled);
+
+  let reason: string;
+  if (isBlocked) {
+    reason =
+      REBUILD_BLOCK_REASONS[hourUtc] ?? 'Hour blocked';
+  } else if (!hourGateEnabled && inBlockedList) {
+    reason = 'Hour filter OFF — bridge will not UTC-block this hour';
+  } else if (hourUtc === 13) {
+    reason = '⭐ Prime hour (56.7% TP, 1.5× size)';
+  } else {
+    reason = 'Clean window';
+  }
 
   return {
     engineId: 'engine_rebuild',
     label: 'Rebuild',
     pair: 'GBPUSD',
     isBlocked,
-    reason: isBlocked
-      ? blockReasons[hourUtc] ?? 'Hour blocked'
-      : hourUtc === 13
-        ? '⭐ Prime hour (56.7% TP, 1.5× size)'
-        : 'Clean window',
-    nextCleanHour: isBlocked ? nextClean : null,
+    reason,
+    nextCleanHour,
     currentHourUtc: hourUtc,
   };
 }
@@ -147,6 +165,7 @@ function StatusPill({ status }: { status: EngineStatus }) {
 
 export function EngineStatusIndicator({
   omegaDir = 'long',
+  rebuildHourGateEnabled = true,
 }: EngineStatusIndicatorProps) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -160,7 +179,7 @@ export function EngineStatusIndicator({
   const minuteUtc = now.getUTCMinutes();
   const timeStr = `${String(hourUtc).padStart(2,'0')}:${String(minuteUtc).padStart(2,'0')} UTC`;
 
-  const rebuildStatus = getRebuildStatus(hourUtc);
+  const rebuildStatus = getRebuildStatus(hourUtc, rebuildHourGateEnabled);
   const omegaStatus = getOmegaStatus(hourUtc, omegaDir);
 
   const anyBlocked = rebuildStatus.isBlocked || omegaStatus.isBlocked;
@@ -281,15 +300,25 @@ export function EngineStatusIndicator({
               </p>
               <div className="grid grid-cols-12 gap-0.5">
                 {Array.from({ length: 24 }, (_, h) => {
-                  const blocked = REBUILD_BLOCKED_HOURS.includes(h);
+                  const wouldBlockIfGateOn =
+                    REBUILD_BLOCKED_HOURS_UTC.includes(h);
+                  const blocked =
+                    rebuildHourGateEnabled && wouldBlockIfGateOn;
                   const current = h === hourUtc;
                   const prime = h === 13;
+                  const hourTitle =
+                    blocked
+                      ? 'BLOCKED (hour filter ON)'
+                      : !rebuildHourGateEnabled &&
+                          wouldBlockIfGateOn
+                        ? 'Hour filter OFF — would block at bridge if ON'
+                        : prime
+                          ? 'PRIME'
+                          : 'Active';
                   return (
                     <div
                       key={h}
-                      title={`Hour ${h}:00 UTC — ${
-                        blocked ? 'BLOCKED' : prime ? 'PRIME' : 'Active'
-                      }`}
+                      title={`Hour ${h}:00 UTC — ${hourTitle}`}
                       className={`
                         flex h-5 items-center justify-center rounded 
                         text-[9px] font-medium
@@ -307,6 +336,12 @@ export function EngineStatusIndicator({
                   );
                 })}
               </div>
+              {!rebuildHourGateEnabled ? (
+                <p className="mt-1 text-[9px] font-medium text-amber-700">
+                  Rebuild UTC hour filter is OFF at bridge — grid shows green
+                  for hours that would block if turned ON.
+                </p>
+              ) : null}
               <div className="mt-1 flex gap-2 text-[9px] text-slate-400">
                 <span>🟥 Blocked</span>
                 <span>🟨 Prime (13)</span>

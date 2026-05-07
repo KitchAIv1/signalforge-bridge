@@ -65,3 +65,5 @@ export function useRebuildHourGate() {
     sync,
   };
 }
+
+export type RebuildHourGateControl = ReturnType<typeof useRebuildHourGate>;

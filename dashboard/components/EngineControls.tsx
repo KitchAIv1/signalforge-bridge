@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useEngineControlsState } from '@/hooks/useEngineControlsState';
-import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
+import type { RebuildHourGateControl } from '@/hooks/useRebuildHourGate';
 import { RebuildHourGateSwitch } from '@/components/RebuildHourGateSwitch';
 
 const LIVE_ENGINE_ROWS = [
@@ -12,8 +12,11 @@ const LIVE_ENGINE_ROWS = [
   { id: 'sigma', display: 'Sigma' },
 ] as const;
 
-export function EngineControls() {
-  const hourGateCtrl = useRebuildHourGate();
+interface EngineControlsProps {
+  hourGateControl: RebuildHourGateControl;
+}
+
+export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControlsProps) {
   const {
     pausedIds,
     omegaDir,
