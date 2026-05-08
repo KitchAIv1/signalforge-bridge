@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Rebuild Shadow — SignalForge Bridge',
-  description: 'GBPUSD scalper shadow — phase gates and session stats',
+  title: 'Rebuild — SignalForge Bridge',
+  description: 'Redirect to overview',
 };
 
 export default function RebuildLayout({ children }: { children: React.ReactNode }) {
