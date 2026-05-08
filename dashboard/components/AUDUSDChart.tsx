@@ -91,7 +91,13 @@ export function AUDUSDChart({
           container_id: containerId,
         });
         if (cancelled) {
-          if (typeof widget.remove === 'function') widget.remove();
+          if (typeof widget.remove === 'function') {
+            try {
+              widget.remove();
+            } catch {
+              /* ignore */
+            }
+          }
           return;
         }
         widgetRef.current = widget;
@@ -101,10 +107,15 @@ export function AUDUSDChart({
     })();
     return () => {
       cancelled = true;
-      if (widgetRef.current && typeof widgetRef.current.remove === 'function') {
-        widgetRef.current.remove();
-      }
+      const widget = widgetRef.current;
       widgetRef.current = null;
+      if (widget != null && typeof widget.remove === 'function') {
+        try {
+          widget.remove();
+        } catch {
+          /* TradingView remove() can throw if iframe/DOM already torn down (nav, Strict Mode) */
+        }
+      }
       const el = document.getElementById(containerId);
       if (el) el.innerHTML = '';
       removeOurTradingViewScript();
