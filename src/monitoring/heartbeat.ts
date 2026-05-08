@@ -63,5 +63,13 @@ export async function runHeartbeat(supabase: SupabaseClient): Promise<void> {
     oanda_ok: oandaOk,
     supabase_ok: supabaseOk,
     broker_connection_status: oandaOk ? 'connected' : 'error',
+    details: oandaOk && cachedAccount ? {
+      balance: cachedAccount.balance,
+      equity: cachedAccount.equity,
+      unrealizedPL: cachedAccount.unrealizedPL,
+      marginUsed: cachedAccount.marginUsed,
+      marginAvailable: cachedAccount.marginAvailable,
+      openTradeCount: cachedAccount.openTradeCount,
+    } : null,
   });
 }

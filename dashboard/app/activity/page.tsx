@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { EngineControls } from '@/components/EngineControls';
 import { AUDUSDChart } from '@/components/AUDUSDChart';
+import { AccountSnapshotBar } from '@/components/AccountSnapshotBar';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
@@ -279,6 +280,8 @@ export default function ActivityPage() {
         />
         <EngineControls hourGateControl={rebuildHourGateCtrl} />
       </div>
+
+      <AccountSnapshotBar />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <AUDUSDChart
