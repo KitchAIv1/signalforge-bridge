@@ -58,6 +58,10 @@ export interface BridgeTradeLogRow {
   slippage_pips: number | null;
   close_reason: string | null;
   duration_minutes: number | null;
+  regime_direction?: string | null;
+  regime_confidence?: string | null;
+  regime_evaluated_at?: string | null;
+  regime_size_multiplier?: number | null;
 }
 
 export interface OmegaShadowSignalRow {

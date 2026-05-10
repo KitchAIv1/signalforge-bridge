@@ -8,6 +8,11 @@ import type { SignalInsertPayload } from '../connectors/supabase.js';
 import type { BridgeConfig, BridgeEngineRow } from '../types/config.js';
 import type { AccountSummary } from '../connectors/oanda.js';
 import type { DecisionType } from '../types/signals.js';
+import {
+  fetchLatestRegimeState,
+  getRegimeSizeMultiplier,
+  type ActiveRegimeState,
+} from '../services/RegimeStateService.js';
 import { validateSignal } from './signalValidation.js';
 import { isTripped, getPeakEquity, getConsecutiveLosses, enterCooldown } from './circuitBreaker.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
@@ -618,6 +623,36 @@ export async function processSignal(
     }
   }
 
+  let regimeState: ActiveRegimeState | null = null;
+  let regimeSizeMultiplier = 1.0;
+
+  if (norm.engineId === 'omega') {
+    regimeState = await fetchLatestRegimeState('AUD_USD');
+
+    if (regimeState) {
+      regimeSizeMultiplier = getRegimeSizeMultiplier(regimeState.confidence);
+
+      if (regimeSizeMultiplier === 0) {
+        console.log(
+          `[RegimeGate] omega BLOCKED — confidence: ${regimeState.confidence} | ` +
+          `direction: ${regimeState.direction} | evaluated: ${regimeState.evaluatedAt}`
+        );
+        await supabase.from('bridge_trade_log').insert(
+          buildTradeLogRow(
+            payload,
+            'BLOCKED',
+            'REGIME_CONFIDENCE_BLOCK',
+            decisionLatencyMs,
+            cachedAccount?.equity ?? null,
+            openTrades.length,
+            norm.oandaInstrument
+          )
+        );
+        return;
+      }
+    }
+  }
+
   const conversionRate = getConversionRateForInstrument(
     norm.oandaInstrument,
     getCachedConversionRates()
@@ -713,7 +748,7 @@ export async function processSignal(
   // All signals execute — frequency preserved.
   // Sizing scales with bar1 conviction only.
   // Zero effect on other engines.
-  const finalUnits = norm.engineId === 'engine_rebuild'
+  let finalUnits = norm.engineId === 'engine_rebuild'
     ? (() => {
         const equity = cachedAccount?.equity ?? 1000;
         const maxMarginPerTrade = (equity * 0.50) / 4;
@@ -788,6 +823,11 @@ export async function processSignal(
         return (units < 0 ? -1 : 1) * finalAbs;
       })()
     : units;
+
+  if (norm.engineId === 'omega' && regimeSizeMultiplier < 1.0 && regimeSizeMultiplier > 0) {
+    finalUnits = Math.floor(finalUnits * regimeSizeMultiplier);
+    console.log(`[RegimeGate] omega size → ${regimeSizeMultiplier * 100}% = ${finalUnits} units`);
+  }
 
   try {
     const TRAIL_STOP_ENGINES = [
@@ -918,6 +958,12 @@ export async function processSignal(
             bar1Data.strength;
         }
       }
+    }
+    if (norm.engineId === 'omega') {
+      (row as Record<string, unknown>).regime_direction = regimeState?.direction ?? null;
+      (row as Record<string, unknown>).regime_confidence = regimeState?.confidence ?? null;
+      (row as Record<string, unknown>).regime_evaluated_at = regimeState?.evaluatedAt ?? null;
+      (row as Record<string, unknown>).regime_size_multiplier = regimeSizeMultiplier;
     }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();

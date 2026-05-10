@@ -4,6 +4,7 @@
  */
 
 import 'dotenv/config';
+import cron from 'node-cron';
 import { getSupabaseClient, subscribeToSignalInserts, getSignalTableName } from './connectors/supabase.js';
 import { loadBridgeConfig, loadActiveEngines } from './config/bridgeConfig.js';
 import { getAccountSummary } from './connectors/oanda.js';
@@ -13,6 +14,7 @@ import { runStartupReconciliation } from './startupReconciliation.js';
 import { runHeartbeat, getCachedAccountSummary } from './monitoring/heartbeat.js';
 import { runTradeMonitor } from './monitoring/tradeMonitor.js';
 import { logInfo, logWarn } from './utils/logger.js';
+import { runRegimeDetection } from './services/RegimeDetectorService.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -62,6 +64,21 @@ async function main(): Promise<void> {
   setInterval(() => runHeartbeat(supabase), heartbeatIntervalMs);
   setInterval(() => runTradeMonitor(supabase, engines), config.tradeMonitorIntervalMs ?? 30000);
   await runHeartbeat(supabase);
+
+  // Regime detector — runs 5 minutes after every H4 candle close (6x per day)
+  // H4 candles close at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC
+  cron.schedule('5 0,4,8,12,16,20 * * *', async () => {
+    try {
+      await runRegimeDetection();
+    } catch (regimeError) {
+      console.error('[RegimeDetector] Scheduled run error:', regimeError);
+    }
+  }, { timezone: 'UTC' });
+
+  // Run once on startup so regime_state is populated immediately
+  runRegimeDetection().catch(startupError => {
+    console.error('[RegimeDetector] Startup run error:', startupError);
+  });
 
   const channel = subscribeToSignalInserts(supabase, (payload) => {
     if (!ready) {

@@ -327,3 +327,57 @@ export function getAccountId(): string {
   if (!OANDA_ACCOUNT_ID) throw new Error('OANDA_ACCOUNT_ID not set');
   return OANDA_ACCOUNT_ID;
 }
+
+/**
+ * Fetches completed historical candles for D or H4 granularity.
+ * Used by RegimeDetectorService only.
+ * Returns only candles where complete === true.
+ */
+export async function fetchCompletedCandles(
+  pair: string,
+  granularity: 'D' | 'H4',
+  fromISO: string,
+  toISO: string
+): Promise<Array<{
+  time: string;
+  mid: { o: string; h: string; l: string; c: string };
+  complete: boolean;
+}>> {
+  const token   = process.env.OANDA_API_TOKEN;
+  const env     = process.env.OANDA_ENVIRONMENT ?? 'practice';
+  const baseUrl = env === 'live'
+    ? 'https://api-fxtrade.oanda.com'
+    : 'https://api-fxpractice.oanda.com';
+
+  const url =
+    `${baseUrl}/v3/instruments/${pair}/candles` +
+    `?granularity=${granularity}` +
+    `&from=${encodeURIComponent(fromISO)}` +
+    `&to=${encodeURIComponent(toISO)}` +
+    `&price=M` +
+    `&includeFirst=true`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(
+      `[fetchCompletedCandles] ${granularity} fetch failed: ${response.status} — ${body}`
+    );
+  }
+
+  const payload = await response.json() as {
+    candles: Array<{
+      time: string;
+      mid: { o: string; h: string; l: string; c: string };
+      complete: boolean;
+    }>;
+  };
+
+  return (payload.candles ?? []).filter(c => c.complete === true);
+}

@@ -10,12 +10,14 @@ import type { DecisionType } from '@/lib/types';
 import { EngineStatusIndicator } from '@/components/EngineStatusIndicator';
 import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
+import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
 
 const PAGE_SIZE = 50;
-const TABLE_COL_COUNT = 17;
+const TABLE_COL_COUNT = 19;
 
 const EXPANDED_TRADE_LOG_SELECT =
-  'id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, confluence_score, units, risk_amount, pnl_dollars, fill_price, exit_price, stop_loss, take_profit, pnl_pips, pnl_r, lot_size, slippage_pips, close_reason, duration_minutes, signal_received_at, created_at';
+  'id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, confluence_score, units, risk_amount, pnl_dollars, fill_price, exit_price, stop_loss, take_profit, pnl_pips, pnl_r, lot_size, slippage_pips, close_reason, duration_minutes, signal_received_at, created_at, regime_direction, regime_confidence, regime_evaluated_at, regime_size_multiplier';
+
 
 const DECISIONS: { value: string; label: string }[] = [
   { value: '', label: 'All' },
@@ -155,6 +157,16 @@ function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
         ) : (
           '—'
         )}
+      </td>
+      <td className="px-3 py-2 text-sm text-gray-700">
+        {row.regime_direction ?? '—'}
+      </td>
+      <td className="px-3 py-2">
+        <RegimeConfidenceBadge
+          confidence={row.regime_confidence ?? null}
+          direction={row.regime_direction ?? null}
+          evaluatedAt={row.regime_evaluated_at ?? null}
+        />
       </td>
     </tr>
   );
@@ -317,6 +329,12 @@ export default function ActivityPage() {
               <th className="px-3 py-2 text-xs font-medium">R</th>
               <th className="px-3 py-2 text-xs font-medium">Duration</th>
               <th className="px-3 py-2 text-xs font-medium">Result</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Regime
+              </th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Confidence
+              </th>
             </tr>
           </thead>
           <tbody>
