@@ -90,7 +90,19 @@ function getOmegaStatus(
   hourUtc: number,
   dir: 'long' | 'short'
 ): EngineStatus {
-  const isWeekend = [0, 6].includes(new Date().getUTCDay());
+  const now = new Date();
+  const day = now.getUTCDay(); // 0=Sun, 1=Mon...6=Sat
+  const hourUTC = now.getUTCHours();
+  const minuteUTC = now.getUTCMinutes();
+  const timeDecimal = hourUTC + minuteUTC / 60;
+
+  // Forex market hours:
+  // Opens:  Sunday 21:00 UTC (Sydney/Asian open)
+  // Closes: Friday 21:00 UTC
+  const isWeekend =
+    day === 6 ||
+    (day === 0 && timeDecimal < 21) ||
+    (day === 5 && timeDecimal >= 21);
 
   if (isWeekend) {
     return {
