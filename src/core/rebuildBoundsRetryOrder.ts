@@ -58,7 +58,7 @@ function buildMarketParams(
  * engine_rebuild: first submission uses 2-pip priceBound when enabled.
  * If OANDA cancels with BOUNDS_VIOLATION and
  * rebuildBoundsRetryEnabled, waits 1500ms then
- * retries once WITH same 2-pip priceBound.
+ * retries once without priceBound.
  */
 export async function placeMarketOrderWithRebuildBoundsRetry(params: {
   norm: MarketOrderNormSlice;
@@ -97,7 +97,7 @@ export async function placeMarketOrderWithRebuildBoundsRetry(params: {
     );
     retriedWithoutPriceBound = true;
     orderResult = await placeMarketOrder(
-      buildMarketParams(norm, finalUnits, useTrailStop, true, priceBoundFormatted),
+      buildMarketParams(norm, finalUnits, useTrailStop, false, priceBoundFormatted),
       maxOrderTimeoutMs
     );
   }
