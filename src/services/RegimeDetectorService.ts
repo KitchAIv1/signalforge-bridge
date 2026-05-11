@@ -58,7 +58,7 @@ export async function runRegimeDetection(): Promise<void> {
   const l5 = computeLayer5(h4Candles, evaluatedAt);
   const l6 = computeLayer6(d1Candles, evaluatedAt);
 
-  // Layer 7 — weekly open reality check (active Sunday 21:00 → Monday 01:00 UTC only)
+  // Layer 7 — weekly open reality check (active Sunday 21:00 → Monday 08:00 UTC only)
   let effectiveL5Result = l5.result;
   let layer7Output: Awaited<ReturnType<typeof computeLayer7>> | null = null;
 
