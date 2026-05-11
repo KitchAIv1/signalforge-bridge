@@ -584,6 +584,18 @@ export async function processSignal(
   // This does not affect the engine or shadow signals.
   norm.direction = effectiveDirection as typeof norm.direction;
 
+  // Rebuild direction flip experiment — env var controlled
+  // Flips LONG→SHORT and SHORT→LONG for engine_rebuild only
+  // Applies after omega direction resolution, before units and bar1
+  // so ALL downstream logic (units sign, bar1, OANDA order,
+  // bridge_trade_log direction) uses the flipped direction consistently
+  if (
+    norm.engineId === 'engine_rebuild' &&
+    process.env.REBUILD_DIRECTION_FLIP === 'true'
+  ) {
+    norm.direction = norm.direction === 'LONG' ? 'SHORT' : 'LONG';
+  }
+
   // Safety net: opposing Omega legs still open (auto-close lag / failure).
   if (norm.engineId === 'omega') {
     const opposingDir =
