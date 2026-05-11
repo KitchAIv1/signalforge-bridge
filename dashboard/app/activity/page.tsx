@@ -12,6 +12,7 @@ import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
 import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDesktopTable';
 import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobileList';
+import { RegimePanel } from '@/components/RegimePanel';
 
 const PAGE_SIZE = 50;
 
@@ -196,6 +197,8 @@ export default function ActivityPage() {
       </div>
 
       <AccountSnapshotBar />
+
+      <RegimePanel />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />

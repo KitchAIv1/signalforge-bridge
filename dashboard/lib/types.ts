@@ -154,3 +154,19 @@ export interface RebuildWeeklyReportRow {
   summary_json?: unknown;
   [key: string]: unknown;
 }
+
+export interface RegimeState {
+  id:                       string;
+  pair:                     string;
+  evaluated_at:             string;
+  regime_direction:         'LONG' | 'SHORT' | 'PAUSE';
+  regime_confidence:        'HIGH' | 'MEDIUM' | 'LOW' | 'PAUSE';
+  choppy_extended_override: boolean;
+  layer4_result:            string | null;
+  layer4_bullish_count:     number | null;
+  layer4_bearish_count:     number | null;
+  layer5_result:            string | null;
+  layer5_pip_diff:          number | null;
+  layer6_position_pct:      number | null;
+  created_at:               string;
+}
