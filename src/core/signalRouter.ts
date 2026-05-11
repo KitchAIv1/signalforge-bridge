@@ -946,6 +946,25 @@ export async function processSignal(
       (row as Record<string, unknown>).regime_confidence = regimeState?.confidence ?? null;
       (row as Record<string, unknown>).regime_evaluated_at = regimeState?.evaluatedAt ?? null;
       (row as Record<string, unknown>).regime_size_multiplier = regimeSizeMultiplier;
+      // ── Regime layer detail — advisory training dataset ──────────────────────────
+      (row as Record<string, unknown>).layer4_result = regimeState?.layer4_result ?? null;
+      (row as Record<string, unknown>).layer4_bullish_count =
+        regimeState?.layer4_bullish_count ?? null;
+      (row as Record<string, unknown>).layer4_bearish_count =
+        regimeState?.layer4_bearish_count ?? null;
+      (row as Record<string, unknown>).layer5_result = regimeState?.layer5_result ?? null;
+      (row as Record<string, unknown>).layer5_pip_diff = regimeState?.layer5_pip_diff ?? null;
+      (row as Record<string, unknown>).layer6_position_pct =
+        regimeState?.layer6_position_pct ?? null;
+      (row as Record<string, unknown>).layer7_active =
+        regimeState?.layer7_override_active ?? null;
+      (row as Record<string, unknown>).layer7_pip_diff =
+        regimeState?.layer7_pip_diff ?? null;
+      (row as Record<string, unknown>).choppy_extended =
+        regimeState?.choppy_extended_override ?? null;
+      (row as Record<string, unknown>).manual_tag = null;
+      (row as Record<string, unknown>).close_tag = null;
+      (row as Record<string, unknown>).signal_session = null;
     }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();

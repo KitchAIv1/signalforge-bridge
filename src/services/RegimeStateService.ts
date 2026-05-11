@@ -11,6 +11,16 @@ export interface ActiveRegimeState {
   confidence:     RegimeConfidence;
   evaluatedAt:    string;
   choppyOverride: boolean;
+
+  layer4_result?:             string | null;
+  layer4_bullish_count?:      number | null;
+  layer4_bearish_count?:      number | null;
+  layer5_result?:             string | null;
+  layer5_pip_diff?:           number | null;
+  layer6_position_pct?:       number | null;
+  layer7_override_active?:    boolean | null;
+  layer7_pip_diff?:           number | null;
+  choppy_extended_override?:  boolean | null;
 }
 
 const CONFIDENCE_SIZE_MULTIPLIER: Record<RegimeConfidence, number> = {
@@ -35,20 +45,37 @@ export async function fetchLatestRegimeState(
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const { data: regimeRow, error } = await supabase
+  const { data: regimeRaw, error } = await supabase
     .from('regime_state')
-    .select('regime_direction, regime_confidence, evaluated_at, choppy_extended_override')
+    .select(
+      'regime_direction, regime_confidence, evaluated_at, choppy_extended_override, ' +
+        'layer4_result, layer4_bullish_count, layer4_bearish_count, ' +
+        'layer5_result, layer5_pip_diff, layer6_position_pct, ' +
+        'layer7_override_active, layer7_pip_diff'
+    )
     .eq('pair', pair)
     .order('evaluated_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (error || !regimeRow) return null;
+  if (error || !regimeRaw) return null;
+
+  const regimeRow = regimeRaw as unknown as Record<string, unknown>;
 
   return {
-    direction:      regimeRow.regime_direction      as RegimeDirection,
-    confidence:     regimeRow.regime_confidence     as RegimeConfidence,
-    evaluatedAt:    regimeRow.evaluated_at,
-    choppyOverride: regimeRow.choppy_extended_override ?? false,
+    direction:       regimeRow['regime_direction'] as RegimeDirection,
+    confidence:      regimeRow['regime_confidence'] as RegimeConfidence,
+    evaluatedAt:    regimeRow['evaluated_at'] as string,
+    choppyOverride: (regimeRow['choppy_extended_override'] ?? false) as boolean,
+
+    layer4_result:            (regimeRow['layer4_result'] as string | null | undefined) ?? null,
+    layer4_bullish_count:     (regimeRow['layer4_bullish_count'] as number | null | undefined) ?? null,
+    layer4_bearish_count:     (regimeRow['layer4_bearish_count'] as number | null | undefined) ?? null,
+    layer5_result:            (regimeRow['layer5_result'] as string | null | undefined) ?? null,
+    layer5_pip_diff:          (regimeRow['layer5_pip_diff'] as number | null | undefined) ?? null,
+    layer6_position_pct:      (regimeRow['layer6_position_pct'] as number | null | undefined) ?? null,
+    layer7_override_active:   (regimeRow['layer7_override_active'] as boolean | null | undefined) ?? null,
+    layer7_pip_diff:          (regimeRow['layer7_pip_diff'] as number | null | undefined) ?? null,
+    choppy_extended_override: (regimeRow['choppy_extended_override'] as boolean | null | undefined) ?? null,
   };
 }
