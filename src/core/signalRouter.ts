@@ -631,13 +631,13 @@ export async function processSignal(
 
     if (regimeState) {
       regimeSizeMultiplier = getRegimeSizeMultiplier(regimeState.confidence);
+      console.log(
+        `[RegimeAdvisory] omega signal proceeding — confidence: ${regimeState?.confidence ?? 'unknown'} | ` +
+        `regime direction: ${regimeState?.direction ?? 'unknown'} | ` +
+        `omega direction: ${norm.direction} | ` +
+        `evaluated: ${regimeState?.evaluatedAt ?? 'unknown'}`
+      );
     }
-    console.log(
-      `[RegimeAdvisory] omega signal proceeding — confidence: ${regimeState?.confidence ?? 'unknown'} | ` +
-      `regime direction: ${regimeState?.direction ?? 'unknown'} | ` +
-      `omega direction: ${norm.direction} | ` +
-      `evaluated: ${regimeState?.evaluatedAt ?? 'unknown'}`
-    );
   }
 
   const conversionRate = getConversionRateForInstrument(
