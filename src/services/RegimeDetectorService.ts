@@ -100,7 +100,10 @@ export async function runRegimeDetection(): Promise<void> {
     layer4_result:           l4.result,
     layer4_bullish_count:    l4.bullishCount,
     layer4_bearish_count:    l4.bearishCount,
-    layer5_result:           l5.result,
+    layer5_result:          effectiveL5Result,
+    layer5_result_raw:      l5.result,
+    layer7_pip_diff:        layer7Output?.pipDiff ?? null,
+    layer7_override_active: layer7Output != null && layer7Output.l5Override !== null,
     layer5_pip_diff:         l5.pipDiff,
     layer6_position_pct:     l6.positionPct,
   });
