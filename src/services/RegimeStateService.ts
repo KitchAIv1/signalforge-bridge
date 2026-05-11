@@ -24,10 +24,10 @@ export interface ActiveRegimeState {
 }
 
 const CONFIDENCE_SIZE_MULTIPLIER: Record<RegimeConfidence, number> = {
-  HIGH:   1.0,
-  MEDIUM: 0.3,
-  LOW:    0.0,
-  PAUSE:  0.0,
+  HIGH:   1.0,  // always full size — proven +$8,028 live
+  MEDIUM: 0.3,  // reduced — positive but uncertain
+  LOW:    0.15, // minimal — negative overall, small exposure for data
+  PAUSE:  0.10, // token — worst condition, data collection only
 };
 
 export function getRegimeSizeMultiplier(confidence: RegimeConfidence): number {
@@ -77,4 +77,31 @@ export async function fetchLatestRegimeState(
     layer7_pip_diff:         regimeRow['layer7_pip_diff'] as number | null ?? null,
     choppy_extended_override: (regimeRow['choppy_extended_override'] ?? null) as boolean | null,
   };
+}
+
+/**
+ * Reads presence_last_seen from bridge_config and returns
+ * minutes since the last dashboard ping.
+ * Returns 999 if key missing or fetch fails — treated as away.
+ */
+export async function fetchMinutesSincePresence(): Promise<number> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) return 999;
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const { data: presenceRow, error } = await supabase
+    .from('bridge_config')
+    .select('config_value')
+    .eq('config_key', 'presence_last_seen')
+    .single();
+
+  if (error || !presenceRow?.config_value) return 999;
+
+  const lastSeen = new Date(presenceRow.config_value as string).getTime();
+  const minutesSince = (Date.now() - lastSeen) / 60_000;
+  return minutesSince;
 }

@@ -11,6 +11,7 @@ import type { DecisionType } from '../types/signals.js';
 import {
   fetchLatestRegimeState,
   getRegimeSizeMultiplier,
+  fetchMinutesSincePresence,
   type ActiveRegimeState,
 } from '../services/RegimeStateService.js';
 import { validateSignal } from './signalValidation.js';
@@ -822,6 +823,38 @@ export async function processSignal(
         return (units < 0 ? -1 : 1) * finalAbs;
       })()
     : units;
+
+  // ── AUTO-SIZING WHEN AWAY — omega only ───────────────────────────────────────
+  // When the dashboard has not sent a presence ping in 30+ minutes,
+  // the user is away. Apply confidence-based size multiplier to protect capital.
+  // When present (ping within 30 min): always full size regardless of confidence.
+  // HIGH confidence: always 1.0 in both modes — proven profitable.
+
+  if (norm.engineId === 'omega') {
+    const minutesSincePresence = await fetchMinutesSincePresence();
+    const isPresent            = minutesSincePresence <= 30;
+
+    if (!isPresent && regimeSizeMultiplier < 1.0) {
+      const signedFinalUnits = finalUnits;
+      const absUnits         = Math.abs(signedFinalUnits);
+      const reducedAbs       = Math.floor(absUnits * regimeSizeMultiplier);
+      finalUnits             = signedFinalUnits < 0 ? -reducedAbs : reducedAbs;
+
+      console.log(
+        `[AutoSizing] omega away mode — confidence: ${regimeState?.confidence} ` +
+        `| multiplier: ${regimeSizeMultiplier} ` +
+        `| units: ${Math.abs(signedFinalUnits)} → ${Math.abs(finalUnits)} ` +
+        `| minutes since ping: ${Math.round(minutesSincePresence)}`
+      );
+    } else if (isPresent) {
+      console.log(
+        `[AutoSizing] omega present — full size ` +
+        `| units: ${Math.abs(finalUnits)} ` +
+        `| minutes since ping: ${Math.round(minutesSincePresence)}`
+      );
+    }
+  }
+  // ── END AUTO-SIZING ──────────────────────────────────────────────────────────
 
   try {
     const TRAIL_STOP_ENGINES = [
