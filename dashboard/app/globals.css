@@ -18,6 +18,23 @@
   animation: pnl-cal-pulse 1.5s infinite;
 }
 
+.dashboard-main-safe {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+@supports not (padding: max(0px)) {
+  .dashboard-main-safe {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+.px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
 body {
   @apply text-slate-900;
 }

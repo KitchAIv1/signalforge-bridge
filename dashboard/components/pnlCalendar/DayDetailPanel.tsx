@@ -3,6 +3,7 @@
 import type { DaySummary } from '@/lib/pnlCalendarTypes';
 import { getDollarValue, getRColor, getRValue } from '@/lib/pnlCalendarFormat';
 import { DayDetailTradeRow } from '@/components/pnlCalendar/DayDetailTradeRow';
+import { DayDetailTradeMobileBlock } from '@/components/pnlCalendar/DayDetailTradeMobileBlock';
 
 type StatChip =
   | { label: string; val: string | number; color: string }
@@ -56,23 +57,19 @@ export function DayDetailPanel({ day, onDismiss }: DayDetailPanelProps) {
 
   return (
     <div
+      className="box-border max-w-[100vw]"
       style={{
         background: '#0e1824',
         border: '1px solid #1e2d3d',
         borderRadius: 14,
-        padding: '24px 28px',
+        padding: '20px',
         marginTop: 2,
       }}
     >
       <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: 20,
-        }}
+        className="mb-5 flex flex-col gap-4 sm:mb-5 sm:flex-row sm:items-start sm:justify-between"
       >
-        <div>
+        <div className="min-w-0 pr-2">
           <div
             style={{
               fontSize: 13,
@@ -83,10 +80,10 @@ export function DayDetailPanel({ day, onDismiss }: DayDetailPanelProps) {
           >
             {dateLabel}
           </div>
-          <div style={{ display: 'flex', gap: 24, alignItems: 'baseline' }}>
+          <div className="flex flex-wrap items-baseline gap-3 sm:gap-6">
             <span
+              className="text-[26px] sm:text-[32px]"
               style={{
-                fontSize: 32,
                 fontFamily: "'Roboto Mono', monospace",
                 fontWeight: 700,
                 color: getRColor(day.netR),
@@ -96,8 +93,8 @@ export function DayDetailPanel({ day, onDismiss }: DayDetailPanelProps) {
               {getRValue(day.netR)}
             </span>
             <span
+              className="text-[17px] sm:text-[18px]"
               style={{
-                fontSize: 18,
                 fontFamily: "'Roboto Mono', monospace",
                 color: getRColor(day.netDollars),
                 opacity: 0.8,
@@ -113,13 +110,14 @@ export function DayDetailPanel({ day, onDismiss }: DayDetailPanelProps) {
         <button
           type="button"
           onClick={onDismiss}
+          className="min-h-[44px] shrink-0 self-start sm:self-auto"
           style={{
             background: 'transparent',
             border: '1px solid #1e2d3d',
             borderRadius: 7,
             color: '#4a6080',
             cursor: 'pointer',
-            padding: '5px 10px',
+            padding: '8px 12px',
             fontSize: 13,
             fontFamily: "'DM Sans', sans-serif",
           }}
@@ -127,7 +125,7 @@ export function DayDetailPanel({ day, onDismiss }: DayDetailPanelProps) {
           ✕
         </button>
       </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+      <div className="mb-5 flex flex-wrap gap-2.5 sm:mb-5">
         {chips.map((chip, idx) => (
           <div
             key={`${chip.label}-${idx}`}
@@ -157,8 +155,13 @@ export function DayDetailPanel({ day, onDismiss }: DayDetailPanelProps) {
           </div>
         ))}
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <div className="space-y-3 sm:hidden">
+        {sortedTrades.map((trade, idx) => (
+          <DayDetailTradeMobileBlock key={trade.id ?? `m-${idx}`} trade={trade} />
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto sm:block">
+        <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #1e2d3d' }}>
               {['Time', 'Engine', 'Dir', 'Result', 'P&L R', 'P&L $', 'Close Reason', 'Bar1'].map(

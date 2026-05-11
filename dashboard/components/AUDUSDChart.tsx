@@ -9,6 +9,8 @@ export interface AUDUSDChartProps {
   symbol?: string;
   interval?: string;
   height?: number;
+  /** Charts fill viewport-friendly heights at each breakpoint instead of fixed `height` pixels. */
+  useResponsiveHeight?: boolean;
 }
 
 declare global {
@@ -63,6 +65,7 @@ export function AUDUSDChart({
   symbol = 'OANDA:AUDUSD',
   interval = '5',
   height = 400,
+  useResponsiveHeight = false,
 }: AUDUSDChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<{ remove?: () => void } | null>(null);
@@ -133,8 +136,12 @@ export function AUDUSDChart({
       <div
         ref={containerRef}
         id={containerId}
-        className="w-full"
-        style={{ height }}
+        className={
+          useResponsiveHeight
+            ? 'h-[248px] w-full sm:h-[300px] lg:h-[376px]'
+            : 'w-full'
+        }
+        style={useResponsiveHeight ? undefined : { height }}
       />
     </div>
   );

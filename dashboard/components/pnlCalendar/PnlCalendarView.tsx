@@ -36,28 +36,19 @@ export function PnlCalendarView() {
   return (
     <>
       <div
+        className="min-h-screen px-4 py-6 sm:px-6 sm:py-7 lg:px-8"
         style={{
-          minHeight: '100vh',
           background: '#070b0f',
           color: '#e0e8f0',
           fontFamily: "'DM Sans', sans-serif",
-          padding: '28px 32px',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: 28,
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+        <div className="mb-6 flex flex-col gap-4 sm:mb-7 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-5">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2 sm:gap-2.5">
               <h1
+                className="text-[21px] font-bold leading-tight sm:text-[22px]"
                 style={{
-                  fontSize: 22,
-                  fontWeight: 700,
                   color: '#e0e8f0',
                   margin: 0,
                   letterSpacing: '-0.3px',
@@ -65,7 +56,7 @@ export function PnlCalendarView() {
               >
                 P&L Calendar
               </h1>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="flex flex-wrap gap-1.5">
                 {(['omega', 'engine_rebuild'] as const).map((engineKey) => (
                   <span
                     key={engineKey}
@@ -90,6 +81,7 @@ export function PnlCalendarView() {
           </div>
           {loading && (
             <div
+              className="shrink-0"
               style={{
                 fontSize: 12,
                 color: '#3d5470',

@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeBrokerRow, BridgeEngineRow, BridgeHealthLogRow, BridgeTradeLogRow } from '@/lib/types';
 import { BridgeToggle } from '@/components/BridgeToggle';
+import { OverviewRecentActivity, OverviewRecentHeader } from '@/components/overview/OverviewRecentActivity';
 
 const TRADE_LOG_PAGE_SIZE = 25;
 
@@ -15,10 +15,6 @@ function formatTimeAgo(iso: string | null): string {
   if (sec < 60) return `${sec}s ago`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
   return d.toLocaleTimeString();
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 export default function OverviewPage() {
@@ -135,66 +131,8 @@ export default function OverviewPage() {
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-slate-700">Recent activity</h2>
-          <Link href="/activity" className="text-sm font-medium text-slate-600 hover:text-slate-900">
-            View all
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-600">
-                <th className="pb-2 pr-4 font-medium">Time</th>
-                <th className="pb-2 pr-4 font-medium">Engine</th>
-                <th className="pb-2 pr-4 font-medium">Pair</th>
-                <th className="pb-2 pr-4 font-medium">Decision</th>
-                <th className="pb-2 pr-4 font-medium">Reason</th>
-                <th className="pb-2 pr-4 font-medium">Latency</th>
-                <th className="pb-2 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tradeLog.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-slate-500">
-                    No activity yet
-                  </td>
-                </tr>
-              ) : (
-                tradeLog.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-100">
-                    <td className="py-2 pr-4 text-slate-700">{formatTime(row.created_at)}</td>
-                    <td className="py-2 pr-4 font-medium">{row.engine_id}</td>
-                    <td className="py-2 pr-4">{row.pair}</td>
-                    <td className="py-2 pr-4">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                          row.decision === 'EXECUTED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : row.decision === 'BLOCKED'
-                              ? 'bg-red-100 text-red-800'
-                              : row.decision === 'SKIPPED'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {row.decision}
-                      </span>
-                    </td>
-                    <td className="max-w-[200px] truncate py-2 pr-4 text-slate-600" title={row.block_reason ?? undefined}>
-                      {row.block_reason ?? '—'}
-                    </td>
-                    <td className="py-2 pr-4 text-slate-600">
-                      {row.decision_latency_ms != null ? `${row.decision_latency_ms} ms` : '—'}
-                    </td>
-                    <td className="py-2 text-slate-600">{row.status}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <OverviewRecentHeader />
+        <OverviewRecentActivity tradeRows={tradeLog} />
       </section>
     </div>
   );

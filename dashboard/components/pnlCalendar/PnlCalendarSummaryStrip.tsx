@@ -47,7 +47,7 @@ export function PnlCalendarSummaryStrip({
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 24 }}>
+    <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
       {stats.map((stat) => (
         <div
           key={stat.label}

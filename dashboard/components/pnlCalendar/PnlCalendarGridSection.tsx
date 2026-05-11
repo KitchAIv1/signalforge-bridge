@@ -52,20 +52,19 @@ export function PnlCalendarGridSection({
   };
 
   return (
-    <div
-      style={{
-        background: '#0e1420',
-        border: '1px solid #1e2d3d',
-        borderRadius: 14,
-        padding: '20px 22px',
-        marginBottom: 16,
-      }}
-    >
+    <div className="overflow-x-auto" style={{ marginBottom: 16 }}>
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          background: '#0e1420',
+          border: '1px solid #1e2d3d',
+          borderRadius: 14,
+          padding: '20px 22px',
+          minWidth: 'min(100%, 320px)',
+        }}
+      >
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 sm:gap-3"
+        style={{
           marginBottom: 18,
         }}
       >
@@ -125,14 +124,15 @@ export function PnlCalendarGridSection({
               letterSpacing: '0.5px',
             }}
           >
-            {label}
+            <span className="sm:hidden">{label.slice(0, 2)}</span>
+            <span className="hidden sm:inline">{label}</span>
           </div>
         ))}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
         {calendarCells.map((cellDate, idx) => {
           if (!cellDate) {
-            return <div key={`pad-${idx}`} style={{ minHeight: 110 }} />;
+            return <div key={`pad-${idx}`} className="min-h-[74px] sm:min-h-[90px] lg:min-h-[110px]" />;
           }
           const isoKey = toDateKeyFromInput(cellDate);
           const day = daySummaries.get(isoKey);
@@ -153,6 +153,7 @@ export function PnlCalendarGridSection({
             />
           );
         })}
+      </div>
       </div>
     </div>
   );

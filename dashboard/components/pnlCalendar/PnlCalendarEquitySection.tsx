@@ -31,25 +31,20 @@ export function PnlCalendarEquitySection({ equityCurve }: PnlCalendarEquitySecti
         marginBottom: 24,
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16,
-        }}
-      >
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}>Cumulative R</span>
-          <span style={{ fontSize: 11, color: '#3d5470', marginLeft: 10 }}>equity curve since Apr 30</span>
+          <span style={{ fontSize: 11, color: '#3d5470', marginLeft: 10 }}>
+            equity curve since Apr 30
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: 16, fontSize: 11 }}>
+        <div className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] leading-relaxed">
           <span style={{ color: '#0ea5e9' }}>── Combined</span>
           <span style={{ color: '#7c3aed' }}>── Omega</span>
           <span style={{ color: '#d97706' }}>── Rebuild</span>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={140}>
+      <ResponsiveContainer width="100%" height={128}>
         <AreaChart data={equityCurve} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="combinedGrad" x1="0" y1="0" x2="0" y2="1">

@@ -32,7 +32,11 @@ export function DayCell({
   const [hovered, setHovered] = useState(false);
 
   if (!date) {
-    return <div style={{ minHeight: 110, background: 'transparent' }} />;
+    return (
+      <div
+        className="min-h-[74px] bg-transparent sm:min-h-[90px] lg:min-h-[110px]"
+      />
+    );
   }
 
   const tradeCount = day?.tradeCount ?? 0;
@@ -59,23 +63,13 @@ export function DayCell({
       }
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className={`relative flex min-h-[74px] flex-col gap-0.5 rounded-[10px] p-2 pb-2 pt-2.5 transition-all duration-150 ease-in-out sm:min-h-[90px] lg:min-h-[110px] ${
+        hasTrades ? 'cursor-pointer' : 'cursor-default'
+      }`}
       style={{
-        minHeight: 110,
-        background: isSelected
-          ? 'rgba(59,130,246,0.07)'
-          : hovered && hasTrades
-            ? 'rgba(255,255,255,0.02)'
-            : bg,
+        background: isSelected ? 'rgba(59,130,246,0.07)' : hovered && hasTrades ? 'rgba(255,255,255,0.02)' : bg,
         border,
-        borderRadius: 10,
-        padding: '10px 11px 8px',
-        cursor: hasTrades ? 'pointer' : 'default',
         opacity: dim ? 0.25 : 1,
-        transition: 'all 0.15s ease',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2,
       }}
     >
       <div
