@@ -3,7 +3,7 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { ActivityTradeTableRow } from '@/components/activity/ActivityTradeTableRow';
 
-export const ACTIVITY_DESKTOP_COLUMN_COUNT = 19;
+export const ACTIVITY_DESKTOP_COLUMN_COUNT = 18;
 
 interface ActivityTradeDesktopTableProps {
   rows: BridgeTradeLogRow[];
@@ -20,25 +20,20 @@ export function ActivityTradeDesktopTable({ rows, isTradeListLoading }: Activity
             <th className="px-3 py-2 text-xs font-medium">Engine</th>
             <th className="px-3 py-2 text-xs font-medium">Pair</th>
             <th className="px-3 py-2 text-xs font-medium">Dir</th>
-            <th className="px-3 py-2 text-xs font-medium">Score</th>
             <th className="px-3 py-2 text-xs font-medium">Decision</th>
             <th className="px-3 py-2 text-xs font-medium">Reason</th>
+            <th className="px-3 py-2 text-xs font-medium">Session</th>
             <th className="px-3 py-2 text-xs font-medium">Fill</th>
             <th className="px-3 py-2 text-xs font-medium">SL</th>
             <th className="px-3 py-2 text-xs font-medium">TP</th>
             <th className="px-3 py-2 text-xs font-medium">Exit</th>
-            <th className="px-3 py-2 text-xs font-medium">Lots</th>
             <th className="px-3 py-2 text-xs font-medium">P&L $</th>
-            <th className="px-3 py-2 text-xs font-medium">Pips</th>
             <th className="px-3 py-2 text-xs font-medium">R</th>
             <th className="px-3 py-2 text-xs font-medium">Duration</th>
+            <th className="px-3 py-2 text-xs font-medium">Close Reason</th>
             <th className="px-3 py-2 text-xs font-medium">Result</th>
-            <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              Regime
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              Confidence
-            </th>
+            <th className="px-3 py-2 text-xs font-medium">Confidence</th>
+            <th className="px-3 py-2 text-xs font-medium">Tag</th>
           </tr>
         </thead>
         <tbody>

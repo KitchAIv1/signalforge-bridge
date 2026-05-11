@@ -13,11 +13,18 @@ import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
 import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDesktopTable';
 import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobileList';
 import { RegimePanel } from '@/components/RegimePanel';
+import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 
 const PAGE_SIZE = 50;
 
 const EXPANDED_TRADE_LOG_SELECT =
-  'id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, confluence_score, units, risk_amount, pnl_dollars, fill_price, exit_price, stop_loss, take_profit, pnl_pips, pnl_r, lot_size, slippage_pips, close_reason, duration_minutes, signal_received_at, created_at, regime_direction, regime_confidence, regime_evaluated_at, regime_size_multiplier';
+  'id, signal_id, engine_id, pair, direction, decision, block_reason, status, result, ' +
+  'confluence_score, units, risk_amount, pnl_dollars, fill_price, exit_price, stop_loss, ' +
+  'take_profit, pnl_pips, pnl_r, lot_size, close_reason, duration_minutes, ' +
+  'signal_received_at, created_at, regime_direction, regime_confidence, regime_evaluated_at, ' +
+  'signal_session, close_tag, manual_tag, ' +
+  'layer4_result, layer4_bullish_count, layer4_bearish_count, ' +
+  'layer5_result, layer5_pip_diff, layer6_position_pct, choppy_extended';
 
 const DECISIONS: { value: string; label: string }[] = [
   { value: '', label: 'All' },
@@ -107,7 +114,7 @@ export default function ActivityPage() {
         setLoading(false);
         return;
       }
-      const list = (data ?? []) as BridgeTradeLogRow[];
+      const list = (data ?? []) as unknown as BridgeTradeLogRow[];
       setRows((prev) => (append ? [...prev, ...list] : list));
       setHasMore(list.length === PAGE_SIZE);
       setLoading(false);
@@ -143,7 +150,7 @@ export default function ActivityPage() {
       if (decision) q = q.eq('decision', decision as DecisionType);
       if (engine) q = q.eq('engine_id', engine);
       const { data } = await q;
-      const list = (data ?? []) as BridgeTradeLogRow[];
+      const list = (data ?? []) as unknown as BridgeTradeLogRow[];
       const csv = toCSV(list);
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const anchor = document.createElement('a');
@@ -204,6 +211,8 @@ export default function ActivityPage() {
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />
         <AUDUSDChart symbol="OANDA:GBPUSD" interval="5" useResponsiveHeight />
       </div>
+
+      <NewsEventStrip />
 
       <ActivityTradeMobileList rows={rows} isTradeListLoading={loading} />
       <ActivityTradeDesktopTable rows={rows} isTradeListLoading={loading} />

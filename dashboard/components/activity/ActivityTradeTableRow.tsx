@@ -3,6 +3,7 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
+import { CloseTagButton } from '@/components/activity/CloseTagButton';
 
 export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
   const isExecuted = row.decision === 'EXECUTED';
@@ -35,17 +36,15 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
           <span className="text-red-500">SHORT</span>
         )}
       </td>
-      <td className="px-3 py-2 text-xs">{row.confluence_score ?? '—'}</td>
       <td className="px-3 py-2 text-xs">
-        <span
-          className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${decisionBadgeClasses}`}
-        >
+        <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${decisionBadgeClasses}`}>
           {row.decision}
         </span>
       </td>
-      <td className="max-w-[160px] truncate px-3 py-2 text-xs text-slate-500" title={row.block_reason ?? ''}>
+      <td className="max-w-[140px] truncate px-3 py-2 text-xs text-slate-500" title={row.block_reason ?? ''}>
         {row.block_reason ?? '—'}
       </td>
+      <td className="px-3 py-2 text-xs text-slate-500">{row.signal_session ?? '—'}</td>
       <td className="px-3 py-2 text-xs">
         {isExecuted && row.fill_price != null ? Number(row.fill_price).toFixed(5) : '—'}
       </td>
@@ -58,14 +57,8 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
       <td className="px-3 py-2 text-xs">
         {isExecuted && row.exit_price != null ? Number(row.exit_price).toFixed(5) : '—'}
       </td>
-      <td className="px-3 py-2 text-xs">
-        {isExecuted && row.lot_size != null ? Number(row.lot_size).toFixed(2) : '—'}
-      </td>
       <td className={`px-3 py-2 text-xs font-medium ${pnlColorClass}`}>
         {row.pnl_dollars != null ? (row.pnl_dollars >= 0 ? '+' : '') + Number(row.pnl_dollars).toFixed(2) : '—'}
-      </td>
-      <td className={`px-3 py-2 text-xs ${pnlColorClass}`}>
-        {row.pnl_pips != null ? (row.pnl_pips >= 0 ? '+' : '') + Number(row.pnl_pips).toFixed(1) : '—'}
       </td>
       <td className={`px-3 py-2 text-xs ${pnlColorClass}`}>
         {row.pnl_r != null ? (row.pnl_r >= 0 ? '+' : '') + Number(row.pnl_r).toFixed(2) + 'R' : '—'}
@@ -73,23 +66,29 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
       <td className="px-3 py-2 text-xs text-slate-500">
         {row.duration_minutes != null ? Math.round(Number(row.duration_minutes)) + 'm' : '—'}
       </td>
+      <td className="px-3 py-2 text-xs text-slate-500">{row.close_reason ?? '—'}</td>
       <td className="px-3 py-2 text-xs">
         {row.result ? (
-          <span
-            className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${resultBadgeClasses}`}
-          >
+          <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${resultBadgeClasses}`}>
             {row.result}
           </span>
         ) : (
           '—'
         )}
       </td>
-      <td className="px-3 py-2 text-sm text-gray-700">{row.regime_direction ?? '—'}</td>
       <td className="px-3 py-2">
         <RegimeConfidenceBadge
           confidence={row.regime_confidence ?? null}
           direction={row.regime_direction ?? null}
           evaluatedAt={row.regime_evaluated_at ?? null}
+        />
+      </td>
+      <td className="px-3 py-2 align-top">
+        <CloseTagButton
+          tradeId={row.id}
+          currentTag={row.close_tag ?? null}
+          closeReason={row.close_reason ?? null}
+          pnlR={row.pnl_r != null ? Number(row.pnl_r) : null}
         />
       </td>
     </tr>

@@ -62,6 +62,21 @@ export interface BridgeTradeLogRow {
   regime_confidence?: string | null;
   regime_evaluated_at?: string | null;
   regime_size_multiplier?: number | null;
+
+  // Regime layer detail
+  layer4_result?: string | null;
+  layer4_bullish_count?: number | null;
+  layer4_bearish_count?: number | null;
+  layer5_result?: string | null;
+  layer5_pip_diff?: number | null;
+  layer6_position_pct?: number | null;
+  layer7_active?: boolean | null;
+  choppy_extended?: boolean | null;
+  signal_session?: string | null;
+
+  // Tagging
+  manual_tag?: string | null;
+  close_tag?: string | null;
 }
 
 export interface OmegaShadowSignalRow {
@@ -169,4 +184,14 @@ export interface RegimeState {
   layer5_pip_diff:          number | null;
   layer6_position_pct:      number | null;
   created_at:               string;
+}
+
+export interface NewsEventRow {
+  id:                           string;
+  event_name:                   string;
+  event_datetime_utc:           string;
+  affected_pairs:               string[] | null;
+  pre_event_action:             string;
+  post_event_direction?:        string | null;
+  confirmation_delay_minutes?:  number | null;
 }
