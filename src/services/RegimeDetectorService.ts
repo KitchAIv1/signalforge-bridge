@@ -5,8 +5,14 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { fetchCompletedCandles } from '../connectors/oanda.js';
-import { computeLayer4, computeLayer5, computeLayer6 }
-  from './regimeDetector/layerComputation.js';
+import {
+  computeLayer4,
+  computeLayer5,
+  computeLayer6,
+  computeLayer7,
+  fetchCurrentMidPrice,
+  isWeeklyOpenWindow,
+} from './regimeDetector/layerComputation.js';
 import { classifyRegime } from './regimeDetector/regimeClassifier.js';
 
 const AUDUSD_PAIR   = 'AUD_USD';
@@ -48,10 +54,41 @@ export async function runRegimeDetection(): Promise<void> {
     return;
   }
 
-  const l4     = computeLayer4(d1Candles, evaluatedAt);
-  const l5     = computeLayer5(h4Candles, evaluatedAt);
-  const l6     = computeLayer6(d1Candles, evaluatedAt);
-  const regime = classifyRegime(l4.result, l5.result, l6.positionPct, Math.abs(l5.pipDiff));
+  const l4 = computeLayer4(d1Candles, evaluatedAt);
+  const l5 = computeLayer5(h4Candles, evaluatedAt);
+  const l6 = computeLayer6(d1Candles, evaluatedAt);
+
+  // Layer 7 — weekly open reality check (active Sunday 21:00 → Monday 01:00 UTC only)
+  let effectiveL5Result = l5.result;
+  let layer7Output: Awaited<ReturnType<typeof computeLayer7>> | null = null;
+
+  if (isWeeklyOpenWindow(evaluatedAt)) {
+    const currentMidPrice = await fetchCurrentMidPrice(AUDUSD_PAIR);
+    layer7Output = computeLayer7(d1Candles, currentMidPrice ?? 0, evaluatedAt);
+
+    if (layer7Output.l5Override !== null) {
+      effectiveL5Result = layer7Output.l5Override;
+      console.log(
+        `[RegimeDetector] Layer7 ACTIVE — ${layer7Output.overrideReason} ` +
+        `| fridayClose: ${layer7Output.fridayClose} ` +
+        `| currentPrice: ${layer7Output.currentPrice} ` +
+        `| pipDiff: ${layer7Output.pipDiff} ` +
+        `| L5 overridden: ${l5.result} → ${effectiveL5Result}`
+      );
+    } else {
+      console.log(
+        `[RegimeDetector] Layer7 ACTIVE — no override ` +
+        `| ${layer7Output.overrideReason}`
+      );
+    }
+  }
+
+  const regime = classifyRegime(
+    l4.result,
+    effectiveL5Result,
+    l6.positionPct,
+    Math.abs(l5.pipDiff)
+  );
 
   const supabase = buildRegimeSupabaseClient();
   const { error } = await supabase.from('regime_state').insert({
@@ -76,8 +113,9 @@ export async function runRegimeDetection(): Promise<void> {
   console.log(
     `[RegimeDetector] Written → ${regime.direction} (${regime.confidence}) ` +
     `| L4:${l4.result}(${l4.bullishCount}b/${l4.bearishCount}br) ` +
-    `| L5:${l5.result}(${l5.pipDiff}pips) ` +
+    `| L5:${l5.result}→effective:${effectiveL5Result}(${l5.pipDiff}pips) ` +
     `| L6:${l6.positionPct}% ` +
-    `| choppy:${regime.choppyExtendedOverride}`
+    `| choppy:${regime.choppyExtendedOverride} ` +
+    `| L7:${layer7Output ? `active(${layer7Output.pipDiff}pips→${layer7Output.l5Override ?? 'no override'})` : 'inactive'}`
   );
 }

@@ -112,3 +112,163 @@ export function computeLayer6(
 
   return { positionPct };
 }
+
+// ─── LAYER 7 — WEEKLY OPEN REALITY CHECK ────────────────────────────────────
+// Only active during the first H4 window of the new trading week:
+// Sunday 21:00 UTC → Monday 01:00 UTC.
+// Compares current live price to Friday's D1 close.
+// If price has pulled back 8+ pips from Friday → override L5 to BEARISH.
+// If price has gapped up 8+ pips from Friday → override L5 to BULLISH.
+// Within 8 pips either side → no override, return null.
+// This resolves the weekend candle gap: no H4 candles exist over the weekend
+// so Layer 5 reads stale Friday data. Layer 7 replaces that with a live check.
+
+export interface Layer7Output {
+  active:         boolean;         // true only during Sunday 21:00–Monday 01:00 UTC
+  fridayClose:    number | null;   // last D1 candle close price
+  currentPrice:   number | null;   // live OANDA mid price at evaluation time
+  pipDiff:        number | null;   // (currentPrice - fridayClose) * 10000, signed
+  l5Override:     'BEARISH' | 'BULLISH' | null; // null = no override
+  overrideReason: string | null;   // human-readable reason for logging
+}
+
+/** Returns true if current UTC time is in the weekly open window */
+export function isWeeklyOpenWindow(now: Date): boolean {
+  const day         = now.getUTCDay();    // 0=Sun, 1=Mon
+  const hourUTC     = now.getUTCHours();
+  const minuteUTC   = now.getUTCMinutes();
+  const timeDecimal = hourUTC + minuteUTC / 60;
+
+  // Sunday 21:00 UTC to Monday 01:00 UTC
+  return (day === 0 && timeDecimal >= 21) || (day === 1 && timeDecimal < 1);
+}
+
+/**
+ * Computes Layer 7 output.
+ * @param d1Candles  — same completed D1 candles already fetched by RegimeDetectorService
+ * @param currentPrice — live OANDA mid price fetched separately
+ * @param now        — current evaluation timestamp
+ */
+export function computeLayer7(
+  d1Candles: Array<{ time: string; mid: { o: string; h: string; l: string; c: string } }>,
+  currentPrice: number,
+  now: Date
+): Layer7Output {
+  const THRESHOLD_PIPS    = 8;
+  const THRESHOLD_PRICE   = THRESHOLD_PIPS * 0.0001; // 8 pips in price units
+
+  const windowActive = isWeeklyOpenWindow(now);
+
+  if (!windowActive) {
+    return {
+      active:         false,
+      fridayClose:    null,
+      currentPrice:   null,
+      pipDiff:        null,
+      l5Override:     null,
+      overrideReason: null,
+    };
+  }
+
+  // Get Friday's close = last completed D1 candle before now
+  const priorCandles = d1Candles.filter(c => new Date(c.time) < now);
+  if (priorCandles.length === 0) {
+    return {
+      active:         true,
+      fridayClose:    null,
+      currentPrice,
+      pipDiff:        null,
+      l5Override:     null,
+      overrideReason: 'No prior D1 candles available',
+    };
+  }
+
+  const fridayClose = parseFloat(priorCandles[priorCandles.length - 1].mid.c);
+  const diff        = currentPrice - fridayClose;
+  const pipDiff     = Math.round(diff * 10000);
+
+  if (diff <= -THRESHOLD_PRICE) {
+    return {
+      active:         true,
+      fridayClose,
+      currentPrice,
+      pipDiff,
+      l5Override:     'BEARISH',
+      overrideReason: `Price ${Math.abs(pipDiff)} pips below Friday close → retracement → L5 override BEARISH`,
+    };
+  }
+
+  if (diff >= THRESHOLD_PRICE) {
+    return {
+      active:         true,
+      fridayClose,
+      currentPrice,
+      pipDiff,
+      l5Override:     'BULLISH',
+      overrideReason: `Price ${pipDiff} pips above Friday close → gap up → L5 override BULLISH`,
+    };
+  }
+
+  return {
+    active:         true,
+    fridayClose,
+    currentPrice,
+    pipDiff,
+    l5Override:     null,
+    overrideReason: `Price within ${THRESHOLD_PIPS} pip threshold (${pipDiff} pips) — no override`,
+  };
+}
+
+/**
+ * Fetches current live mid price for a pair from OANDA pricing endpoint.
+ * Used exclusively by Layer 7 during the weekly open window.
+ * Returns null on any error — Layer 7 will skip override gracefully.
+ */
+export async function fetchCurrentMidPrice(
+  pair: string
+): Promise<number | null> {
+  try {
+    const token   = process.env.OANDA_API_TOKEN;
+    const env     = process.env.OANDA_ENVIRONMENT ?? 'practice';
+    const baseUrl = env === 'live'
+      ? 'https://api-fxtrade.oanda.com'
+      : 'https://api-fxpractice.oanda.com';
+    const accountId = process.env.OANDA_ACCOUNT_ID;
+
+    if (!token || !accountId) {
+      console.warn('[Layer7] Missing OANDA_API_TOKEN or OANDA_ACCOUNT_ID');
+      return null;
+    }
+
+    const url = `${baseUrl}/v3/accounts/${accountId}/pricing?instruments=${pair}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`[Layer7] Pricing fetch failed: ${response.status}`);
+      return null;
+    }
+
+    const payload = await response.json() as {
+      prices: Array<{ asks: Array<{ price: string }>; bids: Array<{ price: string }> }>;
+    };
+
+    const price = payload.prices?.[0];
+    if (!price) return null;
+
+    const ask = parseFloat(price.asks[0]?.price ?? '0');
+    const bid = parseFloat(price.bids[0]?.price ?? '0');
+
+    if (!ask || !bid) return null;
+
+    return (ask + bid) / 2; // mid price
+  } catch (err) {
+    console.warn('[Layer7] fetchCurrentMidPrice error:', err);
+    return null;
+  }
+}
