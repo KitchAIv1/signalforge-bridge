@@ -631,26 +631,13 @@ export async function processSignal(
 
     if (regimeState) {
       regimeSizeMultiplier = getRegimeSizeMultiplier(regimeState.confidence);
-
-      if (regimeSizeMultiplier === 0) {
-        console.log(
-          `[RegimeGate] omega BLOCKED — confidence: ${regimeState.confidence} | ` +
-          `direction: ${regimeState.direction} | evaluated: ${regimeState.evaluatedAt}`
-        );
-        await supabase.from('bridge_trade_log').insert(
-          buildTradeLogRow(
-            payload,
-            'BLOCKED',
-            'REGIME_CONFIDENCE_BLOCK',
-            decisionLatencyMs,
-            cachedAccount?.equity ?? null,
-            openTrades.length,
-            norm.oandaInstrument
-          )
-        );
-        return;
-      }
     }
+    console.log(
+      `[RegimeAdvisory] omega signal proceeding — confidence: ${regimeState?.confidence ?? 'unknown'} | ` +
+      `regime direction: ${regimeState?.direction ?? 'unknown'} | ` +
+      `omega direction: ${norm.direction} | ` +
+      `evaluated: ${regimeState?.evaluatedAt ?? 'unknown'}`
+    );
   }
 
   const conversionRate = getConversionRateForInstrument(
@@ -823,11 +810,6 @@ export async function processSignal(
         return (units < 0 ? -1 : 1) * finalAbs;
       })()
     : units;
-
-  if (norm.engineId === 'omega' && regimeSizeMultiplier < 1.0 && regimeSizeMultiplier > 0) {
-    finalUnits = Math.floor(finalUnits * regimeSizeMultiplier);
-    console.log(`[RegimeGate] omega size → ${regimeSizeMultiplier * 100}% = ${finalUnits} units`);
-  }
 
   try {
     const TRAIL_STOP_ENGINES = [
