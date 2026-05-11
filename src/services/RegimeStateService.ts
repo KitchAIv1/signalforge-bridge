@@ -63,19 +63,18 @@ export async function fetchLatestRegimeState(
   const regimeRow = regimeRaw as unknown as Record<string, unknown>;
 
   return {
-    direction:       regimeRow['regime_direction'] as RegimeDirection,
-    confidence:      regimeRow['regime_confidence'] as RegimeConfidence,
-    evaluatedAt:    regimeRow['evaluated_at'] as string,
-    choppyOverride: (regimeRow['choppy_extended_override'] ?? false) as boolean,
-
-    layer4_result:            (regimeRow['layer4_result'] as string | null | undefined) ?? null,
-    layer4_bullish_count:     (regimeRow['layer4_bullish_count'] as number | null | undefined) ?? null,
-    layer4_bearish_count:     (regimeRow['layer4_bearish_count'] as number | null | undefined) ?? null,
-    layer5_result:            (regimeRow['layer5_result'] as string | null | undefined) ?? null,
-    layer5_pip_diff:          (regimeRow['layer5_pip_diff'] as number | null | undefined) ?? null,
-    layer6_position_pct:      (regimeRow['layer6_position_pct'] as number | null | undefined) ?? null,
-    layer7_override_active:   (regimeRow['layer7_override_active'] as boolean | null | undefined) ?? null,
-    layer7_pip_diff:          (regimeRow['layer7_pip_diff'] as number | null | undefined) ?? null,
-    choppy_extended_override: (regimeRow['choppy_extended_override'] as boolean | null | undefined) ?? null,
+    direction:                regimeRow['regime_direction'] as RegimeDirection,
+    confidence:               regimeRow['regime_confidence'] as RegimeConfidence,
+    evaluatedAt:              regimeRow['evaluated_at'] as string,
+    choppyOverride:          (regimeRow['choppy_extended_override'] ?? false) as boolean,
+    layer4_result:           regimeRow['layer4_result'] as string | null ?? null,
+    layer4_bullish_count:    regimeRow['layer4_bullish_count'] as number | null ?? null,
+    layer4_bearish_count:    regimeRow['layer4_bearish_count'] as number | null ?? null,
+    layer5_result:           regimeRow['layer5_result'] as string | null ?? null,
+    layer5_pip_diff:          regimeRow['layer5_pip_diff'] as number | null ?? null,
+    layer6_position_pct:     regimeRow['layer6_position_pct'] as number | null ?? null,
+    layer7_override_active:  regimeRow['layer7_override_active'] as boolean | null ?? null,
+    layer7_pip_diff:         regimeRow['layer7_pip_diff'] as number | null ?? null,
+    choppy_extended_override: (regimeRow['choppy_extended_override'] ?? null) as boolean | null,
   };
 }
