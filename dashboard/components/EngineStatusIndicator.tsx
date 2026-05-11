@@ -17,10 +17,8 @@ interface EngineStatusIndicatorProps {
   omegaDir?: 'long' | 'short';
   rebuildHourGateEnabled?: boolean;
 }
-// Omega — engine-side filters (NY session filtered in engine,
-// signals never reach bridge from these hours)
-const OMEGA_NY_HOURS = [15, 16, 17, 18, 19]; // tagSession() NY
-const OMEGA_LAYER3A_HOUR = 20; // Layer 3A: always SHORT
+
+// Omega: bridge no longer applies UTC hour gates; UI shows advisory/active only (weekend still closed).
 
 const REBUILD_BLOCK_REASONS: Record<number, string> = {
   0: 'Asian session',
@@ -95,6 +93,7 @@ function getOmegaStatus(
   const hourUTC = now.getUTCHours();
   const minuteUTC = now.getUTCMinutes();
   const timeDecimal = hourUTC + minuteUTC / 60;
+  const dirLabel = dir === 'long' ? '↑ LONG' : '↓ SHORT';
 
   // Forex market hours:
   // Opens:  Sunday 21:00 UTC (Sydney/Asian open)
@@ -111,34 +110,6 @@ function getOmegaStatus(
       pair: 'AUDUSD',
       isBlocked: true,
       reason: 'Weekend — forex market closed',
-      nextCleanHour: null,
-      currentHourUtc: hourUtc,
-    };
-  }
-
-  const isNY = OMEGA_NY_HOURS.includes(hourUtc);
-  const isLayer3A = hourUtc === OMEGA_LAYER3A_HOUR;
-  const dirLabel = dir === 'long' ? '↑ LONG' : '↓ SHORT';
-
-  if (isNY) {
-    return {
-      engineId: 'omega',
-      label: 'Omega',
-      pair: 'AUDUSD',
-      isBlocked: true,
-      reason: 'Engine filter: NY session (15–19 UTC)',
-      nextCleanHour: 21,
-      currentHourUtc: hourUtc,
-    };
-  }
-
-  if (isLayer3A) {
-    return {
-      engineId: 'omega',
-      label: 'Omega',
-      pair: 'AUDUSD',
-      isBlocked: false,
-      reason: '⚡ Layer 3A: hour 20 UTC — SHORT override',
       nextCleanHour: null,
       currentHourUtc: hourUtc,
     };
@@ -267,31 +238,23 @@ export function EngineStatusIndicator({
 
             <div>
               <p className="mb-1 text-xs font-medium text-slate-500">
-                Omega hour grid (UTC)
+                Omega (UTC grid — informational)
+              </p>
+              <p className="mb-1 text-[9px] text-slate-500">
+                Bridge does not block Omega by UTC hour; regime is advisory only.
               </p>
               <div className="grid grid-cols-12 gap-0.5">
                 {Array.from({ length: 24 }, (_, h) => {
-                  const isNY = OMEGA_NY_HOURS.includes(h);
-                  const isL3A = h === OMEGA_LAYER3A_HOUR;
                   const current = h === hourUtc;
                   return (
                     <div
                       key={h}
-                      title={`Hour ${h}:00 UTC — ${
-                        isNY ? 'NY session (engine filter)'
-                          : isL3A ? 'Layer 3A: SHORT override'
-                          : 'Active'
-                      }`}
+                      title={`Hour ${h}:00 UTC — not blocked at bridge`}
                       className={`
-                        flex h-5 items-center justify-center rounded 
+                        flex h-5 items-center justify-center rounded
                         text-[9px] font-medium
                         ${current ? 'ring-1 ring-slate-800' : ''}
-                        ${isNY
-                          ? 'bg-red-200 text-red-700'
-                          : isL3A
-                            ? 'bg-amber-200 text-amber-800'
-                            : 'bg-emerald-200 text-emerald-700'
-                        }
+                        bg-emerald-200 text-emerald-700
                       `}
                     >
                       {h}
@@ -300,9 +263,7 @@ export function EngineStatusIndicator({
                 })}
               </div>
               <div className="mt-1 flex gap-2 text-[9px] text-slate-400">
-                <span>🟥 NY filter</span>
-                <span>🟨 Layer 3A (SHORT)</span>
-                <span>🟩 Active</span>
+                <span>🟩 All hours eligible (market open)</span>
               </div>
             </div>
 
