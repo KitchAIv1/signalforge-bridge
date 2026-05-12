@@ -127,7 +127,15 @@ async function main(): Promise<void> {
         }
       }
     )
-    .subscribe();
+    .subscribe((status, err) => {
+      if (status === 'SUBSCRIBED') {
+        logInfo('[EngineRoster] bridge_engines realtime subscription active');
+      } else {
+        logWarn(
+          `[EngineRoster] bridge_engines subscription status: ${status} | err: ${JSON.stringify(err)}`
+        );
+      }
+    });
 
   ready = true;
   while (signalQueue.length > 0) {
