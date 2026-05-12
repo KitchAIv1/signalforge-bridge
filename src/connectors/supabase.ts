@@ -105,9 +105,9 @@ export function subscribeToSignalInserts(
 
           if (attemptCount >= MAX_ATTEMPTS) {
             console.error(
-              '[Bridge] Max reconnect attempts reached. Manual restart required.'
+              '[Bridge] Max reconnect attempts reached — forcing process restart.'
             );
-            return;
+            process.exit(1);
           }
 
           attemptCount++;
