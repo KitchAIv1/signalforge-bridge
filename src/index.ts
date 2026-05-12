@@ -100,6 +100,9 @@ async function main(): Promise<void> {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'bridge_engines' },
       async (change) => {
+        logInfo(
+          `[EngineRoster] change received | event: ${change.eventType} | new: ${JSON.stringify(change.new)} | old: ${JSON.stringify(change.old)}`
+        );
         try {
           const engineId: string =
             (change.new as { engine_id?: string } | null)?.engine_id
