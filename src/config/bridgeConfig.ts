@@ -128,3 +128,17 @@ export async function loadActiveEngines(supabase: SupabaseClient): Promise<Bridg
   if (error) throw new Error(`Failed to load bridge_engines: ${error.message}`);
   return (data ?? []) as BridgeEngineRow[];
 }
+
+export async function reloadEngineById(
+  supabase: SupabaseClient,
+  engineId: string
+): Promise<BridgeEngineRow | null> {
+  const { data, error } = await supabase
+    .from('bridge_engines')
+    .select('engine_id, is_active, execution_threshold, max_hold_hours, weight, max_daily_trades, trades_today')
+    .eq('engine_id', engineId)
+    .single();
+
+  if (error || !data) return null;
+  return data as BridgeEngineRow;
+}

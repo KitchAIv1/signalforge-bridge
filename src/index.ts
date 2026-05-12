@@ -6,7 +6,7 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import { getSupabaseClient, subscribeToSignalInserts, getSignalTableName } from './connectors/supabase.js';
-import { loadBridgeConfig, loadActiveEngines } from './config/bridgeConfig.js';
+import { loadBridgeConfig, loadActiveEngines, reloadEngineById } from './config/bridgeConfig.js';
 import { getAccountSummary } from './connectors/oanda.js';
 import { initCircuitBreaker, updatePeakEquity } from './core/circuitBreaker.js';
 import { processSignal } from './core/signalRouter.js';
@@ -93,6 +93,42 @@ async function main(): Promise<void> {
       getOpenTradesFromLog,
     }).catch((err) => logWarn('processSignal error', { error: String(err) }));
   });
+
+  const enginesRosterChannel = supabase
+    .channel('bridge_engines_changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'bridge_engines' },
+      async (change) => {
+        try {
+          const engineId: string =
+            (change.new as { engine_id?: string } | null)?.engine_id
+            ?? (change.old as { engine_id?: string } | null)?.engine_id ?? '';
+
+          if (!engineId) return;
+
+          const updated = await reloadEngineById(supabase, engineId);
+          const idx = engines.findIndex((e) => e.engine_id === engineId);
+
+          if (!updated || !updated.is_active) {
+            if (idx !== -1) {
+              engines.splice(idx, 1);
+              logInfo(`[EngineRoster] ${engineId} deactivated — removed from in-memory roster`);
+            }
+          } else if (idx !== -1) {
+            engines[idx] = updated;
+            logInfo(`[EngineRoster] ${engineId} updated in-memory roster`);
+          } else {
+            engines.push(updated);
+            logInfo(`[EngineRoster] ${engineId} activated — added to in-memory roster`);
+          }
+        } catch (rosterErr) {
+          logWarn('[EngineRoster] realtime sync error', { error: String(rosterErr) });
+        }
+      }
+    )
+    .subscribe();
+
   ready = true;
   while (signalQueue.length > 0) {
     const payload = signalQueue.shift() as Record<string, unknown>;
@@ -146,8 +182,18 @@ async function main(): Promise<void> {
 
   await resetIfNeeded();
   scheduleMidnightReset();
-  process.on('SIGINT', () => { channel.unsubscribe(); logInfo('Bridge shutdown'); process.exit(0); });
-  process.on('SIGTERM', () => { channel.unsubscribe(); logInfo('Bridge shutdown'); process.exit(0); });
+  process.on('SIGINT', () => {
+    void enginesRosterChannel.unsubscribe();
+    channel.unsubscribe();
+    logInfo('Bridge shutdown');
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    void enginesRosterChannel.unsubscribe();
+    channel.unsubscribe();
+    logInfo('Bridge shutdown');
+    process.exit(0);
+  });
 }
 
 main().catch((err) => {
