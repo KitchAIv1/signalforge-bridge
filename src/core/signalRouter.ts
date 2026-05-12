@@ -597,6 +597,31 @@ export async function processSignal(
     norm.direction = norm.direction === 'LONG' ? 'SHORT' : 'LONG';
   }
 
+  // Mirror SL and TP when direction is flipped for engine_rebuild
+  // Required because norm.stopLoss and norm.takeProfit are priced
+  // for the original signal direction. RC3 reads norm.stopLoss at
+  // fill time — if direction is flipped but SL/TP are not mirrored,
+  // widenedSL computes on the wrong side and correctedTP breaks.
+  // Mirror formula: reflect SL and TP distances around entryPrice.
+  if (
+    norm.engineId === 'engine_rebuild' &&
+    process.env.REBUILD_DIRECTION_FLIP === 'true'
+  ) {
+    const slDistance = Math.abs(norm.entryPrice - norm.stopLoss);
+    const tpDistance = Math.abs(norm.takeProfit - norm.entryPrice);
+    if (norm.direction === 'SHORT') {
+      // Was LONG (before flip): SL was below entry, TP above entry
+      // Now SHORT: SL must be above entry, TP below entry
+      norm.stopLoss = norm.entryPrice + slDistance;
+      norm.takeProfit = norm.entryPrice - tpDistance;
+    } else {
+      // Was SHORT (before flip): SL was above entry, TP below entry
+      // Now LONG: SL must be below entry, TP above entry
+      norm.stopLoss = norm.entryPrice - slDistance;
+      norm.takeProfit = norm.entryPrice + tpDistance;
+    }
+  }
+
   // Safety net: opposing Omega legs still open (auto-close lag / failure).
   if (norm.engineId === 'omega') {
     const opposingDir =
