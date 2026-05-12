@@ -4,7 +4,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { closeTrade, fetchLatestM5Candle } from '../connectors/oanda.js';
+import { closeTrade, fetchLatestM5Candle, getPricing } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import { computeDerivedFields, resultFromPnl } from './tradeMonitorHelpers.js';
 import {
@@ -23,6 +23,30 @@ import {
 
 const candleFetchFailures = new Map<string, number>();
 const CANDLE_FAILURE_ALERT_THRESHOLD = 5;
+
+async function resolveTrailLiveMidForExit(instrument: string): Promise<number | null> {
+  try {
+    const liveQuotes = await getPricing(instrument);
+    const quote = liveQuotes[0];
+    if (!quote) {
+      console.warn(
+        '[TrailStop] getPricing returned no quote for',
+        instrument,
+        '— skipping exit check this cycle'
+      );
+      return null;
+    }
+    const liveMid = (parseFloat(quote.bid) + parseFloat(quote.ask)) / 2;
+    if (!Number.isFinite(liveMid) || liveMid <= 0) {
+      console.warn('[TrailStop] liveMid invalid for', instrument, '— skipping exit check this cycle');
+      return null;
+    }
+    return liveMid;
+  } catch {
+    console.warn('[TrailStop] getPricing failed for', instrument, '— skipping exit check this cycle');
+    return null;
+  }
+}
 
 export function isTrailStopEngine(engineId: string): boolean {
   if (!getTrailEnabled()) return false;
@@ -103,26 +127,39 @@ export async function runTrailingStopCheck(
   }
   candleFetchFailures.delete(oandaTradeId);
 
-  const { favorable, adverse } = favorableAndAdverse(state.direction, fillPrice, candle);
-  if (adverse >= state.sl_distance && !state.trail_activated) {
+  // Candle: peak tracking + activation threshold (full closed-bar excursion).
+  const { favorable: candleFavorable } = favorableAndAdverse(state.direction, fillPrice, candle);
+
+  // Live mid: exit decisions only — avoids stale-candle premature closes.
+  const liveMid = await resolveTrailLiveMidForExit(instrument);
+  if (liveMid === null) return NO_TRAIL_CLOSE;
+
+  const { favorable: liveFavorable, adverse: liveAdverse } = favorableAndAdverse(
+    state.direction,
+    fillPrice,
+    { high: liveMid, low: liveMid }
+  );
+
+  if (liveAdverse >= state.sl_distance && !state.trail_activated) {
     return { shouldClose: true, reason: 'trail_sl_hit', pnlR: -getSlMultiplier() };
   }
 
-  const nowActivated = state.trail_activated || favorable >= state.activation_threshold;
+  const nowActivated = state.trail_activated || candleFavorable >= state.activation_threshold;
+
   const peakFavorable = await applyTrailPeakUpdates(
     supabase,
     oandaTradeId,
     state,
     nowActivated,
-    favorable
+    candleFavorable
   );
 
   const exitDecision = evaluateTrailExitDecision(
     state,
     nowActivated,
     peakFavorable,
-    favorable,
-    adverse
+    liveFavorable,
+    liveAdverse
   );
   return exitDecision ?? NO_TRAIL_CLOSE;
 }
