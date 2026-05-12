@@ -159,7 +159,7 @@ export function evaluateTrailExitDecision(
   favorable: number,
   adverse: number
 ): { shouldClose: boolean; reason: string; pnlR: number | null } | null {
-  if (nowActivated && peakFavorable > 0) {
+  if (nowActivated && peakFavorable >= state.trail_distance) {
     const trailExitLevel = peakFavorable - state.trail_distance;
     if (favorable <= trailExitLevel) {
       const lockedPnlR = trailExitLevel / state.r_size_raw;
