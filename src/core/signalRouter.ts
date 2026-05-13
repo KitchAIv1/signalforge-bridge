@@ -20,7 +20,7 @@ import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDed
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
 import { calculateUnits } from './positionSizer.js';
-import { closeTrade, patchTradeTPSL } from '../connectors/oanda.js';
+import { closeTrade, getClosedTradeDetails, patchTradeTPSL } from '../connectors/oanda.js';
 import {
   parseRebuildBoundsRetryFlag,
   placeMarketOrderWithRebuildBoundsRetry,
@@ -115,7 +115,7 @@ async function closeAllOpenOmegaPositions(
     const normalizedOppose = opposingDirection.toLowerCase();
     const { data: openTradeRows } = await supabase
       .from('bridge_trade_log')
-      .select('id, oanda_trade_id, direction')
+      .select('id, oanda_trade_id, direction, fill_price, r_size_raw, created_at')
       .eq('engine_id', 'omega')
       .eq('status', 'open')
       .ilike('direction', normalizedOppose)
@@ -137,14 +137,49 @@ async function closeAllOpenOmegaPositions(
       const oid = logRow.oanda_trade_id as string;
       try {
         await closeTrade(oid);
-        await supabase
+
+        const details = await getClosedTradeDetails(
+          oid,
+          logRow.created_at ?? new Date(Date.now() - 60 * 60 * 1000).toISOString()
+        );
+
+        const fillPrice = logRow.fill_price != null ? Number(logRow.fill_price) : null;
+        const rSize = logRow.r_size_raw != null ? Number(logRow.r_size_raw) : null;
+
+        let pnlR: number | null = null;
+        if (details.exitPrice != null && fillPrice != null && rSize != null && rSize > 0) {
+          const rawMove =
+            String(logRow.direction).toLowerCase() === 'short'
+              ? fillPrice - details.exitPrice
+              : details.exitPrice - fillPrice;
+          pnlR = rawMove / rSize;
+        }
+
+        const result =
+          details.pnlDollars == null ? 'breakeven'
+          : details.pnlDollars > 0 ? 'win'
+          : details.pnlDollars < 0 ? 'loss'
+          : 'breakeven';
+
+        const { error: updateErr } = await supabase
           .from('bridge_trade_log')
           .update({
             status: 'closed',
             close_reason: 'direction_flip_auto_close',
-            closed_at: new Date().toISOString(),
+            closed_at: details.closedTime ?? new Date().toISOString(),
+            exit_price: details.exitPrice,
+            pnl_dollars: details.pnlDollars,
+            pnl_r: pnlR,
+            result,
           })
           .eq('id', logRow.id);
+
+        if (updateErr) {
+          console.error('[Omega] Failed to update bridge_trade_log after auto-close', {
+            id: logRow.id,
+            error: updateErr.message,
+          });
+        }
         logInfo('[Omega] Auto-closed opposing trade', {
           oanda_trade_id: oid,
           direction: logRow.direction,
