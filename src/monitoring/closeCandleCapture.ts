@@ -25,7 +25,7 @@ export async function fetchCloseCandles(
 }> {
   try {
     const postExitEnd = new Date(
-      new Date(closedAtIso).getTime() + 60 * 60 * 1000
+      new Date(closedAtIso).getTime() + 3 * 60 * 60 * 1000
     ).toISOString();
 
     const [intraTradeCandles, postExitCandles] = await Promise.all([
