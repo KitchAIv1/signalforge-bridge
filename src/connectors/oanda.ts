@@ -335,7 +335,7 @@ export function getAccountId(): string {
  */
 export async function fetchCompletedCandles(
   pair: string,
-  granularity: 'D' | 'H4',
+  granularity: 'D' | 'H4' | 'M5' | 'H1',
   fromISO: string,
   toISO: string
 ): Promise<Array<{
@@ -380,4 +380,57 @@ export async function fetchCompletedCandles(
   };
 
   return (payload.candles ?? []).filter(c => c.complete === true);
+}
+
+/**
+ * Fetches completed M5 or H1 candles between two ISO timestamps.
+ * Used for intra-trade candle capture (entry → exit window).
+ * Returns empty array on any failure — never throws.
+ */
+export async function fetchCandleRange(
+  pair:        string,
+  fromISO:     string,
+  toISO:       string,
+  granularity: 'M5' | 'H1' = 'M5'
+): Promise<Array<{
+  time:     string;
+  mid:      { o: string; h: string; l: string; c: string };
+  complete: boolean;
+}>> {
+  try {
+    const token   = process.env.OANDA_API_TOKEN;
+    const env     = process.env.OANDA_ENVIRONMENT ?? 'practice';
+    const baseUrl = env === 'live'
+      ? 'https://api-fxtrade.oanda.com'
+      : 'https://api-fxpractice.oanda.com';
+
+    const url =
+      `${baseUrl}/v3/instruments/${pair}/candles` +
+      `?granularity=${granularity}` +
+      `&from=${encodeURIComponent(fromISO)}` +
+      `&to=${encodeURIComponent(toISO)}` +
+      `&price=M` +
+      `&includeFirst=true`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) return [];
+
+    const payload = await response.json() as {
+      candles: Array<{
+        time:     string;
+        mid:      { o: string; h: string; l: string; c: string };
+        complete: boolean;
+      }>;
+    };
+
+    return (payload.candles ?? []).filter(c => c.complete === true);
+  } catch {
+    return [];
+  }
 }

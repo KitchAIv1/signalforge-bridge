@@ -19,7 +19,12 @@ import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDed
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
 import { calculateUnits } from './positionSizer.js';
-import { closeTrade, getClosedTradeDetails, patchTradeTPSL } from '../connectors/oanda.js';
+import {
+  closeTrade,
+  fetchCompletedCandles,
+  getClosedTradeDetails,
+  patchTradeTPSL,
+} from '../connectors/oanda.js';
 import {
   parseRebuildBoundsRetryFlag,
   placeMarketOrderWithRebuildBoundsRetry,
@@ -926,6 +931,29 @@ export async function processSignal(
     (row as Record<string, unknown>).oanda_trade_id = tradeId;
     (row as Record<string, unknown>).units = filledUnits;
     if (fillPrice != null) (row as Record<string, unknown>).fill_price = fillPrice;
+    // ── Pre-entry candle capture — omega only ─────────────────────────────
+    if (norm.engineId === 'omega' && fillPrice != null) {
+      try {
+        const fillIso  = new Date().toISOString();
+        const fromM5   = new Date(Date.now() - 12 * 5 * 60 * 1000).toISOString();
+        const fromH1   = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+
+        const [preEntryCandles, h1SessionCandles] = await Promise.all([
+          fetchCompletedCandles(norm.oandaInstrument, 'M5', fromM5, fillIso),
+          fetchCompletedCandles(norm.oandaInstrument, 'H1', fromH1, fillIso),
+        ]);
+
+        if (preEntryCandles.length > 0) {
+          (row as Record<string, unknown>).pre_entry_candles  = preEntryCandles;
+        }
+        if (h1SessionCandles.length > 0) {
+          (row as Record<string, unknown>).h1_session_candles = h1SessionCandles;
+        }
+      } catch {
+        // Candle fetch failure never blocks execution
+      }
+    }
+    // ── End pre-entry candle capture ──────────────────────────────────────
     // ── Omega SL mirror for trail stop sizing ──────────────────
     // When omega direction is inverted by resolveOmegaDirection,
     // norm.stopLoss stays as the original signal SL (wrong side).

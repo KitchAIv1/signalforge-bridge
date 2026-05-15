@@ -8,7 +8,13 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getOpenTrades, closeTrade, getClosedTradeDetails } from '../connectors/oanda.js';
+import {
+  getOpenTrades,
+  closeTrade,
+  getClosedTradeDetails,
+  fetchCompletedCandles,
+  fetchCandleRange,
+} from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import type { BridgeEngineRow } from '../types/config.js';
 import { computeDerivedFields, resultFromPnl } from './tradeMonitorHelpers.js';
@@ -32,6 +38,34 @@ function durationMinutes(signalReceivedAt: string, closedAt: string): number | n
   const b = new Date(closedAt).getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) return null;
   return Math.round((b - a) / 60000 * 100) / 100;
+}
+
+/**
+ * Fetches intra-trade and post-exit candles for intelligence capture.
+ * Always returns safely — never throws, never blocks trade close logic.
+ */
+async function fetchCloseCandles(
+  pair:        string,
+  entryIso:    string,
+  closedAtIso: string
+): Promise<{
+  intraTradeCandles: Array<{ time: string; mid: { o: string; h: string; l: string; c: string }; complete: boolean }>;
+  postExitCandles:   Array<{ time: string; mid: { o: string; h: string; l: string; c: string }; complete: boolean }>;
+}> {
+  try {
+    const postExitEnd = new Date(
+      new Date(closedAtIso).getTime() + 60 * 60 * 1000
+    ).toISOString();
+
+    const [intraTradeCandles, postExitCandles] = await Promise.all([
+      fetchCandleRange(pair, entryIso, closedAtIso, 'M5'),
+      fetchCompletedCandles(pair, 'M5', closedAtIso, postExitEnd),
+    ]);
+
+    return { intraTradeCandles, postExitCandles };
+  } catch {
+    return { intraTradeCandles: [], postExitCandles: [] };
+  }
 }
 
 export async function runTradeMonitor(
@@ -91,6 +125,15 @@ export async function runTradeMonitor(
         duration_minutes: durationMinutes(openTime, closedAt),
         ...derived,
       };
+      if ((row.engine_id as string) === 'omega') {
+        const { intraTradeCandles, postExitCandles } = await fetchCloseCandles(
+          row.pair as string,
+          openTime,
+          closedAt
+        );
+        if (intraTradeCandles.length > 0) update.intra_trade_candles = intraTradeCandles;
+        if (postExitCandles.length > 0)   update.post_exit_candles   = postExitCandles;
+      }
       await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
       recordClosedTrade(resultFromPnl(details.pnlDollars));
       continue;
@@ -112,6 +155,15 @@ export async function runTradeMonitor(
         duration_minutes: durationMinutes(openTime, closedAt),
         ...derived,
       };
+      if ((row.engine_id as string) === 'omega') {
+        const { intraTradeCandles, postExitCandles } = await fetchCloseCandles(
+          row.pair as string,
+          openTime,
+          closedAt
+        );
+        if (intraTradeCandles.length > 0) update.intra_trade_candles = intraTradeCandles;
+        if (postExitCandles.length > 0)   update.post_exit_candles   = postExitCandles;
+      }
       await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
       recordClosedTrade(resultFromPnl(pnlDollars));
       continue;
