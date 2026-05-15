@@ -8,13 +8,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-  getOpenTrades,
-  closeTrade,
-  getClosedTradeDetails,
-  fetchCompletedCandles,
-  fetchCandleRange,
-} from '../connectors/oanda.js';
+import { getOpenTrades, closeTrade, getClosedTradeDetails } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import type { BridgeEngineRow } from '../types/config.js';
 import { computeDerivedFields, resultFromPnl } from './tradeMonitorHelpers.js';
@@ -27,6 +21,7 @@ import {
 } from './trailingStopMonitor.js';
 import { getTrailEnabled } from './trailingStopSupport.js';
 import { runNewsAutoDetect } from '../utils/newsAutoDetect.js';
+import { fetchCloseCandles } from './closeCandleCapture.js';
 
 /** Do not infer "closed" from absent open list if trade age < this (OANDA propagation lag). */
 const MIN_OPEN_AGE_MS = 60_000;
@@ -38,34 +33,6 @@ function durationMinutes(signalReceivedAt: string, closedAt: string): number | n
   const b = new Date(closedAt).getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) return null;
   return Math.round((b - a) / 60000 * 100) / 100;
-}
-
-/**
- * Fetches intra-trade and post-exit candles for intelligence capture.
- * Always returns safely — never throws, never blocks trade close logic.
- */
-async function fetchCloseCandles(
-  pair:        string,
-  entryIso:    string,
-  closedAtIso: string
-): Promise<{
-  intraTradeCandles: Array<{ time: string; mid: { o: string; h: string; l: string; c: string }; complete: boolean }>;
-  postExitCandles:   Array<{ time: string; mid: { o: string; h: string; l: string; c: string }; complete: boolean }>;
-}> {
-  try {
-    const postExitEnd = new Date(
-      new Date(closedAtIso).getTime() + 60 * 60 * 1000
-    ).toISOString();
-
-    const [intraTradeCandles, postExitCandles] = await Promise.all([
-      fetchCandleRange(pair, entryIso, closedAtIso, 'M5'),
-      fetchCompletedCandles(pair, 'M5', closedAtIso, postExitEnd),
-    ]);
-
-    return { intraTradeCandles, postExitCandles };
-  } catch {
-    return { intraTradeCandles: [], postExitCandles: [] };
-  }
 }
 
 export async function runTradeMonitor(

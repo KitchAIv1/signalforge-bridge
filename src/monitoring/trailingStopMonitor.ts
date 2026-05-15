@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { closeTrade, fetchLatestM5Candle, getPricing } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import { computeDerivedFields, resultFromPnl } from './tradeMonitorHelpers.js';
+import { fetchCloseCandles } from './closeCandleCapture.js';
 import {
   NO_TRAIL_CLOSE,
   applyTrailPeakUpdates,
@@ -183,6 +184,23 @@ async function persistBridgeLogAfterTrailClose(
   }
 
   const derived = computeDerivedFields(logRow, exitPriceNum, pnlDollars);
+
+  // ── Candle intelligence capture — omega only ────────────────────────────
+  const candleUpdate: Record<string, unknown> = {};
+  if ((logRow.engine_id as string) === 'omega') {
+    const entryIso = signalReceivedAt ?? (logRow.created_at as string);
+    if (entryIso) {
+      const { intraTradeCandles, postExitCandles } = await fetchCloseCandles(
+        logRow.pair as string,
+        entryIso,
+        closedAt
+      );
+      if (intraTradeCandles.length > 0) candleUpdate.intra_trade_candles = intraTradeCandles;
+      if (postExitCandles.length > 0) candleUpdate.post_exit_candles = postExitCandles;
+    }
+  }
+  // ── End candle capture ─────────────────────────────────────────────────
+
   await supabase
     .from('bridge_trade_log')
     .update({
@@ -194,6 +212,7 @@ async function persistBridgeLogAfterTrailClose(
       result: resultFromPnl(pnlDollars),
       duration_minutes: durationMins,
       ...derived,
+      ...candleUpdate,
     })
     .eq('id', logRowId);
   await supabase.from('trail_stop_state').delete().eq('oanda_trade_id', oandaTradeId);
