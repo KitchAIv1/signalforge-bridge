@@ -4,10 +4,9 @@ import { useAmdState } from '@/hooks/useAmdState';
 import { AmdPanelMetrics } from '@/components/AmdPanelMetrics';
 import { AmdPanelLoading } from '@/components/AmdPanelLoading';
 import { AmdPanelError } from '@/components/AmdPanelError';
-import { AmdIntelManualTagOverride } from '@/components/AmdIntelManualTagOverride';
 
 export function AmdPanel() {
-  const { amdState, loading, error, refetch } = useAmdState();
+  const { amdState, loading, error } = useAmdState();
 
   if (loading) return <AmdPanelLoading />;
   if (error) return <AmdPanelError message={error} />;
@@ -23,8 +22,6 @@ export function AmdPanel() {
       <div className="text-xs italic text-slate-600 dark:text-slate-300">
         Advisory only — no execution impact
       </div>
-
-      <AmdIntelManualTagOverride amdState={amdState} refetch={refetch} />
     </div>
   );
 }
