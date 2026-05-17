@@ -3,7 +3,7 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { ActivityTradeTableRow } from '@/components/activity/ActivityTradeTableRow';
 
-export const ACTIVITY_DESKTOP_COLUMN_COUNT = 18;
+export const ACTIVITY_DESKTOP_COLUMN_COUNT = 19;
 
 interface ActivityTradeDesktopTableProps {
   rows: BridgeTradeLogRow[];
@@ -33,6 +33,7 @@ export function ActivityTradeDesktopTable({ rows, isTradeListLoading }: Activity
             <th className="px-3 py-2 text-xs font-medium">Close Reason</th>
             <th className="px-3 py-2 text-xs font-medium">Result</th>
             <th className="px-3 py-2 text-xs font-medium">Confidence</th>
+            <th className="px-3 py-2 text-xs font-medium">AMD tag</th>
             <th className="px-3 py-2 text-xs font-medium">Tag</th>
           </tr>
         </thead>

@@ -1,6 +1,7 @@
 'use client';
 
 import type { BridgeTradeLogRow } from '@/lib/types';
+import { amdTagLabel, amdTagColor } from '@/lib/amdPanelFormatters';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
 
@@ -105,6 +106,12 @@ export function ActivityTradeMobileCard({ row }: ActivityTradeMobileCardProps) {
               direction={row.regime_direction ?? null}
               evaluatedAt={row.regime_evaluated_at ?? null}
             />
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">AMD tag</div>
+              <div className={`text-sm font-semibold ${amdTagColor(row.amd_tag ?? null)}`}>
+                {row.amd_tag != null && row.amd_tag !== '' ? amdTagLabel(row.amd_tag) : '—'}
+              </div>
+            </div>
           </div>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>

@@ -77,6 +77,9 @@ export interface BridgeTradeLogRow {
   // Tagging
   manual_tag?: string | null;
   close_tag?: string | null;
+
+  amd_tag?: string | null;
+  amd_evaluated_at?: string | null;
 }
 
 export interface OmegaShadowSignalRow {
@@ -194,4 +197,27 @@ export interface NewsEventRow {
   pre_event_action:             string;
   post_event_direction?:        string | null;
   confirmation_delay_minutes?:  number | null;
+}
+
+export interface AmdState {
+  id:                      string;
+  trade_date:              string;
+  evaluated_at:            string;
+  pair:                    string;
+  asian_range_pips:        number | null;
+  asian_net_pips:          number | null;
+  asian_is_flat:           boolean | null;
+  judas_direction:         'UP' | 'DOWN' | 'FLAT' | null;
+  judas_pips:              number | null;
+  judas_extreme_price:     number | null;
+  reversal_confirmed:      boolean | null;
+  compression_breakout:    boolean;
+  delayed_distribution:    boolean;
+  amd_tag:                 string;
+  chart_url:               string | null;
+  chart_data:              Record<string, unknown> | null;
+  amd_tag_manual_override: string | null;
+  override_reason:          string | null;
+  override_set_at:          string | null;
+  created_at:              string;
 }

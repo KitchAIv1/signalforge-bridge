@@ -1,6 +1,7 @@
 'use client';
 
 import type { BridgeTradeLogRow } from '@/lib/types';
+import { amdTagColor, amdTagLabel } from '@/lib/amdPanelFormatters';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
 import { CloseTagButton } from '@/components/activity/CloseTagButton';
@@ -82,6 +83,13 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
           direction={row.regime_direction ?? null}
           evaluatedAt={row.regime_evaluated_at ?? null}
         />
+      </td>
+      <td className={`px-3 py-2 text-xs font-medium ${amdTagColor(row.amd_tag ?? null)}`}>
+        {row.amd_tag != null && row.amd_tag !== '' ? (
+          amdTagLabel(row.amd_tag)
+        ) : (
+          <span className="text-gray-600">—</span>
+        )}
       </td>
       <td className="px-3 py-2 align-top">
         <CloseTagButton

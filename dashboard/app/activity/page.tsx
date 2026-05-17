@@ -14,6 +14,7 @@ import { usePresencePing } from '@/hooks/usePresencePing';
 import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDesktopTable';
 import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobileList';
 import { RegimePanel } from '@/components/RegimePanel';
+import { AmdPanel } from '@/components/AmdPanel';
 import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
 
@@ -26,7 +27,7 @@ const EXPANDED_TRADE_LOG_SELECT =
   'signal_received_at, created_at, regime_direction, regime_confidence, regime_evaluated_at, ' +
   'signal_session, close_tag, manual_tag, ' +
   'layer4_result, layer4_bullish_count, layer4_bearish_count, ' +
-  'layer5_result, layer5_pip_diff, layer6_position_pct, choppy_extended';
+  'layer5_result, layer5_pip_diff, layer6_position_pct, choppy_extended, amd_tag';
 
 const DECISIONS: { value: string; label: string }[] = [
   { value: '', label: 'All' },
@@ -210,6 +211,7 @@ export default function ActivityPage() {
       <AccountSnapshotBar />
 
       <RegimePanel />
+      <AmdPanel />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />
