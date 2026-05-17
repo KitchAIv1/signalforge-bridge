@@ -167,13 +167,13 @@ export default function ActivityPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900">Activity</h1>
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Activity</h1>
 
       <div className="relative z-10 flex min-w-0 flex-wrap items-center gap-3">
         <select
           value={decision}
           onChange={(e) => setDecision(e.target.value)}
-          className="min-w-0 max-w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+          className="min-w-0 max-w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         >
           {DECISIONS.map((d) => (
             <option key={d.value} value={d.value}>
@@ -184,7 +184,7 @@ export default function ActivityPage() {
         <select
           value={engine}
           onChange={(e) => setEngine(e.target.value)}
-          className="min-w-0 max-w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+          className="min-w-0 max-w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         >
           <option value="">All engines</option>
           {engines.map((id) => (
@@ -196,7 +196,7 @@ export default function ActivityPage() {
         <button
           type="button"
           onClick={handleExportCSV}
-          className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           Export CSV
         </button>
@@ -229,7 +229,7 @@ export default function ActivityPage() {
             type="button"
             onClick={loadMore}
             disabled={loading}
-            className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {loading ? 'Loading…' : 'Load more'}
           </button>

@@ -10,31 +10,35 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
   const isExecuted = row.decision === 'EXECUTED';
   const isWin = row.result === 'win';
   const isLoss = row.result === 'loss';
-  const pnlColorClass = isWin ? 'text-emerald-600' : isLoss ? 'text-red-500' : 'text-slate-500';
+  const pnlColorClass = isWin
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : isLoss
+      ? 'text-red-600 dark:text-red-400'
+      : 'text-slate-600 dark:text-slate-400';
   const resultBadgeClasses = row.result
     ? isWin
-      ? 'bg-emerald-100 text-emerald-700'
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
       : isLoss
-        ? 'bg-red-100 text-red-700'
-        : 'bg-slate-100 text-slate-600'
+        ? 'bg-red-100 text-red-700 dark:bg-red-950/45 dark:text-red-300'
+        : 'bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-200'
     : '';
   const decisionBadgeClasses =
     row.decision === 'EXECUTED'
-      ? 'bg-emerald-100 text-emerald-700'
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
       : row.decision === 'BLOCKED'
-        ? 'bg-red-100 text-red-700'
-        : 'bg-amber-100 text-amber-700';
+        ? 'bg-red-100 text-red-700 dark:bg-red-950/45 dark:text-red-300'
+        : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
 
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50">
-      <td className="px-3 py-2 text-xs text-slate-600">{formatActivityIsoTimestamp(row.created_at)}</td>
-      <td className="px-3 py-2 text-xs font-medium">{row.engine_id}</td>
-      <td className="px-3 py-2 text-xs">{row.pair}</td>
+    <tr className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50">
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{formatActivityIsoTimestamp(row.created_at)}</td>
+      <td className="px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100">{row.engine_id}</td>
+      <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-300">{row.pair}</td>
       <td className="px-3 py-2 text-xs font-medium">
         {row.direction === 'long' || row.direction === 'LONG' ? (
-          <span className="text-emerald-600">LONG</span>
+          <span className="text-emerald-600 dark:text-emerald-400">LONG</span>
         ) : (
-          <span className="text-red-500">SHORT</span>
+          <span className="text-red-600 dark:text-red-400">SHORT</span>
         )}
       </td>
       <td className="px-3 py-2 text-xs">
@@ -42,20 +46,20 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
           {row.decision}
         </span>
       </td>
-      <td className="max-w-[140px] truncate px-3 py-2 text-xs text-slate-500" title={row.block_reason ?? ''}>
+      <td className="max-w-[140px] truncate px-3 py-2 text-xs text-slate-600 dark:text-slate-400" title={row.block_reason ?? ''}>
         {row.block_reason ?? '—'}
       </td>
-      <td className="px-3 py-2 text-xs text-slate-500">{row.signal_session ?? '—'}</td>
-      <td className="px-3 py-2 text-xs">
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{row.signal_session ?? '—'}</td>
+      <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-300">
         {isExecuted && row.fill_price != null ? Number(row.fill_price).toFixed(5) : '—'}
       </td>
-      <td className="px-3 py-2 text-xs">
+      <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-300">
         {isExecuted && row.stop_loss != null ? Number(row.stop_loss).toFixed(5) : '—'}
       </td>
-      <td className="px-3 py-2 text-xs">
+      <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-300">
         {isExecuted && row.take_profit != null ? Number(row.take_profit).toFixed(5) : '—'}
       </td>
-      <td className="px-3 py-2 text-xs">
+      <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-300">
         {isExecuted && row.exit_price != null ? Number(row.exit_price).toFixed(5) : '—'}
       </td>
       <td className={`px-3 py-2 text-xs font-medium ${pnlColorClass}`}>
@@ -64,17 +68,17 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
       <td className={`px-3 py-2 text-xs ${pnlColorClass}`}>
         {row.pnl_r != null ? (row.pnl_r >= 0 ? '+' : '') + Number(row.pnl_r).toFixed(2) + 'R' : '—'}
       </td>
-      <td className="px-3 py-2 text-xs text-slate-500">
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
         {row.duration_minutes != null ? Math.round(Number(row.duration_minutes)) + 'm' : '—'}
       </td>
-      <td className="px-3 py-2 text-xs text-slate-500">{row.close_reason ?? '—'}</td>
-      <td className="px-3 py-2 text-xs">
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{row.close_reason ?? '—'}</td>
+      <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-200">
         {row.result ? (
           <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${resultBadgeClasses}`}>
             {row.result}
           </span>
         ) : (
-          '—'
+          <span className="text-slate-400 dark:text-slate-500">—</span>
         )}
       </td>
       <td className="px-3 py-2">
@@ -88,7 +92,7 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
         {row.amd_tag != null && row.amd_tag !== '' ? (
           amdTagLabel(row.amd_tag)
         ) : (
-          <span className="text-gray-600">—</span>
+          <span className="text-slate-500 dark:text-slate-400">—</span>
         )}
       </td>
       <td className="px-3 py-2 align-top">

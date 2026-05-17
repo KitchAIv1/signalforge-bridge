@@ -24,7 +24,7 @@ export function RegimePanel() {
 
   if (isLoading) {
     return (
-      <div className="mb-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-sm text-slate-400">
+      <div className="mb-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-sm text-slate-400 dark:text-slate-300">
         Loading regime data…
       </div>
     );
@@ -61,46 +61,46 @@ export function RegimePanel() {
 
   return (
     <div className="mb-4 space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-300">
         Omega regime — AUD/USD
       </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-          <p className="text-xs text-slate-400 mb-1">D1 trend (L4)</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mb-1">D1 trend (L4)</p>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
             {l4.symbol} {l4.label}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">{l4.detail}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mt-0.5">{l4.detail}</p>
         </div>
 
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-          <p className="text-xs text-slate-400 mb-1">H4 structure (L5)</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mb-1">H4 structure (L5)</p>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
             {l5.symbol} {l5.label}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">{l5.detail}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mt-0.5">{l5.detail}</p>
         </div>
 
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-          <p className="text-xs text-slate-400 mb-1">Range position (L6)</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mb-1">Range position (L6)</p>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{l6.label}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{l6.detail}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mt-0.5">{l6.detail}</p>
         </div>
 
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-          <p className="text-xs text-slate-400 mb-1">Confidence</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mb-1">Confidence</p>
           <p className={`text-sm font-medium ${confidenceColorClass(regimeState.regime_confidence)}`}>
             {regimeState.regime_confidence.charAt(0) +
               regimeState.regime_confidence.slice(1).toLowerCase()}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-400 dark:text-slate-300 mt-0.5">
             {regimeState.choppy_extended_override ? 'Choppy-extended' : 'Normal'}
           </p>
         </div>
 
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-          <p className="text-xs text-slate-400 mb-1">Suggested direction</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mb-1">Suggested direction</p>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
             {regimeState.regime_direction === 'LONG'
               ? '↑ Long'
@@ -108,29 +108,29 @@ export function RegimePanel() {
                 ? '↓ Short'
                 : '— Pause'}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">Active: {omegaDirection}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mt-0.5">Active: {omegaDirection}</p>
         </div>
 
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-          <p className="text-xs text-slate-400 mb-1">Next update</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mb-1">Next update</p>
           <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
             {computeNextUpdateUTC(regimeState.evaluated_at)}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">Last: {formatUTCTime(regimeState.evaluated_at)}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-300 mt-0.5">Last: {formatUTCTime(regimeState.evaluated_at)}</p>
         </div>
       </div>
 
       <div className={`rounded-lg border px-3 py-2 flex items-center justify-between gap-3 ${alert.bg}`}>
         <p className={`text-xs flex-1 ${alert.text}`}>{message}</p>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <span className="text-xs text-slate-400">Direction:</span>
+          <span className="text-xs text-slate-400 dark:text-slate-300">Direction:</span>
           <button
             type="button"
             onClick={() => void flipDirection('long')}
             className={`text-xs px-2.5 py-1 rounded border transition-colors ${
               omegaDirection === 'long'
                 ? 'border-green-400 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 font-medium'
-                : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
+                : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
             }`}
           >
             ↑ Long
@@ -141,7 +141,7 @@ export function RegimePanel() {
             className={`text-xs px-2.5 py-1 rounded border transition-colors ${
               omegaDirection === 'short'
                 ? 'border-red-400 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-medium'
-                : 'border-slate-200 dark:border-slate-600 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
+                : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
             }`}
           >
             ↓ Short

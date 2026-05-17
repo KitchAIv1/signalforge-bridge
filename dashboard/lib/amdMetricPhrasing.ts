@@ -17,7 +17,7 @@ export function reversalAccentClass(state: AmdState | null): string {
   if (state?.reversal_confirmed === true)
     return 'text-emerald-600 dark:text-emerald-400';
   if (state?.reversal_confirmed === false) return 'text-red-500 dark:text-red-400';
-  return 'text-slate-500 dark:text-slate-400';
+  return 'text-slate-600 dark:text-slate-300';
 }
 
 export function triStateYesNo(flag: boolean | undefined): string {

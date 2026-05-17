@@ -14,7 +14,7 @@ export function AmdIntelStatTile({ caption, value, accentClassName }: AmdIntelSt
 
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-      <p className="text-xs text-slate-400 mb-1">{caption}</p>
+      <p className="text-xs text-slate-400 dark:text-slate-300 mb-1">{caption}</p>
       <p className={`text-sm font-medium ${valueTone}`}>{value}</p>
     </div>
   );

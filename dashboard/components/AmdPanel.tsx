@@ -20,7 +20,7 @@ export function AmdPanel() {
     <div className="mb-4 space-y-2">
       <AmdPanelMetrics amdState={amdState} displayTag={displayTag} />
 
-      <div className="text-xs italic text-slate-500 dark:text-slate-400">
+      <div className="text-xs italic text-slate-600 dark:text-slate-300">
         Advisory only — no execution impact
       </div>
 

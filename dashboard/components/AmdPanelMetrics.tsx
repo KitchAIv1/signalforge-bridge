@@ -21,7 +21,7 @@ interface AmdPanelMetricsProps {
 export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) {
   const manualBadge =
     amdState != null && (amdState.amd_tag_manual_override ?? '').trim() !== '' ? (
-      <span className="ml-2 text-xs font-medium text-amber-600 dark:text-amber-400">(manual override)</span>
+      <span className="ml-2 text-xs font-medium text-amber-800 dark:text-amber-300">(manual override)</span>
     ) : null;
 
   const asianMetric = amdState != null ? describeAsianRangePips(amdState) : '—';

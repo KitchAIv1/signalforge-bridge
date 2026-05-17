@@ -24,7 +24,7 @@ function ManualOverrideInputs({ draft }: ManualOverrideInputsProps) {
         value={draft.reasonDraft}
         placeholder="Reason (optional)"
         onChange={draft.bindReasonInput}
-        className="rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+        className="rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
       />
       <ManualOverrideSaveButton
         disabled={draft.formLocked}
@@ -56,12 +56,12 @@ function ManualOverrideStatuses({ saveBanner, amdState, highlightCurrentOverride
         </span>
       )}
       {amdState == null && (
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-slate-600 dark:text-slate-300">
           No amd_state row yet for today — override unavailable.
         </span>
       )}
       {highlightCurrentOverride && amdState != null && (
-        <span className="text-xs text-amber-600 dark:text-amber-400">
+        <span className="text-xs text-amber-800 dark:text-amber-300">
           Current override: {amdTagLabel(amdState.amd_tag_manual_override)}{' '}
           {amdState.override_reason?.trim() ? `— ${amdState.override_reason}` : ''}
         </span>
@@ -80,8 +80,8 @@ export function AmdIntelManualTagOverride({ amdState, refetch }: AmdIntelManualT
   const draft = useAmdIntelManualTagOverrideDraft(amdState, refetch);
 
   return (
-    <details className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 px-3 py-2">
-      <summary className="cursor-pointer select-none text-xs font-medium text-slate-600 dark:text-slate-400">
+    <details className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
+      <summary className="cursor-pointer select-none text-xs font-medium text-slate-700 dark:text-slate-200">
         Override AMD tag (training label)
       </summary>
       <div className="mt-2 flex flex-col gap-2">

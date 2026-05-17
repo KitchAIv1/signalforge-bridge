@@ -21,34 +21,57 @@ export function amdTagLabel(tag: string | null): string {
   return labels[tag] ?? tag;
 }
 
+/** Activity table / inline cells — light + dark foreground pairs */
 export function amdTagColor(tag: string | null): string {
-  if (!tag) return 'text-gray-400';
+  if (!tag) return 'text-slate-500 dark:text-slate-400';
   const colors: Record<string, string> = {
-    AMD_TEXTBOOK:             'text-green-400',
-    AMD_COMPRESSION_BREAKOUT: 'text-blue-400',
-    AMD_FAILED:               'text-red-400',
-    AMD_PARTIAL:              'text-yellow-300',
-    AMD_DELAYED:              'text-orange-400',
-    AMD_SHIFTED:              'text-gray-300',
-    AMD_NONE:                 'text-red-500',
-    INSUFFICIENT_DATA:        'text-gray-500',
+    AMD_TEXTBOOK:             'text-green-700 dark:text-green-400',
+    AMD_COMPRESSION_BREAKOUT: 'text-blue-700 dark:text-blue-300',
+    AMD_FAILED:               'text-red-600 dark:text-red-400',
+    AMD_PARTIAL:              'text-amber-700 dark:text-amber-300',
+    AMD_DELAYED:              'text-orange-700 dark:text-orange-300',
+    AMD_SHIFTED:              'text-slate-700 dark:text-slate-300',
+    AMD_NONE:                 'text-red-700 dark:text-red-400',
+    INSUFFICIENT_DATA:        'text-slate-600 dark:text-slate-400',
   };
-  return colors[tag] ?? 'text-gray-400';
+  return colors[tag] ?? 'text-slate-500 dark:text-slate-400';
+}
+
+/** Primary AMD badge chip — tuned for tinted badge backgrounds */
+export function amdTagBadgeTextClass(tag: string | null): string {
+  if (!tag) return 'text-slate-50 dark:text-slate-100';
+  const colors: Record<string, string> = {
+    AMD_TEXTBOOK:             'text-green-50 dark:text-green-100',
+    AMD_COMPRESSION_BREAKOUT: 'text-blue-50 dark:text-blue-100',
+    AMD_FAILED:               'text-red-50 dark:text-red-100',
+    AMD_PARTIAL:              'text-amber-950 dark:text-yellow-50',
+    AMD_DELAYED:              'text-orange-50 dark:text-orange-100',
+    AMD_SHIFTED:              'text-slate-50 dark:text-slate-100',
+    AMD_NONE:                 'text-red-100 dark:text-red-50',
+    INSUFFICIENT_DATA:        'text-slate-200 dark:text-slate-100',
+  };
+  return colors[tag] ?? 'text-slate-50 dark:text-slate-100';
 }
 
 export function amdTagBgColor(tag: string | null): string {
-  if (!tag) return 'bg-gray-800';
+  if (!tag) {
+    return 'bg-slate-800 border border-slate-600 dark:bg-slate-900/90 dark:border-slate-500';
+  }
   const colors: Record<string, string> = {
-    AMD_TEXTBOOK:             'bg-green-900/40 border border-green-700',
-    AMD_COMPRESSION_BREAKOUT: 'bg-blue-900/40 border border-blue-700',
-    AMD_FAILED:               'bg-red-900/40 border border-red-700',
-    AMD_PARTIAL:              'bg-yellow-900/40 border border-yellow-700',
-    AMD_DELAYED:              'bg-orange-900/40 border border-orange-700',
-    AMD_SHIFTED:              'bg-gray-800 border border-gray-600',
-    AMD_NONE:                 'bg-red-950/60 border border-red-800',
-    INSUFFICIENT_DATA:        'bg-gray-900 border border-gray-700',
+    AMD_TEXTBOOK:             'bg-green-900/40 border border-green-700 dark:border-green-600',
+    AMD_COMPRESSION_BREAKOUT: 'bg-blue-900/40 border border-blue-700 dark:border-blue-600',
+    AMD_FAILED:               'bg-red-900/40 border border-red-700 dark:border-red-600',
+    AMD_PARTIAL:              'bg-yellow-900/40 border border-yellow-700 dark:border-yellow-600',
+    AMD_DELAYED:              'bg-orange-900/40 border border-orange-700 dark:border-orange-600',
+    AMD_SHIFTED:              'bg-slate-800/85 border border-slate-600 dark:bg-slate-900/80 dark:border-slate-500',
+    AMD_NONE:                 'bg-red-950/60 border border-red-800 dark:border-red-700',
+    INSUFFICIENT_DATA:
+      'bg-slate-900/90 border border-slate-700 dark:bg-slate-950/85 dark:border-slate-600',
   };
-  return colors[tag] ?? 'bg-gray-800';
+  return (
+    colors[tag] ??
+    'bg-slate-800 border border-slate-600 dark:bg-slate-900/90 dark:border-slate-500'
+  );
 }
 
 export function judasDirectionLabel(dir: string | null): string {
