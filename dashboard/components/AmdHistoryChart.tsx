@@ -250,9 +250,22 @@ export function AmdHistoryChart({ amdState }: AmdHistoryChartProps) {
       const chartBars = rawBarsToCandlestickData(rawBars);
       series.setData(chartBars);
 
-      series.setMarkers(judasMarkersForBars(rawBars, amdState.trade_date, amdState.judas_direction));
+      series.setMarkers(
+        judasMarkersForBars(
+          rawBars,
+          amdState.trade_date,
+          amdState.judas_direction,
+          amdState.judas_extreme_price
+        ),
+      );
 
-      chartCanvas.timeScale().fitContent();
+      // Show full AMD day: 00:00–17:00 UTC (distribution zone even when candles end early).
+      const dayStartSecForVisibleRange =
+        Math.floor(Date.parse(`${amdState.trade_date}T00:00:00.000Z`) / 1000);
+      chartCanvas.timeScale().setVisibleRange({
+        from: dayStartSecForVisibleRange as UTCTimestamp,
+        to: (dayStartSecForVisibleRange + 17 * 3600) as UTCTimestamp,
+      });
 
       const resize = (): void =>
         chartInstance?.applyOptions({ width: containerRef.current?.clientWidth ?? 700 });

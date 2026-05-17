@@ -48,19 +48,57 @@ function pickJudasUtcSec(rows: RawAmdOhlcBar[], dir: 'UP' | 'DOWN'): UTCTimestam
   return barunixSec(hiRow) as UTCTimestamp;
 }
 
-/** London 08–10 UTC: extreme-low for DOWN Judas / extreme-high for UP. */
+/** London-window bar whose **high** (UP) or **low** (DOWN) has smallest distance to `judasExtremePrice`. */
+function pickLondonBarClosestToJudasExtremePrice(
+  londonBars: RawAmdOhlcBar[],
+  judasDirection: 'UP' | 'DOWN',
+  judasExtremePrice: number
+): RawAmdOhlcBar {
+  const seedBar = londonBars[0];
+  if (judasDirection === 'UP') {
+    return londonBars.reduce((bestCandidate, londonBarCandidate) =>
+      Math.abs(parseFloat(londonBarCandidate.h) - judasExtremePrice) <
+      Math.abs(parseFloat(bestCandidate.h) - judasExtremePrice)
+        ? londonBarCandidate
+        : bestCandidate,
+    seedBar,
+    );
+  }
+  return londonBars.reduce((bestCandidate, londonBarCandidate) =>
+    Math.abs(parseFloat(londonBarCandidate.l) - judasExtremePrice) <
+    Math.abs(parseFloat(bestCandidate.l) - judasExtremePrice)
+      ? londonBarCandidate
+      : bestCandidate,
+  seedBar,
+  );
+}
+
+/**
+ * London 08–10 UTC: Judas candle time via stored `judas_extreme_price` when available,
+ * else extreme-high (UP) / extreme-low (DOWN) heuristic.
+ */
 export function inferJudasCandleUtcSec(
   rawBars: RawAmdOhlcBar[],
   tradeDate: string,
-  judasDirection: 'UP' | 'DOWN' | 'FLAT' | null
+  judasDirection: 'UP' | 'DOWN' | 'FLAT' | null,
+  judasExtremePrice?: number | null,
 ): UTCTimestamp | null {
   const londonBars = londonWindowBars(rawBars, tradeDate);
+
   if (judasDirection === 'UP' || judasDirection === 'DOWN') {
+    if (judasExtremePrice != null && londonBars.length > 0) {
+      const matchedBar = pickLondonBarClosestToJudasExtremePrice(
+        londonBars,
+        judasDirection,
+        judasExtremePrice,
+      );
+      return barunixSec(matchedBar) as UTCTimestamp;
+    }
     return pickJudasUtcSec(londonBars, judasDirection);
   }
+
   if (judasDirection !== 'FLAT') return null;
   if (londonBars.length === 0) return null;
   const midpointIdx = Math.floor(londonBars.length / 2);
   return barunixSec(londonBars[midpointIdx]) as UTCTimestamp;
 }
-

@@ -5,9 +5,15 @@ import { inferJudasCandleUtcSec } from '@/lib/inferJudasCandleUtcSec';
 export function judasMarkersForBars(
   rawBars: RawAmdOhlcBar[],
   tradeDate: string,
-  judasDirection: 'UP' | 'DOWN' | 'FLAT' | null
+  judasDirection: 'UP' | 'DOWN' | 'FLAT' | null,
+  judasExtremePrice?: number | null
 ): SeriesMarker<Time>[] {
-  const judasSec = inferJudasCandleUtcSec(rawBars, tradeDate, judasDirection);
+  const judasSec = inferJudasCandleUtcSec(
+    rawBars,
+    tradeDate,
+    judasDirection,
+    judasExtremePrice
+  );
   if (judasSec == null) return [];
 
   const color =
