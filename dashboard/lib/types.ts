@@ -215,6 +215,7 @@ export interface AmdState {
   delayed_distribution:    boolean;
   amd_tag:                 string;
   chart_url:               string | null;
+  chart_generated_at:      string | null;
   chart_data:              Record<string, unknown> | null;
   amd_tag_manual_override: string | null;
   override_reason:          string | null;
