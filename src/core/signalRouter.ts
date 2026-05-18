@@ -790,6 +790,21 @@ export async function processSignal(
     units = Math.round(units * omegaNewsExploitMult * omegaNewsReduceMult);
   }
 
+  // AMD dynamic sizing — live multiplier applied to Omega units
+  // amdSizeMultiplier is null before 10:05 UTC AMD cron fires — defaults to 1.0x (no change)
+  // multiplier is computed in computeAutoDirectionSnapshot and stored in amd_state
+  if (norm.engineId === 'omega') {
+    const amdMultiplier = amdState?.amdSizeMultiplier ?? 1.0;
+    if (amdMultiplier !== 1.0) {
+      units = Math.round(units * amdMultiplier);
+      logInfo(
+        `[AmdSizing] Applied amd_size_multiplier=${amdMultiplier} → units=${units} | ` +
+        `tag=${amdState?.amdTag ?? 'null'} | ` +
+        `confidence=${amdState?.autoDirectionConfidence ?? 'null'}`
+      );
+    }
+  }
+
   // Bar1 M1 strength — engine_rebuild only
   // Wait for bar1 to complete then fetch M1 candles
   // Computes net R (favorable - adverse) to classify strength

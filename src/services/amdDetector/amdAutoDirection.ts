@@ -16,6 +16,7 @@ export function computeAutoDirectionSnapshot(
   layer4BullishCount: number | null,
   layer4BearishCount: number | null,
   dailyBiasAlignment: DailyBiasAlignment,
+  reversalConfirmed: boolean | null,
 ): AmdAutoDirectionSnapshot {
   const bullish = layer4BullishCount ?? 0;
   const bearish = layer4BearishCount ?? 0;
@@ -128,6 +129,21 @@ export function computeAutoDirectionSnapshot(
     auto_direction_reason =
       `${amdTag} insufficient data for auto direction`;
   }
+
+  // Reversal confirmation modifier
+  // When reversal_confirmed is false: price did not validate the AMD intraday setup
+  // Reduce multiplier by 0.5. If already low/very_low confidence → set neutral (do not override direction)
+  if (reversalConfirmed === false && auto_direction !== 'neutral') {
+    amd_size_multiplier = parseFloat((amd_size_multiplier * 0.5).toFixed(4));
+    if (auto_direction_confidence === 'low' || auto_direction_confidence === 'very_low') {
+      auto_direction = 'neutral';
+      auto_direction_reason = `${auto_direction_reason} [reversal_unconfirmed→neutral]`;
+    } else {
+      auto_direction_reason = `${auto_direction_reason} [reversal_unconfirmed→0.5x]`;
+    }
+  }
+  // reversalConfirmed === null means insufficient data — no adjustment
+  // reversalConfirmed === true means reversal confirmed — no adjustment needed
 
   return {
     auto_direction,
