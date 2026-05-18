@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import {
   fetchEngineControlRows,
+  writeDirectionMode,
   writeOmegaDir,
   writePaused,
   writeRebuildRetry,
@@ -15,6 +16,7 @@ export function useEngineControlsState() {
   const [pausedIds, setPausedIds] = useState<string[]>([]);
   const [omegaDir, setOmegaDir] = useState<'long' | 'short'>('long');
   const [rebuildRetry, setRebuildRetry] = useState(false);
+  const [directionMode, setDirectionMode] = useState<'auto' | 'manual'>('manual');
   const [lastSyncedUtc, setLastSyncedUtc] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -32,6 +34,7 @@ export function useEngineControlsState() {
       setPausedIds(row.pausedIds);
       setOmegaDir(row.omegaDir);
       setRebuildRetry(row.rebuildRetry);
+      setDirectionMode(row.directionMode);
       setLastSyncedUtc(new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC');
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
@@ -79,6 +82,21 @@ export function useEngineControlsState() {
       showToast(`Update failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [omegaDir, showToast, sync]);
+  const toggleDirectionMode = useCallback(async () => {
+    const next: 'auto' | 'manual' = directionMode === 'auto' ? 'manual' : 'auto';
+    try {
+      await writeDirectionMode(getSupabase(), next);
+      setDirectionMode(next);
+      showToast(
+        next === 'auto'
+          ? 'Omega → AUTO direction (AMD intelligence)'
+          : 'Omega → MANUAL direction',
+      );
+      void sync();
+    } catch (e) {
+      showToast(`Update failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [directionMode, showToast, sync]);
   const toggleRebuildRetry = useCallback(async () => {
     const next = !rebuildRetry;
     try {
@@ -90,5 +108,17 @@ export function useEngineControlsState() {
       showToast(`Update failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [rebuildRetry, showToast, sync]);
-  return { pausedIds, omegaDir, rebuildRetry, lastSyncedUtc, toast, loadError, togglePause, flipOmega, toggleRebuildRetry };
+  return {
+    pausedIds,
+    omegaDir,
+    rebuildRetry,
+    directionMode,
+    lastSyncedUtc,
+    toast,
+    loadError,
+    togglePause,
+    flipOmega,
+    toggleDirectionMode,
+    toggleRebuildRetry,
+  };
 }

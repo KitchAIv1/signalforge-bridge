@@ -15,6 +15,7 @@ import { runHeartbeat, getCachedAccountSummary } from './monitoring/heartbeat.js
 import { runTradeMonitor } from './monitoring/tradeMonitor.js';
 import { logInfo, logWarn } from './utils/logger.js';
 import { runRegimeDetection } from './services/RegimeDetectorService.js';
+import { runAmdDetection } from './services/AmdDetectorService.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -78,6 +79,18 @@ async function main(): Promise<void> {
   // Run once on startup so regime_state is populated immediately
   runRegimeDetection().catch(startupError => {
     console.error('[RegimeDetector] Startup run error:', startupError);
+  });
+
+  cron.schedule('5 10 * * *', async () => {
+    try {
+      await runAmdDetection();
+    } catch (amdError) {
+      console.error('[AmdDetector] Scheduled run error:', amdError);
+    }
+  }, { timezone: 'UTC' });
+
+  runAmdDetection().catch(startupAmdErr => {
+    console.error('[AmdDetector] Startup run error:', startupAmdErr);
   });
 
   const channel = subscribeToSignalInserts(supabase, (payload) => {

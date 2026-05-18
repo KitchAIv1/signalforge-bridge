@@ -27,7 +27,7 @@ const EXPANDED_TRADE_LOG_SELECT =
   'signal_received_at, created_at, regime_direction, regime_confidence, regime_evaluated_at, ' +
   'signal_session, close_tag, manual_tag, ' +
   'layer4_result, layer4_bullish_count, layer4_bearish_count, ' +
-  'layer5_result, layer5_pip_diff, layer6_position_pct, choppy_extended, amd_tag';
+  'layer5_result, layer5_pip_diff, layer6_position_pct, choppy_extended, amd_tag, direction_source, amd_size_multiplier';
 
 const DECISIONS: { value: string; label: string }[] = [
   { value: '', label: 'All' },

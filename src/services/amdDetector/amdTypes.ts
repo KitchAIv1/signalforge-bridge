@@ -59,6 +59,24 @@ export type AmdStateRow = {
   layer4_bullish_count: number | null;
   layer4_bearish_count: number | null;
   daily_bias_alignment: DailyBiasAlignment;
+  auto_direction: string | null;
+  auto_direction_confidence: string | null;
+  auto_direction_reason: string | null;
+  amd_size_multiplier: number | null;
   chart_url: string | null;
   chart_generated_at: string | null;
+};
+
+/** Auto-direction output from AMD + D1 conviction analysis. */
+export type AutoDirection = 'long' | 'short' | 'neutral';
+
+/** Confidence level for auto-direction decision. */
+export type AutoDirectionConfidence = 'high' | 'medium' | 'low' | 'very_low';
+
+/** Full auto-direction snapshot written to amd_state. */
+export type AmdAutoDirectionSnapshot = {
+  auto_direction: AutoDirection;
+  auto_direction_confidence: AutoDirectionConfidence;
+  auto_direction_reason: string;
+  amd_size_multiplier: number;
 };

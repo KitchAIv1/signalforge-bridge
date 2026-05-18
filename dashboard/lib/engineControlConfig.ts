@@ -5,6 +5,8 @@ export const KEY_OMEGA_DIR = 'omega_direction';
 /** Must match signalRouter bridge_config read for rebuild_bounds_retry */
 export const KEY_REBUILD_RETRY = 'rebuild_bounds_retry';
 
+export const KEY_DIRECTION_MODE = 'direction_mode';
+
 export function parseOmegaDir(raw: unknown): 'long' | 'short' {
   if (raw === 'short' || raw === 'SHORT') return 'short';
   if (typeof raw === 'string' && raw.toLowerCase() === 'short') return 'short';
@@ -22,22 +24,29 @@ export function parseRebuildRetry(raw: unknown): boolean {
   return raw === true;
 }
 
+export function parseDirectionMode(raw: unknown): 'auto' | 'manual' {
+  if (raw === 'auto') return 'auto';
+  return 'manual';
+}
+
 type ConfigRow = { config_key: string; config_value: unknown };
 
 export async function fetchEngineControlRows(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from('bridge_config')
     .select('config_key, config_value')
-    .in('config_key', [KEY_PAUSED, KEY_OMEGA_DIR, KEY_REBUILD_RETRY]);
+    .in('config_key', [KEY_PAUSED, KEY_OMEGA_DIR, KEY_REBUILD_RETRY, KEY_DIRECTION_MODE]);
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as ConfigRow[];
   const pa = rows.find((r) => r.config_key === KEY_PAUSED);
   const om = rows.find((r) => r.config_key === KEY_OMEGA_DIR);
   const br = rows.find((r) => r.config_key === KEY_REBUILD_RETRY);
+  const dm = rows.find((r) => r.config_key === KEY_DIRECTION_MODE);
   return {
     pausedIds: parsePaused(pa?.config_value),
     omegaDir: parseOmegaDir(om?.config_value),
     rebuildRetry: parseRebuildRetry(br?.config_value),
+    directionMode: parseDirectionMode(dm?.config_value),
   };
 }
 
@@ -62,5 +71,16 @@ export async function writeRebuildRetry(supabase: SupabaseClient, enabled: boole
     .from('bridge_config')
     .update({ config_value: enabled, updated_at: new Date().toISOString() })
     .eq('config_key', KEY_REBUILD_RETRY);
+  if (error) throw new Error(error.message);
+}
+
+export async function writeDirectionMode(
+  supabase: SupabaseClient,
+  mode: 'auto' | 'manual',
+): Promise<void> {
+  const { error } = await supabase
+    .from('bridge_config')
+    .update({ config_value: mode, updated_at: new Date().toISOString() })
+    .eq('config_key', KEY_DIRECTION_MODE);
   if (error) throw new Error(error.message);
 }

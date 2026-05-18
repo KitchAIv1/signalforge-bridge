@@ -413,12 +413,13 @@ export async function processSignal(
   }
 
   // Live engine control — reads paused_engines, omega_direction,
-  // rebuild_bounds_retry, rebuild_hour_gate_enabled fresh per signal.
+  // rebuild_bounds_retry, rebuild_hour_gate_enabled, direction_mode fresh per signal.
   const [
     pausedRow,
     dirRow,
     boundsRetryRow,
     hourGateRow,
+    directionModeRow,
   ] = await Promise.all([
     supabase
       .from('bridge_config')
@@ -440,6 +441,11 @@ export async function processSignal(
       .select('config_value')
       .eq('config_key', 'rebuild_hour_gate_enabled')
       .maybeSingle(),
+    supabase
+      .from('bridge_config')
+      .select('config_value')
+      .eq('config_key', 'direction_mode')
+      .maybeSingle(),
   ]);
   const pausedEngines: string[] =
     Array.isArray(pausedRow.data?.config_value)
@@ -455,6 +461,10 @@ export async function processSignal(
   const rebuildHourGateEnabled = parseRebuildHourGateEnabled(
     hourGateRow.data?.config_value
   );
+  const directionMode: string =
+    typeof directionModeRow.data?.config_value === 'string'
+      ? directionModeRow.data.config_value
+      : 'manual';
 
   const engine = findEngine(engines, norm.engineId);
   if (!engine || !engine.is_active) {
@@ -733,7 +743,8 @@ export async function processSignal(
           `reversal: ${amdState.reversalConfirmed ?? 'null'} | ` +
           `D1: ${amdState.layer4D1Bias ?? 'null'} ` +
           `(${amdState.layer4BullishCount ?? '—'}↑/${amdState.layer4BearishCount ?? '—'}↓) | ` +
-          `bias_align: ${amdState.dailyBiasAlignment ?? 'null'}`
+          `bias_align: ${amdState.dailyBiasAlignment ?? 'null'} | ` +
+          `auto_dir: ${amdState.autoDirection ?? 'null'} (${amdState.autoDirectionConfidence ?? 'null'})`
         );
       }
     } catch (amdErr: unknown) {
@@ -1097,6 +1108,10 @@ export async function processSignal(
         amdState?.layer4D1Bias ?? null;
       (row as Record<string, unknown>).daily_bias_alignment =
         amdState?.dailyBiasAlignment ?? null;
+      (row as Record<string, unknown>).direction_source =
+        directionMode === 'auto' ? 'auto' : 'manual';
+      (row as Record<string, unknown>).amd_size_multiplier =
+        amdState?.amdSizeMultiplier ?? null;
     }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();

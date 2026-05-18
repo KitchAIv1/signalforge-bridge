@@ -17,6 +17,7 @@ export function RegimePanel() {
   const {
     regimeState,
     omegaDirection,
+    directionMode,
     isLoading,
     fetchError,
     flipDirection,
@@ -126,23 +127,31 @@ export function RegimePanel() {
           <span className="text-xs text-slate-400 dark:text-slate-300">Direction:</span>
           <button
             type="button"
-            onClick={() => void flipDirection('long')}
+            onClick={() =>
+              directionMode === 'manual' ? void flipDirection('long') : undefined
+            }
+            disabled={directionMode === 'auto'}
+            title={directionMode === 'auto' ? 'Auto mode active' : undefined}
             className={`text-xs px-2.5 py-1 rounded border transition-colors ${
               omegaDirection === 'long'
                 ? 'border-green-400 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 font-medium'
                 : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
+            }${directionMode === 'auto' ? ' opacity-40 cursor-not-allowed' : ''}`}
           >
             ↑ Long
           </button>
           <button
             type="button"
-            onClick={() => void flipDirection('short')}
+            onClick={() =>
+              directionMode === 'manual' ? void flipDirection('short') : undefined
+            }
+            disabled={directionMode === 'auto'}
+            title={directionMode === 'auto' ? 'Auto mode active' : undefined}
             className={`text-xs px-2.5 py-1 rounded border transition-colors ${
               omegaDirection === 'short'
                 ? 'border-red-400 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-medium'
                 : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
+            }${directionMode === 'auto' ? ' opacity-40 cursor-not-allowed' : ''}`}
           >
             ↓ Short
           </button>

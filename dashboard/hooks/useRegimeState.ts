@@ -5,6 +5,7 @@ import { getSupabase } from '@/lib/supabase';
 import {
   KEY_OMEGA_DIR,
   parseOmegaDir,
+  parseDirectionMode,
   writeOmegaDir,
 } from '@/lib/engineControlConfig';
 import type { RegimeState } from '@/lib/types';
@@ -17,11 +18,13 @@ export interface RegimePanelData {
   isLoading:       boolean;
   fetchError:      string | null;
   flipDirection:   (direction: 'long' | 'short') => Promise<void>;
+  directionMode:   'auto' | 'manual';
 }
 
 export function useRegimeState(): RegimePanelData {
   const [regimeState,    setRegimeState]    = useState<RegimeState | null>(null);
   const [omegaDirection, setOmegaDirection] = useState<'long' | 'short'>('long');
+  const [directionMode, setDirectionMode] = useState<'auto' | 'manual'>('manual');
   const [isLoading,      setIsLoading]      = useState(true);
   const [fetchError,     setFetchError]     = useState<string | null>(null);
 
@@ -53,6 +56,14 @@ export function useRegimeState(): RegimePanelData {
 
       setRegimeState((regimeRow as RegimeState | null) ?? null);
       setOmegaDirection(parseOmegaDir(configRow?.config_value));
+
+      const { data: modeRow } = await supabase
+        .from('bridge_config')
+        .select('config_value')
+        .eq('config_key', 'direction_mode')
+        .maybeSingle();
+      setDirectionMode(parseDirectionMode(modeRow?.config_value));
+
       setFetchError(null);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Unknown error');
@@ -79,5 +90,5 @@ export function useRegimeState(): RegimePanelData {
     return () => window.clearInterval(interval);
   }, [fetchData]);
 
-  return { regimeState, omegaDirection, isLoading, fetchError, flipDirection };
+  return { regimeState, omegaDirection, isLoading, fetchError, flipDirection, directionMode };
 }

@@ -21,11 +21,13 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
     pausedIds,
     omegaDir,
     rebuildRetry,
+    directionMode,
     lastSyncedUtc,
     toast,
     loadError,
     togglePause,
     flipOmega,
+    toggleDirectionMode,
     toggleRebuildRetry,
   } = useEngineControlsState();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -87,12 +89,35 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
                         </button>
                         <button
                           type="button"
-                          onClick={() => void flipOmega()}
+                          onClick={() => void toggleDirectionMode()}
+                          className={`inline-flex h-8 items-center justify-center border px-2 text-xs font-semibold max-md:min-h-[44px] ${
+                            directionMode === 'auto'
+                              ? 'border-blue-400 bg-blue-100 text-blue-800'
+                              : 'border-slate-300 bg-slate-50 text-slate-600'
+                          }`}
+                          title={
+                            directionMode === 'auto'
+                              ? 'Auto mode — AMD sets direction at 10:05 UTC daily. Click to switch to manual.'
+                              : 'Manual mode — you set direction. Click to switch to auto.'
+                          }
+                        >
+                          <span className="md:hidden">{directionMode === 'auto' ? '⚡A' : '✋M'}</span>
+                          <span className="hidden md:inline">{directionMode === 'auto' ? '⚡ AUTO' : '✋ MANUAL'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => (directionMode === 'manual' ? void flipOmega() : undefined)}
+                          disabled={directionMode === 'auto'}
+                          title={
+                            directionMode === 'auto'
+                              ? 'Auto mode active — direction set by AMD intelligence'
+                              : undefined
+                          }
                           className={`inline-flex h-8 min-w-[2.5rem] shrink-0 items-center justify-center border px-2 text-sm font-semibold max-md:min-h-[44px] md:min-w-[4.5rem] ${
                             omegaDir === 'long'
                               ? 'border-slate-200 bg-slate-100 text-slate-800'
                               : 'border-amber-300 bg-amber-100 text-amber-900'
-                          }`}
+                          }${directionMode === 'auto' ? ' opacity-40 cursor-not-allowed' : ''}`}
                         >
                           <span className="md:hidden">{omegaDir === 'long' ? 'L' : 'S'}</span>
                           <span className="hidden md:inline">

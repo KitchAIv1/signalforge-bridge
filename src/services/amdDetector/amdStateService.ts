@@ -23,6 +23,10 @@ export type ActiveAmdState = {
   layer4BullishCount: number | null;
   layer4BearishCount: number | null;
   dailyBiasAlignment: DailyBiasAlignment;
+  autoDirection: string | null;
+  autoDirectionConfidence: string | null;
+  autoDirectionReason: string | null;
+  amdSizeMultiplier: number | null;
 };
 
 function utcTodayDate(): string {
@@ -46,7 +50,8 @@ export async function fetchLatestAmdState(
     .select(
       'trade_date, evaluated_at, amd_tag, asian_range_pips, asian_is_flat, ' +
         'judas_direction, judas_pips, reversal_confirmed, compression_breakout, ' +
-        'layer4_d1_bias, layer4_bullish_count, layer4_bearish_count, daily_bias_alignment',
+        'layer4_d1_bias, layer4_bullish_count, layer4_bearish_count, daily_bias_alignment, ' +
+        'auto_direction, auto_direction_confidence, auto_direction_reason, amd_size_multiplier',
     )
     .eq('pair', pair)
     .eq('trade_date', tradeDateToday)
@@ -84,5 +89,10 @@ export async function fetchLatestAmdState(
         : Number(rec['layer4_bearish_count']),
     dailyBiasAlignment: (rec['daily_bias_alignment'] ??
       null) as DailyBiasAlignment,
+    autoDirection: (rec['auto_direction'] ?? null) as string | null,
+    autoDirectionConfidence: (rec['auto_direction_confidence'] ?? null) as string | null,
+    autoDirectionReason: (rec['auto_direction_reason'] ?? null) as string | null,
+    amdSizeMultiplier:
+      rec['amd_size_multiplier'] == null ? null : Number(rec['amd_size_multiplier']),
   };
 }

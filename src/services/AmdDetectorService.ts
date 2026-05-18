@@ -8,12 +8,17 @@ import { fetchCompletedCandles } from '../connectors/oanda.js';
 import { computeDateFeatures, type OhlcCandle } from './amdDetector/amdFeatures.js';
 import { buildAmdChartDataPayload } from './amdDetector/amdChartPayload.js';
 import type {
+  AmdAutoDirectionSnapshot,
   AmdDailyBiasSnapshot,
   AmdDateFeatures,
   DailyBiasAlignment,
   JudasDirection,
   Layer4D1Bias,
 } from './amdDetector/amdTypes.js';
+import {
+  applyAutoDirectionToBridgeConfig,
+  computeAutoDirectionSnapshot,
+} from './amdDetector/amdAutoDirection.js';
 import { sendAmdTelegramAlert } from './amdDetector/sendAmdTelegramAlert.js';
 
 const AUD_AMD_PAIR = 'AUD_USD';
@@ -55,6 +60,7 @@ type InsertAmdOpts = {
   candlesForChart: OhlcCandle[];
   features: AmdDateFeatures;
   dailyBias: AmdDailyBiasSnapshot;
+  autoDir: AmdAutoDirectionSnapshot;
 };
 
 function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
@@ -86,11 +92,15 @@ function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
     chart_url: null,
     chart_generated_at: null,
     chart_data: chartPayload,
+    auto_direction: insertOpts.autoDir.auto_direction,
+    auto_direction_confidence: insertOpts.autoDir.auto_direction_confidence,
+    auto_direction_reason: insertOpts.autoDir.auto_direction_reason,
+    amd_size_multiplier: insertOpts.autoDir.amd_size_multiplier,
   };
 }
 
 function logAmdPersistSummary(insertOpts: InsertAmdOpts): void {
-  const { tradeDate, features, dailyBias } = insertOpts;
+  const { tradeDate, features, dailyBias, autoDir } = insertOpts;
   const flatDisp = `${features.asian_is_flat}`;
   console.log(
     `[AmdDetector] ${tradeDate} | ${features.amd_tag} | ` +
@@ -101,11 +111,12 @@ function logAmdPersistSummary(insertOpts: InsertAmdOpts): void {
       `D1=${dailyBias.layer4_d1_bias ?? 'null'} ` +
       `(${dailyBias.layer4_bullish_count ?? '—'}↑/${dailyBias.layer4_bearish_count ?? '—'}↓) | ` +
       `bias_align=${dailyBias.daily_bias_alignment ?? 'null'} | ` +
-      `chart=none`,
+      `chart=none | ` +
+      `auto=${autoDir.auto_direction} (${autoDir.auto_direction_confidence})`,
   );
 }
 
-async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<void> {
+async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<boolean> {
   const { amdSupabase } = insertOpts;
   const upsertRow = buildAmdStateUpsertRow(insertOpts);
   const { error } = await amdSupabase
@@ -114,10 +125,11 @@ async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<void> {
 
   if (error) {
     console.error('[AmdDetector] Write to amd_state failed:', error.message);
-    return;
+    return false;
   }
 
   logAmdPersistSummary(insertOpts);
+  return true;
 }
 
 function countTrendVotesFromFiveD1Bars(
@@ -257,14 +269,30 @@ async function recordAmdInsightForEmptyH1(
     tradeDate,
     emptyFeatures.judas_direction,
   );
-  await persistAmdInsightRow({
+  const autoDir = computeAutoDirectionSnapshot(
+    emptyFeatures.amd_tag,
+    emptyFeatures.judas_direction,
+    emptyDailyBias.layer4_d1_bias,
+    emptyDailyBias.layer4_bullish_count,
+    emptyDailyBias.layer4_bearish_count,
+    emptyDailyBias.daily_bias_alignment,
+  );
+  const persisted = await persistAmdInsightRow({
     amdSupabase: supabaseDb,
     tradeDate,
     evaluatedAtISO,
     candlesForChart: [],
     features: emptyFeatures,
     dailyBias: emptyDailyBias,
+    autoDir,
   });
+  if (persisted) {
+    await applyAutoDirectionToBridgeConfig(
+      supabaseDb,
+      autoDir.auto_direction,
+      autoDir.auto_direction_reason,
+    );
+  }
   try {
     await sendAmdTelegramAlert(tradeDate, emptyFeatures);
   } catch (tgErr: unknown) {
@@ -288,14 +316,32 @@ async function recordAmdInsightForH1Window(
     features.judas_direction,
   );
 
-  await persistAmdInsightRow({
+  const autoDir = computeAutoDirectionSnapshot(
+    features.amd_tag,
+    features.judas_direction,
+    filledDailyBias.layer4_d1_bias,
+    filledDailyBias.layer4_bullish_count,
+    filledDailyBias.layer4_bearish_count,
+    filledDailyBias.daily_bias_alignment,
+  );
+
+  const persisted = await persistAmdInsightRow({
     amdSupabase: supabaseDb,
     tradeDate,
     evaluatedAtISO,
     candlesForChart: h1Pull,
     features,
     dailyBias: filledDailyBias,
+    autoDir,
   });
+
+  if (persisted) {
+    await applyAutoDirectionToBridgeConfig(
+      supabaseDb,
+      autoDir.auto_direction,
+      autoDir.auto_direction_reason,
+    );
+  }
 
   try {
     await sendAmdTelegramAlert(tradeDate, features);
