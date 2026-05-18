@@ -2,7 +2,12 @@
  * Reads today's AMD advisory row from amd_state for a pair.
  */
 import { createClient } from '@supabase/supabase-js';
-import type { AmdTag, JudasDirection } from './amdTypes.js';
+import type {
+  AmdTag,
+  DailyBiasAlignment,
+  JudasDirection,
+  Layer4D1Bias,
+} from './amdTypes.js';
 
 export type ActiveAmdState = {
   amdTag: AmdTag;
@@ -14,6 +19,10 @@ export type ActiveAmdState = {
   judasPips: number | null;
   reversalConfirmed: boolean | null;
   compressionBreakout: boolean;
+  layer4D1Bias: Layer4D1Bias;
+  layer4BullishCount: number | null;
+  layer4BearishCount: number | null;
+  dailyBiasAlignment: DailyBiasAlignment;
 };
 
 function utcTodayDate(): string {
@@ -36,7 +45,8 @@ export async function fetchLatestAmdState(
     .from('amd_state')
     .select(
       'trade_date, evaluated_at, amd_tag, asian_range_pips, asian_is_flat, ' +
-        'judas_direction, judas_pips, reversal_confirmed, compression_breakout'
+        'judas_direction, judas_pips, reversal_confirmed, compression_breakout, ' +
+        'layer4_d1_bias, layer4_bullish_count, layer4_bearish_count, daily_bias_alignment',
     )
     .eq('pair', pair)
     .eq('trade_date', tradeDateToday)
@@ -63,5 +73,16 @@ export async function fetchLatestAmdState(
         ? null
         : Boolean(rec['reversal_confirmed']),
     compressionBreakout: Boolean(rec['compression_breakout'] ?? false),
+    layer4D1Bias: (rec['layer4_d1_bias'] ?? null) as Layer4D1Bias,
+    layer4BullishCount:
+      rec['layer4_bullish_count'] == null
+        ? null
+        : Number(rec['layer4_bullish_count']),
+    layer4BearishCount:
+      rec['layer4_bearish_count'] == null
+        ? null
+        : Number(rec['layer4_bearish_count']),
+    dailyBiasAlignment: (rec['daily_bias_alignment'] ??
+      null) as DailyBiasAlignment,
   };
 }

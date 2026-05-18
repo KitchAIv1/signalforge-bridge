@@ -1,5 +1,19 @@
 export type JudasDirection = 'UP' | 'DOWN' | 'FLAT';
 
+/** Last-five-D1-bar vote snapshot (aligned with historical AMD backtest). */
+export type Layer4D1Bias = 'TRENDING_UP' | 'TRENDING_DOWN' | 'RANGING' | null;
+
+/** Judas vs D1 macro alignment (null when insufficient signal). */
+export type DailyBiasAlignment = 'ALIGNED' | 'CONFLICTED' | 'RANGING' | null;
+
+/** Persisted alongside amd_state / echoed on trade log for audit. */
+export type AmdDailyBiasSnapshot = {
+  layer4_d1_bias: Layer4D1Bias;
+  layer4_bullish_count: number | null;
+  layer4_bearish_count: number | null;
+  daily_bias_alignment: DailyBiasAlignment;
+};
+
 export type AmdTag =
   | 'INSUFFICIENT_DATA'
   | 'AMD_TEXTBOOK'
@@ -41,6 +55,10 @@ export type AmdStateRow = {
   compression_breakout: boolean;
   delayed_distribution: boolean;
   amd_tag: AmdTag;
+  layer4_d1_bias: Layer4D1Bias;
+  layer4_bullish_count: number | null;
+  layer4_bearish_count: number | null;
+  daily_bias_alignment: DailyBiasAlignment;
   chart_url: string | null;
   chart_generated_at: string | null;
 };

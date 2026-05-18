@@ -7,7 +7,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { fetchCompletedCandles } from '../connectors/oanda.js';
 import { computeDateFeatures, type OhlcCandle } from './amdDetector/amdFeatures.js';
 import { buildAmdChartDataPayload } from './amdDetector/amdChartPayload.js';
-import type { AmdDateFeatures } from './amdDetector/amdTypes.js';
+import type {
+  AmdDailyBiasSnapshot,
+  AmdDateFeatures,
+  DailyBiasAlignment,
+  JudasDirection,
+  Layer4D1Bias,
+} from './amdDetector/amdTypes.js';
 import { sendAmdTelegramAlert } from './amdDetector/sendAmdTelegramAlert.js';
 
 const AUD_AMD_PAIR = 'AUD_USD';
@@ -48,49 +54,43 @@ type InsertAmdOpts = {
   evaluatedAtISO: string;
   candlesForChart: OhlcCandle[];
   features: AmdDateFeatures;
+  dailyBias: AmdDailyBiasSnapshot;
 };
 
-async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<void> {
-  const {
-    amdSupabase,
-    tradeDate,
-    evaluatedAtISO,
-    candlesForChart,
-    features,
-  } = insertOpts;
+function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
+  const { tradeDate, evaluatedAtISO, candlesForChart, features, dailyBias } =
+    insertOpts;
   const chartPayload = buildAmdChartDataPayload(
     tradeDate,
     candlesForChart,
-    features
+    features,
   );
+  return {
+    trade_date: tradeDate,
+    evaluated_at: evaluatedAtISO,
+    pair: AUD_AMD_PAIR,
+    asian_range_pips: features.asian_range_pips,
+    asian_net_pips: features.asian_net_pips,
+    asian_is_flat: features.asian_is_flat,
+    judas_direction: features.judas_direction,
+    judas_pips: features.judas_pips,
+    judas_extreme_price: features.judas_extreme_price,
+    reversal_confirmed: features.reversal_confirmed,
+    compression_breakout: features.compression_breakout,
+    delayed_distribution: features.delayed_distribution,
+    amd_tag: features.amd_tag,
+    layer4_d1_bias: dailyBias.layer4_d1_bias,
+    layer4_bullish_count: dailyBias.layer4_bullish_count,
+    layer4_bearish_count: dailyBias.layer4_bearish_count,
+    daily_bias_alignment: dailyBias.daily_bias_alignment,
+    chart_url: null,
+    chart_generated_at: null,
+    chart_data: chartPayload,
+  };
+}
 
-  const { error } = await amdSupabase.from('amd_state').upsert(
-    {
-      trade_date: tradeDate,
-      evaluated_at: evaluatedAtISO,
-      pair: AUD_AMD_PAIR,
-      asian_range_pips: features.asian_range_pips,
-      asian_net_pips: features.asian_net_pips,
-      asian_is_flat: features.asian_is_flat,
-      judas_direction: features.judas_direction,
-      judas_pips: features.judas_pips,
-      judas_extreme_price: features.judas_extreme_price,
-      reversal_confirmed: features.reversal_confirmed,
-      compression_breakout: features.compression_breakout,
-      delayed_distribution: features.delayed_distribution,
-      amd_tag: features.amd_tag,
-      chart_url: null,
-      chart_generated_at: null,
-      chart_data: chartPayload,
-    },
-    { onConflict: 'trade_date,pair' }
-  );
-
-  if (error) {
-    console.error('[AmdDetector] Write to amd_state failed:', error.message);
-    return;
-  }
-
+function logAmdPersistSummary(insertOpts: InsertAmdOpts): void {
+  const { tradeDate, features, dailyBias } = insertOpts;
   const flatDisp = `${features.asian_is_flat}`;
   console.log(
     `[AmdDetector] ${tradeDate} | ${features.amd_tag} | ` +
@@ -98,8 +98,132 @@ async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<void> {
       `judas=${features.judas_direction ?? 'null'} ` +
       `${features.judas_pips ?? 'null'}pips | ` +
       `reversal=${features.reversal_confirmed ?? 'null'} | ` +
-      `chart=none`
+      `D1=${dailyBias.layer4_d1_bias ?? 'null'} ` +
+      `(${dailyBias.layer4_bullish_count ?? '—'}↑/${dailyBias.layer4_bearish_count ?? '—'}↓) | ` +
+      `bias_align=${dailyBias.daily_bias_alignment ?? 'null'} | ` +
+      `chart=none`,
   );
+}
+
+async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<void> {
+  const { amdSupabase } = insertOpts;
+  const upsertRow = buildAmdStateUpsertRow(insertOpts);
+  const { error } = await amdSupabase
+    .from('amd_state')
+    .upsert(upsertRow, { onConflict: 'trade_date,pair' });
+
+  if (error) {
+    console.error('[AmdDetector] Write to amd_state failed:', error.message);
+    return;
+  }
+
+  logAmdPersistSummary(insertOpts);
+}
+
+function countTrendVotesFromFiveD1Bars(
+  lastFiveBars: ReadonlyArray<{ mid: { o: string; c: string } }>,
+): { bullishCount: number; bearishCount: number } {
+  let bullishCount = 0;
+  let bearishCount = 0;
+  for (const candleEntry of lastFiveBars) {
+    const openPx = parseFloat(candleEntry.mid.o);
+    const closePx = parseFloat(candleEntry.mid.c);
+    if (!Number.isFinite(openPx) || !Number.isFinite(closePx)) continue;
+    if (closePx > openPx) bullishCount++;
+    else if (openPx > closePx) bearishCount++;
+  }
+  return { bullishCount, bearishCount };
+}
+
+function computeDailyBiasAlignment(
+  judasDirection: JudasDirection | null,
+  layer4D1Bias: Layer4D1Bias,
+): DailyBiasAlignment {
+  if (!judasDirection || judasDirection === 'FLAT') return null;
+  if (!layer4D1Bias) return null;
+  if (layer4D1Bias === 'RANGING') return 'RANGING';
+  if (judasDirection === 'UP') {
+    if (layer4D1Bias === 'TRENDING_DOWN') return 'ALIGNED';
+    if (layer4D1Bias === 'TRENDING_UP') return 'CONFLICTED';
+  }
+  if (judasDirection === 'DOWN') {
+    if (layer4D1Bias === 'TRENDING_UP') return 'ALIGNED';
+    if (layer4D1Bias === 'TRENDING_DOWN') return 'CONFLICTED';
+  }
+  return null;
+}
+
+function emptyD1VoteCounts(): Pick<
+  AmdDailyBiasSnapshot,
+  'layer4_d1_bias' | 'layer4_bullish_count' | 'layer4_bearish_count'
+> {
+  return {
+    layer4_d1_bias: null,
+    layer4_bullish_count: null,
+    layer4_bearish_count: null,
+  };
+}
+
+function d1BiasVotesFromLastFive(
+  lastFiveCompleted: ReadonlyArray<{ mid: { o: string; c: string } }>,
+): Pick<
+  AmdDailyBiasSnapshot,
+  'layer4_d1_bias' | 'layer4_bullish_count' | 'layer4_bearish_count'
+> {
+  if (lastFiveCompleted.length === 0) return emptyD1VoteCounts();
+
+  const { bullishCount, bearishCount } =
+    countTrendVotesFromFiveD1Bars(lastFiveCompleted);
+  const layer4_d1_bias: Layer4D1Bias =
+    bullishCount >= 3
+      ? 'TRENDING_UP'
+      : bearishCount >= 3
+        ? 'TRENDING_DOWN'
+        : 'RANGING';
+
+  return {
+    layer4_d1_bias,
+    layer4_bullish_count: bullishCount,
+    layer4_bearish_count: bearishCount,
+  };
+}
+
+async function fetchD1BiasVotesForTradeDate(
+  pair: string,
+  tradeDate: string,
+): Promise<
+  Pick<AmdDailyBiasSnapshot, 'layer4_d1_bias' | 'layer4_bullish_count' | 'layer4_bearish_count'>
+> {
+  try {
+    const tradeDateMs = Date.parse(`${tradeDate}T00:00:00.000Z`);
+    const rangeStartUtc = new Date(tradeDateMs - 14 * 24 * 3600 * 1000);
+    const fromISO =
+      rangeStartUtc.toISOString().split('T')[0] + 'T00:00:00.000000000Z';
+    const toISO = `${tradeDate}T00:00:00.000000000Z`;
+    const d1Bars = await fetchCompletedCandles(pair, 'D', fromISO, toISO);
+    return d1BiasVotesFromLastFive(d1Bars.slice(-5));
+  } catch (biasErr: unknown) {
+    console.warn(
+      '[AmdDetector] D1 bias fetch failed — counts null:',
+      biasErr instanceof Error ? biasErr.message : biasErr,
+    );
+    return emptyD1VoteCounts();
+  }
+}
+
+async function buildDailyBiasSnapshot(
+  pair: string,
+  tradeDate: string,
+  judasDirection: JudasDirection | null,
+): Promise<AmdDailyBiasSnapshot> {
+  const votesRow = await fetchD1BiasVotesForTradeDate(pair, tradeDate);
+  return {
+    ...votesRow,
+    daily_bias_alignment: computeDailyBiasAlignment(
+      judasDirection,
+      votesRow.layer4_d1_bias,
+    ),
+  };
 }
 
 async function pullAudUsdH1ForAmd(dayStamp: string): Promise<OhlcCandle[] | null> {
@@ -117,6 +241,69 @@ async function pullAudUsdH1ForAmd(dayStamp: string): Promise<OhlcCandle[] | null
   }
 }
 
+async function recordAmdInsightForEmptyH1(
+  supabaseDb: SupabaseClient,
+  tradeDate: string,
+  evaluatedAtISO: string,
+): Promise<void> {
+  const emptyFeatures = computeDateFeatures(
+    [],
+    (badCandle, warnReason) => {
+      console.warn(`[AmdDetector] Candle issue: ${warnReason}`, badCandle.time);
+    },
+  );
+  const emptyDailyBias = await buildDailyBiasSnapshot(
+    AUD_AMD_PAIR,
+    tradeDate,
+    emptyFeatures.judas_direction,
+  );
+  await persistAmdInsightRow({
+    amdSupabase: supabaseDb,
+    tradeDate,
+    evaluatedAtISO,
+    candlesForChart: [],
+    features: emptyFeatures,
+    dailyBias: emptyDailyBias,
+  });
+  try {
+    await sendAmdTelegramAlert(tradeDate, emptyFeatures);
+  } catch (tgErr: unknown) {
+    console.warn('[AmdDetector] Telegram alert failed:', tgErr);
+  }
+}
+
+async function recordAmdInsightForH1Window(
+  supabaseDb: SupabaseClient,
+  tradeDate: string,
+  evaluatedAtISO: string,
+  h1Pull: OhlcCandle[],
+): Promise<void> {
+  const features = computeDateFeatures(h1Pull, (badHourCandle, candleReason) => {
+    console.warn(`[AmdDetector] Candle issue: ${candleReason}`, badHourCandle.time);
+  });
+
+  const filledDailyBias = await buildDailyBiasSnapshot(
+    AUD_AMD_PAIR,
+    tradeDate,
+    features.judas_direction,
+  );
+
+  await persistAmdInsightRow({
+    amdSupabase: supabaseDb,
+    tradeDate,
+    evaluatedAtISO,
+    candlesForChart: h1Pull,
+    features,
+    dailyBias: filledDailyBias,
+  });
+
+  try {
+    await sendAmdTelegramAlert(tradeDate, features);
+  } catch (tgErr: unknown) {
+    console.warn('[AmdDetector] Telegram alert failed:', tgErr);
+  }
+}
+
 export async function runAmdDetection(): Promise<void> {
   const evaluatedAtISO = new Date().toISOString();
   const tradeDate = utcTradeDateStamp();
@@ -128,44 +315,11 @@ export async function runAmdDetection(): Promise<void> {
   if (h1Pull === null) return;
 
   if (h1Pull.length === 0) {
-    const emptyFeatures = computeDateFeatures(
-      [],
-      (badCandle, warnReason) => {
-        console.warn(`[AmdDetector] Candle issue: ${warnReason}`, badCandle.time);
-      }
-    );
-    await persistAmdInsightRow({
-      amdSupabase: supabaseDb,
-      tradeDate,
-      evaluatedAtISO,
-      candlesForChart: [],
-      features: emptyFeatures,
-    });
-    try {
-      await sendAmdTelegramAlert(tradeDate, emptyFeatures);
-    } catch (tgErr: unknown) {
-      console.warn('[AmdDetector] Telegram alert failed:', tgErr);
-    }
+    await recordAmdInsightForEmptyH1(supabaseDb, tradeDate, evaluatedAtISO);
     return;
   }
 
-  const features = computeDateFeatures(h1Pull, (badHourCandle, candleReason) => {
-    console.warn(`[AmdDetector] Candle issue: ${candleReason}`, badHourCandle.time);
-  });
-
-  await persistAmdInsightRow({
-    amdSupabase: supabaseDb,
-    tradeDate,
-    evaluatedAtISO,
-    candlesForChart: h1Pull,
-    features,
-  });
-
-  try {
-    await sendAmdTelegramAlert(tradeDate, features);
-  } catch (tgErr: unknown) {
-    console.warn('[AmdDetector] Telegram alert failed:', tgErr);
-  }
+  await recordAmdInsightForH1Window(supabaseDb, tradeDate, evaluatedAtISO, h1Pull);
 }
 
 if (isExecutedAsCliModule()) {

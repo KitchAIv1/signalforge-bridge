@@ -13,6 +13,10 @@ import {
   getRegimeSizeMultiplier,
   type ActiveRegimeState,
 } from '../services/RegimeStateService.js';
+import {
+  fetchLatestAmdState,
+  type ActiveAmdState,
+} from '../services/amdDetector/amdStateService.js';
 import { validateSignal } from './signalValidation.js';
 import { isTripped, getPeakEquity, getConsecutiveLosses, enterCooldown } from './circuitBreaker.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
@@ -702,6 +706,7 @@ export async function processSignal(
 
   let regimeState: ActiveRegimeState | null = null;
   let regimeSizeMultiplier = 1.0;
+  let amdState: ActiveAmdState | null = null;
 
   if (norm.engineId === 'omega') {
     regimeState = await fetchLatestRegimeState('AUD_USD');
@@ -714,6 +719,25 @@ export async function processSignal(
         `omega direction: ${norm.direction} | ` +
         `evaluated: ${regimeState?.evaluatedAt ?? 'unknown'}`
       );
+    }
+
+    try {
+      amdState = await fetchLatestAmdState('AUD_USD');
+      if (amdState) {
+        logInfo(
+          `[AmdAdvisory] tag: ${amdState.amdTag} | ` +
+          `range: ${amdState.asianRangePips ?? 'null'} | ` +
+          `flat: ${amdState.asianIsFlat} | ` +
+          `judas: ${amdState.judasDirection ?? 'null'} ` +
+          `${amdState.judasPips ?? 'null'}pips | ` +
+          `reversal: ${amdState.reversalConfirmed ?? 'null'} | ` +
+          `D1: ${amdState.layer4D1Bias ?? 'null'} ` +
+          `(${amdState.layer4BullishCount ?? '—'}↑/${amdState.layer4BearishCount ?? '—'}↓) | ` +
+          `bias_align: ${amdState.dailyBiasAlignment ?? 'null'}`
+        );
+      }
+    } catch (amdErr: unknown) {
+      console.warn('[AmdAdvisory] fetchLatestAmdState failed:', amdErr);
     }
   }
 
@@ -1065,6 +1089,14 @@ export async function processSignal(
       (row as Record<string, unknown>).manual_tag = null;
       (row as Record<string, unknown>).close_tag = null;
       (row as Record<string, unknown>).signal_session = null;
+      (row as Record<string, unknown>).amd_tag = amdState?.amdTag ?? null;
+      (row as Record<string, unknown>).amd_evaluated_at =
+        amdState?.evaluatedAt ?? null;
+      // D1 vote counts persist on amd_state; bridge_trade_log.layer4_* counts are regime snapshot fields.
+      (row as Record<string, unknown>).layer4_d1_bias =
+        amdState?.layer4D1Bias ?? null;
+      (row as Record<string, unknown>).daily_bias_alignment =
+        amdState?.dailyBiasAlignment ?? null;
     }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();
