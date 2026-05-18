@@ -875,39 +875,18 @@ export async function processSignal(
           500_000
         );
         const bar1Multipliers: Record<string, number> = {
-          strong:   2.0,
+          strong:   1.0,
           moderate: 1.0,
-          weak:     0.75,
-          // Raised from 0.25 to 0.5:
-          // 6 of 12 winning trades were against-bar1
-          // and all won in trending macro regime.
-          // 0.25x was too small (~$25 risk) to matter.
-          // 0.5x doubles win capture while still
-          // providing 50% size reduction vs base.
-          // Validated via M1 simulation May 4 2026.
-          against:  0.5,
-          no_data:  0.5,
+          weak:     1.0,
+          against:  1.0,
+          no_data:  1.0,
         };
 
-        // Omega direction alignment weight.
-        // Empirical basis (bridge data Apr30-May5 2026):
-        //   67% of Rebuild wins aligned with Omega dir.
-        //   71% of misaligned losses flip to wins.
-        //   Aligned wins avg +$234 vs +$183 misaligned.
-        //   Net +$542 improvement on 8 misaligned trades.
-        // Default 1.0x when omega_direction not set —
-        // prevents stale direction amplifying bad signals.
-        // Applied ON TOP of bar1 multiplier.
         const rebuildSignalDir =
           norm.direction.toLowerCase();
         const omegaDir =
           omegaDirection.toLowerCase();
-        const omegaAlignmentMultiplier: number =
-          omegaDir !== 'long' && omegaDir !== 'short'
-            ? 1.0 // not set — neutral
-            : rebuildSignalDir === omegaDir
-              ? 1.25 // aligned — boost
-              : 0.75; // misaligned — reduce
+        const omegaAlignmentMultiplier: number = 1.0;
 
         const multiplier =
           (bar1Multipliers[bar1Data.strength] ?? 0.5)
