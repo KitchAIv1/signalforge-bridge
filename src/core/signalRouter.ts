@@ -1127,6 +1127,10 @@ export async function processSignal(
         directionMode === 'auto' ? 'auto' : 'manual';
       (row as Record<string, unknown>).amd_size_multiplier =
         amdState?.amdSizeMultiplier ?? null;
+      (row as Record<string, unknown>).reversal_confirmed =
+        amdState?.reversalConfirmed ?? null;
+      (row as Record<string, unknown>).auto_direction_reason =
+        amdState?.autoDirectionReason ?? null;
     }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();

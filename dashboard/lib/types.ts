@@ -82,6 +82,8 @@ export interface BridgeTradeLogRow {
   amd_evaluated_at?: string | null;
   direction_source?: string | null;
   amd_size_multiplier?: number | null;
+  reversal_confirmed?: boolean | null;
+  auto_direction_reason?: string | null;
 }
 
 export interface OmegaShadowSignalRow {
