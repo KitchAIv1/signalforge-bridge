@@ -103,3 +103,44 @@ export function amdEvaluatedLabel(evaluatedAt: string | null): string {
   const mins = d.getUTCMinutes().toString().padStart(2, '0');
   return `Evaluated at ${hours}:${mins} UTC`;
 }
+
+/**
+ * Returns actual computed size multiplier as display string.
+ * Uses numeric value from amd_state when available.
+ * Falls back to tag-based estimate when null.
+ */
+export function amdSizeMultiplierDisplay(
+  numericValue: number | null | undefined,
+  tag: string | null,
+): string {
+  if (numericValue != null) {
+    return `${numericValue.toFixed(2)}×`;
+  }
+  return amdSizeMultiplierLabel(tag);
+}
+
+export function autoDirectionLabel(dir: string | null | undefined): string {
+  if (!dir || dir === 'neutral') return '—';
+  if (dir === 'long') return '↑ LONG';
+  if (dir === 'short') return '↓ SHORT';
+  return dir.toUpperCase();
+}
+
+export function autoDirectionColor(dir: string | null | undefined): string {
+  if (dir === 'long') return 'text-emerald-600 dark:text-emerald-400';
+  if (dir === 'short') return 'text-red-600 dark:text-red-400';
+  return 'text-slate-500 dark:text-slate-400';
+}
+
+export function autoDirectionConfidenceLabel(
+  confidence: string | null | undefined,
+): string {
+  if (!confidence) return '—';
+  const labels: Record<string, string> = {
+    high: '🟢 High',
+    medium: '🟡 Medium',
+    low: '🟠 Low',
+    very_low: '🔴 Very Low',
+  };
+  return labels[confidence] ?? confidence;
+}

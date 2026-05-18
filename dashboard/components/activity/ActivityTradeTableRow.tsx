@@ -35,11 +35,18 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
       <td className="px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100">{row.engine_id}</td>
       <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-300">{row.pair}</td>
       <td className="px-3 py-2 text-xs font-medium">
-        {row.direction === 'long' || row.direction === 'LONG' ? (
-          <span className="text-emerald-600 dark:text-emerald-400">LONG</span>
-        ) : (
-          <span className="text-red-600 dark:text-red-400">SHORT</span>
-        )}
+        <div className="flex items-center gap-1">
+          {row.direction === 'long' || row.direction === 'LONG' ? (
+            <span className="text-emerald-600 dark:text-emerald-400">LONG</span>
+          ) : (
+            <span className="text-red-600 dark:text-red-400">SHORT</span>
+          )}
+          {row.direction_source === 'auto' && (
+            <span className="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+              AUTO
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-3 py-2 text-xs">
         <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${decisionBadgeClasses}`}>

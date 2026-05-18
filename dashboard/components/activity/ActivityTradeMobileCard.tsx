@@ -56,11 +56,18 @@ export function ActivityTradeMobileCard({ row }: ActivityTradeMobileCardProps) {
         <div>
           <dt className="text-[11px] uppercase tracking-wide text-slate-600 dark:text-slate-400">Direction</dt>
           <dd className="font-medium text-slate-900 dark:text-slate-100">
-            {row.direction === 'long' || row.direction === 'LONG' ? (
-              <span className="text-emerald-600 dark:text-emerald-400">LONG</span>
-            ) : (
-              <span className="text-red-600 dark:text-red-400">SHORT</span>
-            )}
+            <div className="flex items-center gap-1">
+              {row.direction === 'long' || row.direction === 'LONG' ? (
+                <span className="text-emerald-600 dark:text-emerald-400">LONG</span>
+              ) : (
+                <span className="text-red-600 dark:text-red-400">SHORT</span>
+              )}
+              {row.direction_source === 'auto' && (
+                <span className="rounded bg-blue-100 px-1 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                  AUTO
+                </span>
+              )}
+            </div>
           </dd>
         </div>
         <div>

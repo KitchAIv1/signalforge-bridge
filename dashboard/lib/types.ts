@@ -223,4 +223,12 @@ export interface AmdState {
   override_reason:          string | null;
   override_set_at:          string | null;
   created_at:              string;
+  layer4_d1_bias?: string | null;
+  layer4_bullish_count?: number | null;
+  layer4_bearish_count?: number | null;
+  daily_bias_alignment?: string | null;
+  auto_direction?: string | null;
+  auto_direction_confidence?: string | null;
+  auto_direction_reason?: string | null;
+  amd_size_multiplier?: number | null;
 }

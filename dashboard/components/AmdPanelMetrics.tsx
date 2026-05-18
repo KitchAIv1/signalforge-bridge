@@ -1,7 +1,12 @@
 'use client';
 
 import type { AmdState } from '@/lib/types';
-import { amdSizeMultiplierLabel } from '@/lib/amdPanelFormatters';
+import {
+  amdSizeMultiplierDisplay,
+  autoDirectionLabel,
+  autoDirectionColor,
+  autoDirectionConfidenceLabel,
+} from '@/lib/amdPanelFormatters';
 import {
   describeAsianRangePips,
   describeReversalStatus,
@@ -44,9 +49,32 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
         />
         <AmdIntelStatTile
           caption="Size multiplier"
-          value={amdSizeMultiplierLabel(displayTag)}
+          value={amdSizeMultiplierDisplay(amdState?.amd_size_multiplier, displayTag)}
         />
       </div>
+
+      {amdState?.auto_direction != null &&
+        amdState.auto_direction !== 'neutral' && (
+          <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Auto Direction
+              </span>
+              <span className={`font-semibold ${autoDirectionColor(amdState.auto_direction)}`}>
+                {autoDirectionLabel(amdState.auto_direction)}
+              </span>
+              <span className="text-slate-600 dark:text-slate-300">
+                {autoDirectionConfidenceLabel(amdState.auto_direction_confidence)}
+              </span>
+              {amdState.auto_direction_reason != null &&
+                amdState.auto_direction_reason !== '' && (
+                  <span className="max-w-xs truncate italic text-slate-500 dark:text-slate-400">
+                    {amdState.auto_direction_reason}
+                  </span>
+                )}
+            </div>
+          </div>
+        )}
 
       <AmdIntelCompressionRow amdState={amdState} />
     </>
