@@ -277,6 +277,7 @@ async function recordAmdInsightForEmptyH1(
     emptyDailyBias.layer4_bearish_count,
     emptyDailyBias.daily_bias_alignment,
     emptyFeatures.reversal_confirmed,
+    emptyFeatures.judas_pips,
   );
   const persisted = await persistAmdInsightRow({
     amdSupabase: supabaseDb,
@@ -325,6 +326,7 @@ async function recordAmdInsightForH1Window(
     filledDailyBias.layer4_bearish_count,
     filledDailyBias.daily_bias_alignment,
     features.reversal_confirmed,
+    features.judas_pips,
   );
 
   const persisted = await persistAmdInsightRow({
