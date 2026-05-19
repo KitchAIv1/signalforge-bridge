@@ -9,5 +9,6 @@ export const NAV_ROUTE_LINKS: NavRouteLink[] = [
   { href: '/amd-history', label: 'AMD History' },
   { href: '/calendar', label: 'Calendar' },
   { href: '/health', label: 'Health' },
+  { href: '/intelligence', label: 'Intelligence' },
   { href: '/settings', label: 'Settings' },
 ];

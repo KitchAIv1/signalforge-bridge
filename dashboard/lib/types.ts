@@ -234,3 +234,13 @@ export interface AmdState {
   auto_direction_reason?: string | null;
   amd_size_multiplier?: number | null;
 }
+
+export interface IntelligenceSnapshotRow {
+  id: string;
+  snapshot_date: string;
+  snapshot_type: 'weekly_auto' | 'manual';
+  claude_weekly_summary: string | null;
+  claude_flags: Record<string, string> | null;
+  trades_analyzed: number | null;
+  created_at: string;
+}
