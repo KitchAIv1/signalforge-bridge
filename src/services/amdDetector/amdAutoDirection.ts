@@ -86,48 +86,24 @@ export function computeAutoDirectionSnapshot(
     }
 
   } else if (amdTag === 'AMD_SHIFTED') {
-    const hasStrongJudas = (judasPips ?? 0) >= 8;
+    // D1 bias governs on SHIFTED days — validated 71% accuracy (272-day backtest)
+    // Judas inversion tested and reverted: 56% accuracy — worse than D1 on all slices
+    // judasPips retained in signature for future logging/analysis only
+    if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
+    else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
+    else auto_direction = 'neutral';
 
-    if (hasStrongJudas) {
-      // Strong Judas on SHIFTED day — use Judas inversion (validated: 71.4% vs 52.9% D1-only)
-      // Judas DOWN = fake short = real LONG. Judas UP = fake long = real SHORT.
-      if (judasDirection === 'DOWN') auto_direction = 'long';
-      else if (judasDirection === 'UP') auto_direction = 'short';
-      else auto_direction = 'neutral';
-
-      if (auto_direction !== 'neutral') {
-        if (dailyBiasAlignment === 'ALIGNED') {
-          // ALIGNED + strong Judas = 76% accuracy (data validated)
-          auto_direction_confidence = 'medium';
-          amd_size_multiplier = 1.5;
-          auto_direction_reason =
-            `AMD_SHIFTED strong Judas (${judasPips}pips) ${judasDirection ?? 'null'} ALIGNED [judas_inversion]`;
-        } else {
-          // CONFLICTED/RANGING + strong Judas = 66% accuracy (data validated on CONFLICTED)
-          auto_direction_confidence = 'low';
-          amd_size_multiplier = 0.5;
-          auto_direction_reason =
-            `AMD_SHIFTED strong Judas (${judasPips}pips) ${judasDirection ?? 'null'} ${dailyBiasAlignment ?? 'null'} [judas_inversion]`;
-        }
-      }
-    } else {
-      // Weak or no Judas — use D1 bias (original behavior)
-      if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
-      else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
-      else auto_direction = 'neutral';
-
-      if (auto_direction !== 'neutral') {
-        if (strongConviction) {
-          auto_direction_confidence = 'medium';
-          amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.5 : 0.75;
-          auto_direction_reason =
-            `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} strong D1 (${bullish}up/${bearish}dn)`;
-        } else {
-          auto_direction_confidence = 'low';
-          amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.0 : 0.5;
-          auto_direction_reason =
-            `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} weak D1 (${bullish}up/${bearish}dn)`;
-        }
+    if (auto_direction !== 'neutral') {
+      if (strongConviction) {
+        auto_direction_confidence = 'medium';
+        amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.5 : 0.75;
+        auto_direction_reason =
+          `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} strong D1 (${bullish}up/${bearish}dn)`;
+      } else {
+        auto_direction_confidence = 'low';
+        amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.0 : 0.5;
+        auto_direction_reason =
+          `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} weak D1 (${bullish}up/${bearish}dn)`;
       }
     }
 
