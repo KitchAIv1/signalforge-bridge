@@ -27,6 +27,7 @@ import { fetchCloseCandles } from './closeCandleCapture.js';
 const MIN_OPEN_AGE_MS = 60_000;
 
 let newsDetectCycleCount = 0;
+let consecutiveOandaMonitorFailures = 0;
 
 function durationMinutes(signalReceivedAt: string, closedAt: string): number | null {
   const a = new Date(signalReceivedAt).getTime();
@@ -50,8 +51,17 @@ export async function runTradeMonitor(
   let oandaTrades: Awaited<ReturnType<typeof getOpenTrades>>;
   try {
     oandaTrades = await getOpenTrades();
+    consecutiveOandaMonitorFailures = 0;
   } catch (err) {
-    console.error('[TradeMonitor] getOpenTrades failed — skipping cycle:', String(err));
+    consecutiveOandaMonitorFailures += 1;
+    console.error(
+      `[TradeMonitor] getOpenTrades failed (${consecutiveOandaMonitorFailures} consecutive) — skipping cycle:`,
+      String(err)
+    );
+    if (consecutiveOandaMonitorFailures >= 5) {
+      console.error('[TradeMonitor] 5 consecutive OANDA failures — forcing restart for clean reconnect');
+      process.exit(1);
+    }
     return;
   }
   const oandaIds = new Set(oandaTrades.map((t) => t.id));

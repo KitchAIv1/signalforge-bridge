@@ -39,19 +39,20 @@ async function main(): Promise<void> {
   }
   let summary: Awaited<ReturnType<typeof getAccountSummary>>;
   let startupAttempt = 0;
-  const MAX_STARTUP_ATTEMPTS = 5;
-  const STARTUP_RETRY_DELAY_MS = 5000;
+  const STARTUP_RETRY_DELAY_MS = 15000;
 
   while (true) {
     try {
       summary = await getAccountSummary();
+      if (startupAttempt > 0) {
+        logInfo(`[Startup] OANDA connected after ${startupAttempt} attempt(s)`);
+      }
       break;
     } catch (err) {
       startupAttempt++;
-      if (startupAttempt >= MAX_STARTUP_ATTEMPTS) {
-        throw new Error(`OANDA unreachable after ${MAX_STARTUP_ATTEMPTS} attempts: ${String(err)}`);
+      if (startupAttempt % 4 === 1) {
+        logWarn(`[Startup] OANDA unreachable (attempt ${startupAttempt}) — retrying in ${STARTUP_RETRY_DELAY_MS / 1000}s`, { error: String(err) });
       }
-      logWarn(`OANDA startup check failed (attempt ${startupAttempt}/${MAX_STARTUP_ATTEMPTS}), retrying in ${STARTUP_RETRY_DELAY_MS}ms...`, { error: String(err) });
       await new Promise<void>((resolve) => setTimeout(resolve, STARTUP_RETRY_DELAY_MS));
     }
   }
@@ -89,9 +90,19 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
-  runAmdDetection().catch(startupAmdErr => {
-    console.error('[AmdDetector] Startup run error:', startupAmdErr);
-  });
+  // Skip AMD startup run if before 10:05 UTC — H1 fetch would request a future 'to' timestamp
+  // The 10:05 UTC cron handles the daily run; startup call only needed if bridge restarts mid-day
+  const _amdNow = new Date();
+  const _amdUtcHour = _amdNow.getUTCHours();
+  const _amdUtcMin = _amdNow.getUTCMinutes();
+  const _amdWindowOpen = _amdUtcHour > 10 || (_amdUtcHour === 10 && _amdUtcMin >= 5);
+  if (_amdWindowOpen) {
+    runAmdDetection().catch(startupAmdErr => {
+      console.error('[AmdDetector] Startup run error:', startupAmdErr);
+    });
+  } else {
+    logInfo('[AmdDetector] Startup before 10:05 UTC — skipping startup run, cron handles daily detection');
+  }
 
   const channel = subscribeToSignalInserts(supabase, (payload) => {
     if (!ready) {
