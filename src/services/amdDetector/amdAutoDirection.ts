@@ -137,7 +137,18 @@ export function computeAutoDirectionSnapshot(
   // Reversal confirmation modifier
   // When reversal_confirmed is false: price did not validate the AMD intraday setup
   // Reduce multiplier by 0.5. If already low/very_low confidence → set neutral (do not override direction)
-  if (reversalConfirmed === false && auto_direction !== 'neutral') {
+  // Reversal modifier only applies to TEXTBOOK and FAILED
+  // These are the only tags where reversal confirmation is part of the prediction signal
+  // TEXTBOOK: reversal failure invalidates the AMD structure
+  // FAILED: AMD attempted reversal but failed — reversal=false confirms the failure
+  // COMPRESSION_BREAKOUT: uses continuation — reversal=false is expected and normal (83% accuracy)
+  // SHIFTED: uses D1 bias — reversal confirmation structurally irrelevant to D1 prediction
+  // NONE: uses D1 bias — same reasoning as SHIFTED
+  if (
+    reversalConfirmed === false &&
+    auto_direction !== 'neutral' &&
+    (amdTag === 'AMD_TEXTBOOK' || amdTag === 'AMD_FAILED')
+  ) {
     amd_size_multiplier = parseFloat((amd_size_multiplier * 0.5).toFixed(4));
     if (auto_direction_confidence === 'low' || auto_direction_confidence === 'very_low') {
       auto_direction = 'neutral';
