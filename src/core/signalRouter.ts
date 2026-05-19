@@ -961,22 +961,31 @@ export async function processSignal(
     (row as Record<string, unknown>).units = filledUnits;
     if (fillPrice != null) (row as Record<string, unknown>).fill_price = fillPrice;
     // ── Pre-entry candle capture — omega only ─────────────────────────────
+    // 3-second timeout prevents slow OANDA candle responses from blocking
+    // signal execution. On timeout, candles are skipped — row inserts cleanly.
     if (norm.engineId === 'omega' && fillPrice != null) {
       try {
         const fillIso  = new Date().toISOString();
         const fromM5   = new Date(Date.now() - 12 * 5 * 60 * 1000).toISOString();
         const fromH1   = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-
-        const [preEntryCandles, h1SessionCandles] = await Promise.all([
-          fetchCompletedCandles(norm.oandaInstrument, 'M5', fromM5, fillIso),
-          fetchCompletedCandles(norm.oandaInstrument, 'H1', fromH1, fillIso),
+        const candleTimeout = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 3000)
+        );
+        const candleResult = await Promise.race([
+          Promise.all([
+            fetchCompletedCandles(norm.oandaInstrument, 'M5', fromM5, fillIso),
+            fetchCompletedCandles(norm.oandaInstrument, 'H1', fromH1, fillIso),
+          ]),
+          candleTimeout,
         ]);
-
-        if (preEntryCandles.length > 0) {
-          (row as Record<string, unknown>).pre_entry_candles  = preEntryCandles;
-        }
-        if (h1SessionCandles.length > 0) {
-          (row as Record<string, unknown>).h1_session_candles = h1SessionCandles;
+        if (candleResult !== null) {
+          const [preEntryCandles, h1SessionCandles] = candleResult;
+          if (preEntryCandles.length > 0) {
+            (row as Record<string, unknown>).pre_entry_candles  = preEntryCandles;
+          }
+          if (h1SessionCandles.length > 0) {
+            (row as Record<string, unknown>).h1_session_candles = h1SessionCandles;
+          }
         }
       } catch {
         // Candle fetch failure never blocks execution

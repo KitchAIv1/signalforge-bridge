@@ -13,6 +13,7 @@ const BASE_URL =
     : 'https://api-fxpractice.oanda.com';
 
 const DEFAULT_TIMEOUT_MS = 10000;
+const OPEN_TRADES_TIMEOUT_MS = 15000;
 
 async function oandaFetch(
   path: string,
@@ -77,7 +78,7 @@ export interface OpenTrade {
 }
 
 export async function getOpenTrades(): Promise<OpenTrade[]> {
-  const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/openTrades`);
+  const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/openTrades`, {}, OPEN_TRADES_TIMEOUT_MS);
   if (!res.ok) throw new Error(`OANDA openTrades failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   const json = (await res.json()) as { trades?: Array<{ id: string; instrument: string; currentUnits: string; openTime: string; stopLossOrderID?: string; takeProfitOrderID?: string; unrealizedPL?: string }> };
   const trades = json.trades ?? [];
