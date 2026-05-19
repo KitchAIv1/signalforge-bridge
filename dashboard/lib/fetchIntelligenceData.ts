@@ -6,6 +6,9 @@ import type { IntelligenceData, IntelligenceSnapshot } from '@/lib/intelligenceT
 /** Re-export documented hour-band map for Intelligence UI slices */
 export { OPTIMAL_WINDOWS };
 
+/** First UTC day with reliable amd_tag on bridge_trade_log Omega executes */
+const AMD_CLEAN_DATA_START = '2026-05-20';
+
 function coerceConfigString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string') return value;
@@ -76,12 +79,17 @@ async function fetchLatestStoredSnapshotRow() {
     .maybeSingle();
 }
 
-async function readIntelDatasetRows(pairLabel: string, todaySlice: string, horizonSlice: string) {
+async function readIntelDatasetRows(
+  pairLabel: string,
+  todaySlice: string,
+  tradeLogSinceUtcDay: string,
+  accumSinceUtcDay: string,
+) {
   return Promise.all([
     fetchAmdDailySnapshot(pairLabel, todaySlice),
     fetchDirectionConfigRowsSnapshot(),
-    fetchTaggedExecutedTradesRolling(horizonSlice),
-    fetchAccumulationRolling(pairLabel, horizonSlice),
+    fetchTaggedExecutedTradesRolling(tradeLogSinceUtcDay),
+    fetchAccumulationRolling(pairLabel, accumSinceUtcDay),
     fetchLatestStoredSnapshotRow(),
   ]);
 }
@@ -162,7 +170,12 @@ export async function fetchIntelligenceData(): Promise<IntelligenceData> {
   const audUsdPair = 'AUD_USD';
   const { todaySlice, thirtyDaysPastSlice } = sliceRollingIntelDates();
   const [todaySnap, cfgSnap, taggedSnap, amdAccumSnap, newestSnapShot] =
-    await readIntelDatasetRows(audUsdPair, todaySlice, thirtyDaysPastSlice);
+    await readIntelDatasetRows(
+      audUsdPair,
+      todaySlice,
+      AMD_CLEAN_DATA_START,
+      thirtyDaysPastSlice,
+    );
 
   return materializeIntelViewModel({
     todayAmdRow: todaySnap.data as {
