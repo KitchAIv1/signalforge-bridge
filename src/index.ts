@@ -82,7 +82,7 @@ async function main(): Promise<void> {
     console.error('[RegimeDetector] Startup run error:', startupError);
   });
 
-  cron.schedule('5 10 * * *', async () => {
+  cron.schedule('31 10 * * *', async () => {
     try {
       await runAmdDetection();
     } catch (amdError) {
@@ -90,18 +90,18 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
-  // Skip AMD startup run if before 10:05 UTC — H1 fetch would request a future 'to' timestamp
-  // The 10:05 UTC cron handles the daily run; startup call only needed if bridge restarts mid-day
+  // Skip AMD startup run if before 10:31 UTC — H1 fetch uses toISO=10:30Z, OANDA rejects future timestamps
+  // The 10:31 UTC cron handles the daily run; startup call only needed if bridge restarts mid-day after 10:31
   const _amdNow = new Date();
   const _amdUtcHour = _amdNow.getUTCHours();
   const _amdUtcMin = _amdNow.getUTCMinutes();
-  const _amdWindowOpen = _amdUtcHour > 10 || (_amdUtcHour === 10 && _amdUtcMin >= 5);
+  const _amdWindowOpen = _amdUtcHour > 10 || (_amdUtcHour === 10 && _amdUtcMin >= 31);
   if (_amdWindowOpen) {
     runAmdDetection().catch(startupAmdErr => {
       console.error('[AmdDetector] Startup run error:', startupAmdErr);
     });
   } else {
-    logInfo('[AmdDetector] Startup before 10:05 UTC — skipping startup run, cron handles daily detection');
+    logInfo('[AmdDetector] Startup before 10:31 UTC — skipping startup run, cron handles daily detection');
   }
 
   const channel = subscribeToSignalInserts(supabase, (payload) => {
