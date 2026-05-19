@@ -52,7 +52,7 @@ export interface AccountSummary {
 
 export async function getAccountSummary(): Promise<AccountSummary> {
   const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/summary`);
-  if (!res.ok) throw new Error(`OANDA account summary failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`OANDA account summary failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   const json = (await res.json()) as { account?: { balance?: string; NAV?: string; unrealizedPL?: string; marginUsed?: string; marginAvailable?: string; openTradeCount?: number } };
   const acc = json.account;
   if (!acc) throw new Error('OANDA response missing account');
@@ -78,7 +78,7 @@ export interface OpenTrade {
 
 export async function getOpenTrades(): Promise<OpenTrade[]> {
   const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/openTrades`);
-  if (!res.ok) throw new Error(`OANDA openTrades failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`OANDA openTrades failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   const json = (await res.json()) as { trades?: Array<{ id: string; instrument: string; currentUnits: string; openTime: string; stopLossOrderID?: string; takeProfitOrderID?: string; unrealizedPL?: string }> };
   const trades = json.trades ?? [];
   return trades.map((t) => ({
@@ -101,7 +101,7 @@ export interface PriceQuote {
 
 export async function getPricing(instruments: string): Promise<PriceQuote[]> {
   const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/pricing?instruments=${encodeURIComponent(instruments)}`);
-  if (!res.ok) throw new Error(`OANDA pricing failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`OANDA pricing failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   const json = (await res.json()) as { prices?: Array<{ instrument: string; bids: Array<{ price: string }>; asks: Array<{ price: string }>; closeoutBid?: string; closeoutAsk?: string }> };
   const prices = json.prices ?? [];
   return prices.map((p) => ({
@@ -235,7 +235,7 @@ export async function closeTrade(tradeId: string, units?: string): Promise<Close
     `/v3/accounts/${OANDA_ACCOUNT_ID}/trades/${tradeId}/close`,
     { method: 'PUT', body: JSON.stringify(body) }
   );
-  if (!res.ok) throw new Error(`OANDA close trade failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`OANDA close trade failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   return res.json() as Promise<CloseTradeResult>;
 }
 
