@@ -19,8 +19,6 @@ export type AmdTag =
   | 'AMD_TEXTBOOK'
   | 'AMD_COMPRESSION_BREAKOUT'
   | 'AMD_FAILED'
-  | 'AMD_PARTIAL'
-  | 'AMD_DELAYED'
   | 'AMD_SHIFTED'
   | 'AMD_NONE';
 

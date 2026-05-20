@@ -381,10 +381,6 @@ function resolveAmdTag(
       if (compression_breakout && !reversal_confirmed) {
         return 'AMD_COMPRESSION_BREAKOUT';
       }
-      if (delayed_distribution && (judas_pips ?? 0) < 8) {
-        return 'AMD_DELAYED';
-      }
-      if (reversal_confirmed === null) return 'AMD_PARTIAL';
       return 'AMD_FAILED';
     }
     return 'AMD_SHIFTED';
