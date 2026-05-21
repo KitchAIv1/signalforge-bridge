@@ -4,6 +4,7 @@
  */
 
 import { fetchCompletedCandles, fetchCandleRange } from '../connectors/oanda.js';
+import { pairToInstrument } from './trailingStopSupport.js';
 
 export type CloseCandleBar = {
   time: string;
@@ -24,17 +25,23 @@ export async function fetchCloseCandles(
   postExitCandles:   CloseCandleBar[];
 }> {
   try {
+    const instrument = pairToInstrument(pair);
     const postExitEnd = new Date(
       new Date(closedAtIso).getTime() + 3 * 60 * 60 * 1000
     ).toISOString();
 
     const [intraTradeCandles, postExitCandles] = await Promise.all([
-      fetchCandleRange(pair, entryIso, closedAtIso, 'M5'),
-      fetchCompletedCandles(pair, 'M5', closedAtIso, postExitEnd),
+      fetchCandleRange(instrument, entryIso, closedAtIso, 'M5'),
+      fetchCompletedCandles(instrument, 'M5', closedAtIso, postExitEnd),
     ]);
 
     return { intraTradeCandles, postExitCandles };
-  } catch {
+  } catch (err) {
+    console.error('[CloseCandleCapture] fetchCloseCandles failed', {
+      pair,
+      instrument: pairToInstrument(pair),
+      error: err instanceof Error ? err.message : String(err),
+    });
     return { intraTradeCandles: [], postExitCandles: [] };
   }
 }
