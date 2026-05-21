@@ -26,8 +26,11 @@ export async function fetchCloseCandles(
 }> {
   try {
     const instrument = pairToInstrument(pair);
-    const postExitEnd = new Date(
+    const threeHoursAfterClose = new Date(
       new Date(closedAtIso).getTime() + 3 * 60 * 60 * 1000
+    );
+    const postExitEnd = new Date(
+      Math.min(threeHoursAfterClose.getTime(), Date.now())
     ).toISOString();
 
     const [intraTradeCandles, postExitCandles] = await Promise.all([
