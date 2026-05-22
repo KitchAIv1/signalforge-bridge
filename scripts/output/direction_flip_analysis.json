@@ -1,0 +1,302 @@
+[
+  {
+    "id": "P1",
+    "label": "SHORT open",
+    "timestamp": "2026-04-28T00:51:00Z",
+    "direction_to": "SHORT",
+    "direction_from": null,
+    "trigger_note": "Session open",
+    "market_state": {
+      "d1_weighted_bias": 0.22285134150127583,
+      "d1_consecutive_direction": -1,
+      "d1_momentum": 29.185867895545822,
+      "d1_range_expansion": 0.8374760994264006,
+      "h4_sma_diff_bps": -7.646363572651899,
+      "atr_ratio_h4": 0.9113686188537394,
+      "h4_price_vs_sma20": 47.21683347526065,
+      "sh_slope": 0.0007290000000001129,
+      "sl_slope": -0.000014000000000002898,
+      "swing_agreement": 0,
+      "h1_momentum_6h": 6.957780189807477,
+      "h1_momentum_12h": 4.451864218141165,
+      "direction_alignment_score": -1
+    },
+    "period_outcome": {
+      "net_r": -5.73,
+      "n_trades": 5,
+      "wins": 1,
+      "avg_r_per_trade": -1.1460000000000001,
+      "period_correct": false
+    }
+  },
+  {
+    "id": "P2",
+    "label": "LONG flip 1",
+    "timestamp": "2026-04-28T03:36:00Z",
+    "direction_to": "LONG",
+    "direction_from": "SHORT",
+    "trigger_note": "Reactive after 3 SHORT losses",
+    "market_state": {
+      "d1_weighted_bias": 0.22285134150127583,
+      "d1_consecutive_direction": -1,
+      "d1_momentum": 29.185867895545822,
+      "d1_range_expansion": 0.8374760994264006,
+      "h4_sma_diff_bps": -6.469244424637794,
+      "atr_ratio_h4": 0.8296062992125979,
+      "h4_price_vs_sma20": 33.8199815882944,
+      "sh_slope": 0.00017599999999990957,
+      "sl_slope": -0.0003450000000000841,
+      "swing_agreement": 0,
+      "h1_momentum_6h": -1.9481784531467115,
+      "h1_momentum_12h": -10.28892411223218,
+      "direction_alignment_score": -1
+    },
+    "period_outcome": {
+      "net_r": -7.33,
+      "n_trades": 22,
+      "wins": 8,
+      "avg_r_per_trade": -0.3331818181818182,
+      "period_correct": false
+    }
+  },
+  {
+    "id": "P3",
+    "label": "SHORT flip 2",
+    "timestamp": "2026-04-29T05:56:00Z",
+    "direction_to": "SHORT",
+    "direction_from": "LONG",
+    "trigger_note": "After -5.75R LONG loss at 02:11",
+    "market_state": {
+      "d1_weighted_bias": 0.06630035870029191,
+      "d1_consecutive_direction": -2,
+      "d1_momentum": -16.834072162055705,
+      "d1_range_expansion": 1.6410256410256325,
+      "h4_sma_diff_bps": 5.962190970467562,
+      "atr_ratio_h4": 0.7976227713481399,
+      "h4_price_vs_sma20": -16.66493436917575,
+      "sh_slope": 0.0001589999999998426,
+      "sl_slope": 0.00023700000000026478,
+      "swing_agreement": 1,
+      "h1_momentum_6h": -36.45521713117014,
+      "h1_momentum_12h": -33.959165495261,
+      "direction_alignment_score": -1
+    },
+    "period_outcome": {
+      "net_r": 6.94,
+      "n_trades": 18,
+      "wins": 8,
+      "avg_r_per_trade": 0.3855555555555556,
+      "period_correct": true
+    }
+  },
+  {
+    "id": "P4",
+    "label": "LONG flip 3",
+    "timestamp": "2026-04-30T01:46:00Z",
+    "direction_to": "LONG",
+    "direction_from": "SHORT",
+    "trigger_note": "Overnight session switch",
+    "market_state": {
+      "d1_weighted_bias": 0.16720457680923312,
+      "d1_consecutive_direction": 1,
+      "d1_momentum": 75.40781779008934,
+      "d1_range_expansion": 1.7445016378100175,
+      "h4_sma_diff_bps": 9.893966077751426,
+      "atr_ratio_h4": 1.0288256227758037,
+      "h4_price_vs_sma20": -68.3602745576395,
+      "sh_slope": -0.0009619999999999962,
+      "sl_slope": -0.002092000000000027,
+      "swing_agreement": -1,
+      "h1_momentum_6h": 12.224080032598073,
+      "h1_momentum_12h": -3.927839968578093,
+      "direction_alignment_score": 2
+    },
+    "period_outcome": {
+      "net_r": 11.54,
+      "n_trades": 21,
+      "wins": 10,
+      "avg_r_per_trade": 0.5495238095238095,
+      "period_correct": true
+    }
+  },
+  {
+    "id": "P5",
+    "label": "SHORT flip 4",
+    "timestamp": "2026-05-01T01:01:00Z",
+    "direction_to": "SHORT",
+    "direction_from": "LONG",
+    "trigger_note": "Overnight switch, pre-NFP",
+    "market_state": {
+      "d1_weighted_bias": 0.17761660648596847,
+      "d1_consecutive_direction": 2,
+      "d1_momentum": 23.240602864020893,
+      "d1_range_expansion": 0.7939204291461798,
+      "h4_sma_diff_bps": 5.860569290897311,
+      "atr_ratio_h4": 1.0193236714975837,
+      "h4_price_vs_sma20": 38.09372256212015,
+      "sh_slope": 0.001255000000000095,
+      "sl_slope": 0.0017010000000000857,
+      "swing_agreement": 1,
+      "h1_momentum_6h": 6.391196821072955,
+      "h1_momentum_12h": 55.4291219301051,
+      "direction_alignment_score": -4
+    },
+    "period_outcome": {
+      "net_r": -13.8,
+      "n_trades": 12,
+      "wins": 3,
+      "avg_r_per_trade": -1.1500000000000001,
+      "period_correct": false
+    }
+  },
+  {
+    "id": "P6",
+    "label": "LONG flip 5 (brief)",
+    "timestamp": "2026-05-01T14:21:00Z",
+    "direction_to": "LONG",
+    "direction_from": "SHORT",
+    "trigger_note": "Post-NFP correction",
+    "market_state": {
+      "d1_weighted_bias": 0.17761660648596847,
+      "d1_consecutive_direction": 2,
+      "d1_momentum": 23.240602864020893,
+      "d1_range_expansion": 0.7939204291461798,
+      "h4_sma_diff_bps": 6.692281549994965,
+      "atr_ratio_h4": 1.202505926176767,
+      "h4_price_vs_sma20": 62.406033397169445,
+      "sh_slope": -0.000009999999999976694,
+      "sl_slope": -0.0004380000000001161,
+      "swing_agreement": -1,
+      "h1_momentum_6h": 30.020013342227312,
+      "h1_momentum_12h": 23.611766993528082,
+      "direction_alignment_score": 2
+    },
+    "period_outcome": {
+      "net_r": -0.3,
+      "n_trades": 1,
+      "wins": 0,
+      "avg_r_per_trade": -0.3,
+      "period_correct": false
+    }
+  },
+  {
+    "id": "P7",
+    "label": "SHORT flip 6",
+    "timestamp": "2026-05-03T22:11:00Z",
+    "direction_to": "SHORT",
+    "direction_from": "LONG",
+    "trigger_note": "Weekend restart, price elevated",
+    "market_state": {
+      "d1_weighted_bias": 0.023531372279642415,
+      "d1_consecutive_direction": -1,
+      "d1_momentum": -20.74659908937734,
+      "d1_range_expansion": 1.1236897274633224,
+      "h4_sma_diff_bps": 8.446393943947216,
+      "atr_ratio_h4": 1.0425265791119456,
+      "h4_price_vs_sma20": 55.152993944956954,
+      "sh_slope": 0.000668000000000113,
+      "sl_slope": 0.0005069999999999907,
+      "swing_agreement": 1,
+      "h1_momentum_6h": 4.298689593011614,
+      "h1_momentum_12h": 33.655985758789186,
+      "direction_alignment_score": -3
+    },
+    "period_outcome": {
+      "net_r": 22.77,
+      "n_trades": 19,
+      "wins": 13,
+      "avg_r_per_trade": 1.1984210526315788,
+      "period_correct": true
+    }
+  },
+  {
+    "id": "P8",
+    "label": "LONG flip 7 (brief)",
+    "timestamp": "2026-05-05T00:56:00Z",
+    "direction_to": "LONG",
+    "direction_from": "SHORT",
+    "trigger_note": "Early Asian, uncertain",
+    "market_state": {
+      "d1_weighted_bias": 0.07970656434967847,
+      "d1_consecutive_direction": 1,
+      "d1_momentum": 93.02456298128209,
+      "d1_range_expansion": 1.0672395273899147,
+      "h4_sma_diff_bps": 12.1381914750547,
+      "atr_ratio_h4": 0.9393556538218597,
+      "h4_price_vs_sma20": -21.511190766704853,
+      "sh_slope": -0.0013299999999999202,
+      "sl_slope": -0.0002420000000000755,
+      "swing_agreement": -1,
+      "h1_momentum_6h": -17.706271087192835,
+      "h1_momentum_12h": -38.81577116781156,
+      "direction_alignment_score": -1
+    },
+    "period_outcome": {
+      "net_r": -1.16,
+      "n_trades": 3,
+      "wins": 1,
+      "avg_r_per_trade": -0.38666666666666666,
+      "period_correct": false
+    }
+  },
+  {
+    "id": "P9",
+    "label": "SHORT flip 8 (RBA)",
+    "timestamp": "2026-05-05T06:11:00Z",
+    "direction_to": "SHORT",
+    "direction_from": "LONG",
+    "trigger_note": "RBA anticipation",
+    "market_state": {
+      "d1_weighted_bias": 0.07970656434967847,
+      "d1_consecutive_direction": 1,
+      "d1_momentum": 93.02456298128209,
+      "d1_range_expansion": 1.0672395273899147,
+      "h4_sma_diff_bps": 17.497037545998534,
+      "atr_ratio_h4": 1.0718213058419255,
+      "h4_price_vs_sma20": -29.66333955295512,
+      "sh_slope": -0.000178999999999796,
+      "sl_slope": -0.000990000000000002,
+      "swing_agreement": -1,
+      "h1_momentum_6h": -22.4863475746868,
+      "h1_momentum_12h": -40.15280372528782,
+      "direction_alignment_score": 1
+    },
+    "period_outcome": {
+      "net_r": -8.73,
+      "n_trades": 6,
+      "wins": 0,
+      "avg_r_per_trade": -1.455,
+      "period_correct": false
+    }
+  },
+  {
+    "id": "P10",
+    "label": "LONG flip 9",
+    "timestamp": "2026-05-05T10:41:00Z",
+    "direction_to": "LONG",
+    "direction_from": "SHORT",
+    "trigger_note": "Post-RBA recovery confirmed",
+    "market_state": {
+      "d1_weighted_bias": 0.07970656434967847,
+      "d1_consecutive_direction": 1,
+      "d1_momentum": 93.02456298128209,
+      "d1_range_expansion": 1.0672395273899147,
+      "h4_sma_diff_bps": 20.88212829714058,
+      "atr_ratio_h4": 1.236522399392557,
+      "h4_price_vs_sma20": -9.134124029151083,
+      "sh_slope": -0.000178999999999796,
+      "sl_slope": -0.000990000000000002,
+      "swing_agreement": -1,
+      "h1_momentum_6h": 22.651640146535904,
+      "h1_momentum_12h": 0.8371236431613832,
+      "direction_alignment_score": 1
+    },
+    "period_outcome": {
+      "net_r": 55.84,
+      "n_trades": 40,
+      "wins": 32,
+      "avg_r_per_trade": 1.3960000000000001,
+      "period_correct": true
+    }
+  }
+]

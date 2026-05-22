@@ -1,0 +1,7 @@
+amd_tag,n_days,pct_of_total,avg_asian_range,flat_count,reversal_confirmed_count,compression_count,delayed_count
+AMD_COMPRESSION_BREAKOUT,47,19.0%,24.7,47,0,47,0
+AMD_FAILED,41,16.5%,21.2,41,24,1,0
+AMD_NONE,34,13.7%,62.8,21,18,17,0
+AMD_SHIFTED,87,35.1%,37.3,45,39,47,0
+AMD_TEXTBOOK,37,14.9%,23.7,37,37,15,0
+INSUFFICIENT_DATA,2,0.8%,,0,0,0,0
