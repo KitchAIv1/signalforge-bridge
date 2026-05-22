@@ -59,7 +59,7 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
               <span className="font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Auto Direction
               </span>
-              <span className={`font-semibold ${autoDirectionColor(amdState.auto_direction)}`}>
+              <span className={`font-bold text-sm ${autoDirectionColor(amdState.auto_direction)}`}>
                 {autoDirectionLabel(amdState.auto_direction)}
               </span>
               <span className="text-slate-600 dark:text-slate-300">

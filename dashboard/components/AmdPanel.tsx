@@ -17,15 +17,32 @@ export function AmdPanel() {
   const displayTag = manualSnippet !== '' ? manualSnippet : serverTag;
 
   return (
-    <div className="mb-4 space-y-2">
-      <AmdPanelMetrics amdState={amdState} displayTag={displayTag} />
-
-      {amdState && (
-        <AmdChart amdState={amdState} onChartUrlSaved={() => void 0} />
-      )}
-
-      <div className="text-xs italic text-slate-600 dark:text-slate-300">
-        Advisory only — no execution impact
+    <div className="mb-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="space-y-2">
+          <AmdPanelMetrics
+            amdState={amdState}
+            displayTag={displayTag}
+          />
+          <div className="text-xs italic text-slate-600 dark:text-slate-300">
+            Advisory only — no execution impact
+          </div>
+        </div>
+        <div>
+          {amdState && (
+            <AmdChart
+              amdState={amdState}
+              onChartUrlSaved={() => void 0}
+            />
+          )}
+          {!amdState && (
+            <div className="flex h-full min-h-[200px] items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
+              <p className="text-sm text-slate-400">
+                No AMD data for today
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

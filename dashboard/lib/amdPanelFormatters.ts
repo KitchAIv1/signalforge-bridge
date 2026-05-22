@@ -110,7 +110,8 @@ export function amdSizeMultiplierDisplay(
 }
 
 export function autoDirectionLabel(dir: string | null | undefined): string {
-  if (!dir || dir === 'neutral') return '—';
+  if (!dir) return '—';
+  if (dir === 'neutral') return '⚪ NEUTRAL';
   if (dir === 'long') return '↑ LONG';
   if (dir === 'short') return '↓ SHORT';
   return dir.toUpperCase();
