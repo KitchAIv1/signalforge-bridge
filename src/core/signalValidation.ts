@@ -71,6 +71,12 @@ export function validateSignal(
   if (direction === 'LONG' && stopLoss >= entryPrice) return { pass: false, reason: 'Stop-loss is in wrong direction' };
   if (direction === 'SHORT' && stopLoss <= entryPrice) return { pass: false, reason: 'Stop-loss is in wrong direction' };
   if (Math.abs(entryPrice - stopLoss) < 1e-10) return { pass: false, reason: 'Stop-loss distance is zero' };
+  if (engineId === 'omega' && Math.abs(entryPrice - stopLoss) < 0.0004) {
+    return {
+      pass: false,
+      reason: `Omega rSize below 4-pip minimum: ${(Math.abs(entryPrice - stopLoss) * 10000).toFixed(1)} pips`,
+    };
+  }
 
   let takeProfit: number;
   if (payload.target_1 != null && !Number.isNaN(Number(payload.target_1))) {
