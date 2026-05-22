@@ -66,6 +66,11 @@ export function computeAutoDirectionSnapshot(
     else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
     else auto_direction = 'neutral';
 
+    if (auto_direction === 'neutral') {
+      auto_direction_reason =
+        'AMD_FAILED RANGING D1 — no directional signal';
+    }
+
     if (auto_direction !== 'neutral') {
       if (dailyBiasAlignment === 'ALIGNED' && strongConviction) {
         auto_direction_confidence = 'medium';
