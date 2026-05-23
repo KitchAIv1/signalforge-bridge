@@ -16,6 +16,8 @@ import { runTradeMonitor } from './monitoring/tradeMonitor.js';
 import { logInfo, logWarn } from './utils/logger.js';
 import { runRegimeDetection } from './services/RegimeDetectorService.js';
 import { runAmdDetection } from './services/AmdDetectorService.js';
+import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
+import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -89,6 +91,20 @@ async function main(): Promise<void> {
       console.error('[AmdDetector] Scheduled run error:', amdError);
     }
   }, { timezone: 'UTC' });
+
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await AmdDistributionEngine.checkAndExecute();
+    } catch (amdDistError) {
+      console.error('[AmdDistribution] Scheduled run error:', amdDistError);
+    }
+  }, { timezone: 'UTC' });
+
+  setInterval(() => {
+    void runAmdTrailMonitor().catch((amdTrailErr) => {
+      console.error('[AmdTrail] Monitor error:', amdTrailErr);
+    });
+  }, 30000);
 
   // Skip AMD startup run if before 10:31 UTC — H1 fetch uses toISO=10:30Z, OANDA rejects future timestamps
   // The 10:31 UTC cron handles the daily run; startup call only needed if bridge restarts mid-day after 10:31
