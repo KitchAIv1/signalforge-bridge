@@ -5,7 +5,13 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../connectors/supabase.js';
-import { getPricing, closeTrade, getOpenTrades, getClosedTradeDetails } from '../connectors/oanda.js';
+import {
+  fetchCandleRange,
+  getPricing,
+  closeTrade,
+  getOpenTrades,
+  getClosedTradeDetails,
+} from '../connectors/oanda.js';
 import { logInfo, logError } from '../utils/logger.js';
 
 const INSTRUMENT = 'AUD_USD';
@@ -81,6 +87,37 @@ async function fetchClosedPnl(tradeId: string): Promise<{
   return { exitPrice: closed.exitPrice, pnlDollars: closed.pnlDollars };
 }
 
+async function attachCloseCandleMetrics(
+  state: TrailStateRow,
+  captured: number,
+): Promise<void> {
+  try {
+    const closeTime = new Date().toISOString();
+    const entryTime = new Date(state.created_at as string).toISOString();
+    const nowCapped = new Date().toISOString();
+    const [intra, postExit] = await Promise.all([
+      fetchCandleRange(INSTRUMENT, entryTime, closeTime, 'M5'),
+      fetchCandleRange(INSTRUMENT, closeTime, nowCapped, 'M5'),
+    ]);
+    const durationMinutes =
+      Math.round(
+        ((Date.now() - new Date(state.created_at as string).getTime()) / 60000) * 100,
+      ) / 100;
+    await supabaseDb()
+      .from('bridge_trade_log')
+      .update({
+        intra_trade_candles: intra,
+        post_exit_candles: postExit,
+        pnl_pips: captured,
+        duration_minutes: durationMinutes,
+      })
+      .eq('oanda_trade_id', state.oanda_trade_id)
+      .eq('engine_id', ENGINE_ID);
+  } catch {
+    // non-fatal
+  }
+}
+
 async function finalizeClose(
   state: TrailStateRow,
   exitPrice: number,
@@ -101,6 +138,7 @@ async function finalizeClose(
   const result = pnlR > 0 ? 'win' : pnlR < 0 ? 'loss' : 'breakeven';
   await markTrailClosed(tradeId);
   await updateTradeLogClosed(tradeId, exitPrice, pnlR, pnlDollars, result, closeReason);
+  await attachCloseCandleMetrics(state, captured);
   logInfo('[AmdTrail] Trade closed', { tradeId, direction, closeReason, captured, pnlR, pnlDollars });
 }
 
@@ -141,6 +179,7 @@ async function handleExternalClose(state: TrailStateRow): Promise<void> {
   const result = pnlR > 0 ? 'win' : pnlR < 0 ? 'loss' : 'breakeven';
   await markTrailClosed(tradeId);
   await updateTradeLogClosed(tradeId, exitPrice, pnlR, pnlDollars, result, 'hard_sl_external');
+  await attachCloseCandleMetrics(state, captured);
   logInfo('[AmdTrail] External close reconciled', { tradeId, pnlR, result });
 }
 

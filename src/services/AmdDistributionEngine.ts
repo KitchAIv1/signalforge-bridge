@@ -6,7 +6,12 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../connectors/supabase.js';
-import { getAccountSummary, getPricing, placeMarketOrder } from '../connectors/oanda.js';
+import {
+  fetchCandleRange,
+  getAccountSummary,
+  getPricing,
+  placeMarketOrder,
+} from '../connectors/oanda.js';
 import { calculateUnits } from '../core/positionSizer.js';
 import { logInfo, logError } from '../utils/logger.js';
 
@@ -167,20 +172,26 @@ async function persistOpenTrade(
   signedUnits: number,
   tradeId: string,
   exitStrategy: string,
+  equity: number,
+  weight: number,
 ): Promise<void> {
   const receivedAt = new Date().toISOString();
+  const riskAmount = equity * weight * BASELINE_RISK_PCT;
   await supabaseDb().from('bridge_trade_log').insert({
     signal_id: randomUUID(),
     engine_id: ENGINE_ID,
     pair: INSTRUMENT,
     direction: direction.toUpperCase(),
     stop_loss: hardSlPrice,
+    entry_price: fillPrice,
     fill_price: fillPrice,
     units: signedUnits,
     oanda_trade_id: tradeId,
     signal_received_at: receivedAt,
     decision: 'EXECUTED',
     status: 'open',
+    account_equity_at_signal: equity,
+    risk_amount: riskAmount,
     amd_tag: tag,
     amd_evaluated_at: amdRow.evaluated_at,
     layer4_d1_bias: amdRow.layer4_d1_bias,
@@ -188,6 +199,7 @@ async function persistOpenTrade(
     direction_source: 'amd_auto_direction',
     reversal_confirmed: amdRow.reversal_confirmed,
     auto_direction_reason: amdRow.auto_direction_reason,
+    amd_size_multiplier: amdRow.amd_size_multiplier ?? null,
     amd_entry_hour: new Date().getUTCHours(),
     amd_exit_strategy: exitStrategy,
     amd_pip_trail: PIP_TRAIL_PIPS,
@@ -225,6 +237,8 @@ type OrderPlan = {
   hardSlPrice: number;
   signedUnits: number;
   exitStrategy: string;
+  equity: number;
+  weight: number;
 };
 
 async function buildOrderPlan(direction: TradeDirection, weight: number): Promise<OrderPlan | null> {
@@ -257,6 +271,8 @@ async function buildOrderPlan(direction: TradeDirection, weight: number): Promis
     hardSlPrice,
     signedUnits: direction === 'long' ? units : -units,
     exitStrategy: 'S0',
+    equity: account.equity,
+    weight,
   };
 }
 
@@ -304,8 +320,30 @@ async function submitAmdOrder(
     plan.signedUnits,
     tradeId,
     exitStrategy,
+    plan.equity,
+    plan.weight,
   );
   await persistTrailState(tag, direction, fillPrice, plan.hardSlPrice, tradeId, exitStrategy, todayStr);
+  try {
+    const now = new Date();
+    const preFrom = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const preTo = now.toISOString();
+    const h1From = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
+    const [preM5, preH1] = await Promise.all([
+      fetchCandleRange(INSTRUMENT, preFrom, preTo, 'M5'),
+      fetchCandleRange(INSTRUMENT, h1From, preTo, 'H1'),
+    ]);
+    await supabaseDb()
+      .from('bridge_trade_log')
+      .update({
+        pre_entry_candles: preM5,
+        h1_session_candles: preH1,
+      })
+      .eq('oanda_trade_id', tradeId)
+      .eq('engine_id', ENGINE_ID);
+  } catch {
+    // non-fatal — candle capture never blocks trade logging
+  }
 }
 
 async function runExecution(
