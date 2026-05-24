@@ -15,6 +15,7 @@ import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDe
 import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobileList';
 import { RegimePanel } from '@/components/RegimePanel';
 import { AmdPanel } from '@/components/AmdPanel';
+import { AsianDirectionPanel } from '@/components/AsianDirectionPanel';
 import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
 
@@ -212,6 +213,7 @@ export default function ActivityPage() {
 
       <RegimePanel />
       <AmdPanel />
+      <AsianDirectionPanel />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />

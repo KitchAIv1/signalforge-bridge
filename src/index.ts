@@ -16,6 +16,7 @@ import { runTradeMonitor } from './monitoring/tradeMonitor.js';
 import { logInfo, logWarn } from './utils/logger.js';
 import { runRegimeDetection } from './services/RegimeDetectorService.js';
 import { runAmdDetection } from './services/AmdDetectorService.js';
+import { runAsianDirectionSet, runAsianSessionClose } from './services/AsianDirectionService.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
 
@@ -92,6 +93,24 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
+  cron.schedule('0 21 * * *', async () => {
+    try {
+      console.log('[AsianDirection] 21:00 UTC cron fired — running direction set');
+      await runAsianDirectionSet();
+    } catch (asianDirSetErr) {
+      console.error('[AsianDirection] Scheduled direction set error:', asianDirSetErr);
+    }
+  }, { timezone: 'UTC' });
+
+  cron.schedule('0 8 * * *', async () => {
+    try {
+      console.log('[AsianDirection] 08:00 UTC cron fired — running Asian session close');
+      await runAsianSessionClose();
+    } catch (asianCloseErr) {
+      console.error('[AsianDirection] Scheduled session close error:', asianCloseErr);
+    }
+  }, { timezone: 'UTC' });
+
   cron.schedule('*/5 * * * *', async () => {
     try {
       await AmdDistributionEngine.checkAndExecute();
@@ -118,6 +137,12 @@ async function main(): Promise<void> {
     });
   } else {
     logInfo('[AmdDetector] Startup before 10:31 UTC — skipping startup run, cron handles daily detection');
+  }
+
+  try {
+    await runAsianDirectionSet();
+  } catch (asianDirStartupErr) {
+    console.error('[AsianDirection] Startup run error:', asianDirStartupErr);
   }
 
   const channel = subscribeToSignalInserts(supabase, (payload) => {
