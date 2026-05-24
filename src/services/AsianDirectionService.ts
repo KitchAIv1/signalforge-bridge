@@ -5,6 +5,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { closeAllOpenOmegaPositions } from './omegaClosePositions.js';
 import { fetchPriorD1Candle } from './asianDirection/fetchPriorD1.js';
+import { sendAsianOpenAlert, sendAsianCloseAlert } from './telegram/alertAsianSession.js';
 import { logAsianDirectionRow } from './asianDirection/logAsianDirection.js';
 import type {
   AsianDirectionAction,
@@ -249,6 +250,14 @@ export async function runAsianDirectionSet(): Promise<void> {
         `[AsianDirection] omega_direction set to ${directionToSet} for ${todayUtc}. ` +
           `AMD_SHIFTED + D1 ${priorD1Direction}. Previous: ${previousDirection}`,
       );
+      void sendAsianOpenAlert({
+        directionSet: directionToSet,
+        previousDirection,
+        amdTag,
+        priorD1Direction,
+        priorD1BodyPips,
+        directionChanged: true,
+      }).catch(() => {});
     }
   } catch (runErr: unknown) {
     console.error('[AsianDirection] runAsianDirectionSet failed:', String(runErr));
@@ -267,6 +276,10 @@ export async function runAsianSessionClose(): Promise<void> {
         '[AsianDirection] Asian session close complete. Direction was:',
         currentDirection,
       );
+      void sendAsianCloseAlert({
+        directionWas: currentDirection,
+        tradeDate: todayUtc,
+      }).catch(() => {});
     } catch (closeErr: unknown) {
       console.error('[AsianDirection] Error during Asian session close:', closeErr);
     }

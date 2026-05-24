@@ -19,6 +19,8 @@ import {
 } from '../services/amdDetector/amdStateService.js';
 import { validateSignal } from './signalValidation.js';
 import { isTripped, getPeakEquity, getConsecutiveLosses, enterCooldown } from './circuitBreaker.js';
+import { sendCircuitBreakerAlert } from '../services/telegram/alertCircuitBreaker.js';
+import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
@@ -403,7 +405,14 @@ export async function processSignal(
   const drawdownPct = peakEquity > 0 && cachedAccount ? (peakEquity - cachedAccount.equity) / peakEquity : 0;
   const trip = isTripped(drawdownPct, config.circuitBreakerDrawdownPct, config.maxConsecutiveLosses, config.cooldownAfterLossesMinutes);
   if (trip.tripped) {
-    if (getConsecutiveLosses() >= config.maxConsecutiveLosses) enterCooldown(config.cooldownAfterLossesMinutes);
+    if (getConsecutiveLosses() >= config.maxConsecutiveLosses) {
+      enterCooldown(config.cooldownAfterLossesMinutes);
+      void sendCircuitBreakerAlert({
+        consecutiveLosses: config.maxConsecutiveLosses,
+        cooldownMinutes: config.cooldownAfterLossesMinutes,
+        tripReason: trip.reason ?? 'Maximum consecutive losses reached',
+      }).catch(() => {});
+    }
     await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', trip.reason ?? 'Circuit breaker', decisionLatencyMs, cachedAccount?.equity ?? null, 0, norm.oandaInstrument));
     return;
   }
@@ -1035,6 +1044,20 @@ export async function processSignal(
     const newCount = ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
     await supabase.from('bridge_engines').update({ trades_today: newCount, updated_at: new Date().toISOString() }).eq('engine_id', norm.engineId);
     logInfo('Trade executed', { signalId, engineId: norm.engineId, pair: norm.oandaInstrument, units: finalUnits, tradeId });
+    void sendTradeExecutedAlert({
+      oandaInstrument: norm.oandaInstrument,
+      direction: norm.direction,
+      fillPrice,
+      stopLoss: typeof (row as Record<string, unknown>).stop_loss === 'number'
+        ? (row as Record<string, unknown>).stop_loss as number
+        : null,
+      takeProfit: payload.take_profit ?? payload.target_1 ?? null,
+      filledUnits,
+      amdTag: amdState?.amdTag ?? null,
+      amdSizeMultiplier: amdState?.amdSizeMultiplier ?? null,
+      directionSource: directionMode === 'auto' ? 'auto' : 'manual',
+      engineId: norm.engineId,
+    }).catch(() => {});
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase.from('bridge_trade_log').insert({

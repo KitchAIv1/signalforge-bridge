@@ -6,6 +6,8 @@ export const AMD_TAG_LABELS: Record<string, string> = {
   AMD_FAILED: '❌ AMD Failed',
   AMD_SHIFTED: '➡️ Shifted / No AMD',
   AMD_NONE: '🚫 No Structure',
+  AMD_PARTIAL: '⏸️ Partial AMD — Awaiting Confirmation',
+  AMD_DELAYED: '🕐 Delayed AMD — Late Distribution',
   INSUFFICIENT_DATA: '⏳ Insufficient Data',
 };
 
@@ -15,5 +17,7 @@ export const AMD_TAG_MULTIPLIERS: Record<string, string> = {
   AMD_FAILED: '0.25× — reduce size, failed AMD',
   AMD_SHIFTED: '1.0× — macro direction governs',
   AMD_NONE: '0.5× — no structure, reduce size',
+  AMD_PARTIAL: '1.0× — await full classification',
+  AMD_DELAYED: '0.75× — delayed distribution, proceed cautiously',
   INSUFFICIENT_DATA: '1.0× — data pending',
 };

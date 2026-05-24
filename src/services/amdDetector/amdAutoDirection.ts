@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { sendAutoDirectionAlert } from '../telegram/alertAutoDirection.js';
 import type {
   AmdAutoDirectionSnapshot,
   AmdTag,
@@ -229,10 +230,18 @@ export function computeAutoDirectionSnapshot(
   };
 }
 
+/** Extra context forwarded from the detector call-site for the Telegram alert. */
+export type AmdDirectionAlertContext = {
+  confidence: string;
+  multiplier: number;
+  amdTag: string;
+};
+
 export async function applyAutoDirectionToBridgeConfig(
   supabaseDb: SupabaseClient,
   autoDirection: AutoDirection,
   reason: string,
+  alertContext?: AmdDirectionAlertContext,
 ): Promise<void> {
   const { data: modeRow, error: modeErr } = await supabaseDb
     .from('bridge_config')
@@ -276,4 +285,14 @@ export async function applyAutoDirectionToBridgeConfig(
   }
 
   console.log(`[AmdDetector] AUTO direction → ${autoDirection.toUpperCase()} | ${reason}`);
+
+  if (alertContext) {
+    void sendAutoDirectionAlert({
+      autoDirection,
+      reason,
+      confidence: alertContext.confidence,
+      amdSizeMultiplier: alertContext.multiplier,
+      amdTag: alertContext.amdTag,
+    }).catch(() => {});
+  }
 }

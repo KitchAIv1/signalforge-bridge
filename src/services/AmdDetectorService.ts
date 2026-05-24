@@ -18,6 +18,7 @@ import type {
 import {
   applyAutoDirectionToBridgeConfig,
   computeAutoDirectionSnapshot,
+  type AmdDirectionAlertContext,
 } from './amdDetector/amdAutoDirection.js';
 import { sendAmdTelegramAlert } from './amdDetector/sendAmdTelegramAlert.js';
 
@@ -289,10 +290,16 @@ async function recordAmdInsightForEmptyH1(
     autoDir,
   });
   if (persisted) {
+    const alertCtx: AmdDirectionAlertContext = {
+      confidence: autoDir.auto_direction_confidence,
+      multiplier: autoDir.amd_size_multiplier,
+      amdTag: emptyFeatures.amd_tag,
+    };
     await applyAutoDirectionToBridgeConfig(
       supabaseDb,
       autoDir.auto_direction,
       autoDir.auto_direction_reason,
+      alertCtx,
     );
   }
   try {
@@ -340,10 +347,16 @@ async function recordAmdInsightForH1Window(
   });
 
   if (persisted) {
+    const alertCtx: AmdDirectionAlertContext = {
+      confidence: autoDir.auto_direction_confidence,
+      multiplier: autoDir.amd_size_multiplier,
+      amdTag: features.amd_tag,
+    };
     await applyAutoDirectionToBridgeConfig(
       supabaseDb,
       autoDir.auto_direction,
       autoDir.auto_direction_reason,
+      alertCtx,
     );
   }
 
