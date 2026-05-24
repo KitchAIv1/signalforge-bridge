@@ -26,6 +26,42 @@ function utcTodayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Resolves the correct date to use for amd_state lookups.
+ * amd_state only has rows for trading days (Mon–Fri).
+ * On Sunday at 21:00 UTC (Asian open), use Friday's date instead.
+ * On Saturday (should not fire but defensive): use Friday's date.
+ * All other days: use today's date.
+ */
+function resolveAmdLookupDate(todayUtc: string): { lookupDate: string; isWeekendFallback: boolean } {
+  const d = new Date(`${todayUtc}T21:00:00.000Z`);
+  const dayOfWeek = d.getUTCDay(); // 0=Sunday, 1=Monday ... 6=Saturday
+
+  if (dayOfWeek === 0) {
+    // Sunday — use Friday (subtract 2 days)
+    const friday = new Date(d);
+    friday.setUTCDate(friday.getUTCDate() - 2);
+    return {
+      lookupDate: friday.toISOString().slice(0, 10),
+      isWeekendFallback: true,
+    };
+  }
+
+  if (dayOfWeek === 6) {
+    // Saturday — use Friday (subtract 1 day)
+    // Defensive: cron should never fire on Saturday but handle it safely
+    const friday = new Date(d);
+    friday.setUTCDate(friday.getUTCDate() - 1);
+    return {
+      lookupDate: friday.toISOString().slice(0, 10),
+      isWeekendFallback: true,
+    };
+  }
+
+  // Monday–Friday: use today
+  return { lookupDate: todayUtc, isWeekendFallback: false };
+}
+
 function emptyLogFields(
   todayUtc: string,
   triggerType: AsianDirectionTriggerType,
@@ -124,13 +160,19 @@ export async function runAsianDirectionSet(): Promise<void> {
   try {
     const supabase = buildAsianDirectionSupabaseClient();
     const todayUtc = utcTodayDate();
-    const amdLookup = await fetchTodayAmdTag(supabase, todayUtc);
+
+    // Weekend fallback: amd_state has no rows for Saturday/Sunday.
+    // On Sunday 21:00 UTC (Asian open), use Friday's AMD tag instead.
+    const { lookupDate, isWeekendFallback } = resolveAmdLookupDate(todayUtc);
+    const amdLookup = await fetchTodayAmdTag(supabase, lookupDate);
 
     if (amdLookup.error || amdLookup.amdTag == null) {
       await logAsianDirectionRow(supabase, {
         ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
         action: 'SKIPPED_NO_AMD',
-        reason: `No amd_state row found for ${todayUtc}`,
+        reason: isWeekendFallback
+          ? `Weekend fallback: no amd_state row found for Friday ${lookupDate} (today=${todayUtc})`
+          : `No amd_state row found for ${todayUtc}`,
       });
       return;
     }
