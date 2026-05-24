@@ -211,9 +211,11 @@ export default function ActivityPage() {
 
       <AccountSnapshotBar />
 
-      <RegimePanel />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RegimePanel />
+        <AsianDirectionPanel />
+      </div>
       <AmdPanel />
-      <AsianDirectionPanel />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />
