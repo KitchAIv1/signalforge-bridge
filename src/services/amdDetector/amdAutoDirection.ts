@@ -23,6 +23,22 @@ export function computeAutoDirectionSnapshot(
   const bearish = layer4BearishCount ?? 0;
   const strongConviction = bullish >= 4 || bearish >= 4;
 
+  // D1 tier based on dominant vote count
+  // TRENDING_STRONG: dominant side >= 4 (high conviction)
+  // TRENDING_WEAK: dominant side === 3 (bare majority — one candle from ranging)
+  // Other: not used in this branch (neutral or unknown)
+  const dominantCount = Math.max(bullish, bearish);
+  const d1Tier: 'TRENDING_STRONG' | 'TRENDING_WEAK' | 'OTHER' =
+    dominantCount >= 4 ? 'TRENDING_STRONG' :
+    dominantCount === 3 ? 'TRENDING_WEAK' :
+    'OTHER';
+
+  // Judas inversion for AMD_NONE: UP Judas = fake long = real SHORT, DOWN Judas = fake short = real LONG
+  const judasFallbackDirection: AutoDirection | null =
+    judasDirection === 'UP' ? 'short' :
+    judasDirection === 'DOWN' ? 'long' :
+    null; // FLAT or null = no fallback available
+
   let auto_direction: AutoDirection = 'neutral';
   let auto_direction_confidence: AutoDirectionConfidence = 'low';
   let auto_direction_reason = '';
@@ -113,21 +129,61 @@ export function computeAutoDirectionSnapshot(
     }
 
   } else if (amdTag === 'AMD_NONE') {
-    if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
-    else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
-    else auto_direction = 'neutral';
 
-    if (auto_direction !== 'neutral') {
-      if (dailyBiasAlignment === 'ALIGNED') {
+    if (d1Tier === 'TRENDING_WEAK' && judasFallbackDirection !== null) {
+      // TRENDING_WEAK (dominant count = 3): Judas inversion outperforms D1
+      // Backtest: Judas 60% vs D1 56% on n=25 (272-day dataset, May 2025–May 2026)
+      auto_direction = judasFallbackDirection;
+      auto_direction_confidence = 'low';
+      amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 0.75 : 0.5;
+      auto_direction_reason =
+        `AMD_NONE TRENDING_WEAK judas_fallback=${judasFallbackDirection} ` +
+        `(${bullish}up/${bearish}dn) d1_would_have=${layer4D1Bias === 'TRENDING_UP' ? 'long' : 'short'} ` +
+        `align=${dailyBiasAlignment ?? 'null'}`;
+
+    } else if (d1Tier === 'TRENDING_WEAK' && judasFallbackDirection === null) {
+      // TRENDING_WEAK but Judas is FLAT or null — cannot use fallback, fall to D1
+      if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
+      else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
+      else auto_direction = 'neutral';
+      if (auto_direction !== 'neutral') {
         auto_direction_confidence = 'low';
-        amd_size_multiplier = 1.0;
+        amd_size_multiplier = 0.5;
         auto_direction_reason =
-          `AMD_NONE ALIGNED D1 (${bullish}up/${bearish}dn)`;
-      } else {
+          `AMD_NONE TRENDING_WEAK judas_flat_fallback_to_d1 ` +
+          `(${bullish}up/${bearish}dn) align=${dailyBiasAlignment ?? 'null'}`;
+      }
+
+    } else if (d1Tier === 'TRENDING_STRONG') {
+      // TRENDING_STRONG (dominant count >= 4): D1 wins (55.6% tied — forward testing Judas)
+      // Direction stays on D1. Judas fallback tagged in reason string for forward test analysis.
+      if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
+      else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
+      else auto_direction = 'neutral';
+      if (auto_direction !== 'neutral') {
+        auto_direction_confidence = 'low';
+        amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.0 : 0.25;
+        auto_direction_reason =
+          `AMD_NONE TRENDING_STRONG d1=${auto_direction} ` +
+          `(${bullish}up/${bearish}dn) align=${dailyBiasAlignment ?? 'null'} ` +
+          `judas_fwd_test=${judasFallbackDirection ?? 'none'}`;
+      }
+
+    } else {
+      // RANGING D1 (dominant < 3) or UNKNOWN — neutral, use Judas if available for logging only
+      if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
+      else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
+      else auto_direction = 'neutral';
+      if (auto_direction !== 'neutral') {
         auto_direction_confidence = 'very_low';
         amd_size_multiplier = 0.25;
         auto_direction_reason =
-          `AMD_NONE CONFLICTED D1 (${bullish}up/${bearish}dn) below-random`;
+          `AMD_NONE OTHER_TIER d1=${auto_direction} ` +
+          `(${bullish}up/${bearish}dn) judas=${judasDirection ?? 'null'}`;
+      } else {
+        auto_direction_reason =
+          `AMD_NONE RANGING D1 — no directional signal ` +
+          `judas_available=${judasFallbackDirection ?? 'none'}`;
       }
     }
 
