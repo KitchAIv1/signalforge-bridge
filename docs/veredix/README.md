@@ -11,7 +11,8 @@ Veredix is the trading operations system built around the SignalForge Bridge. Th
 5. [UI UX Spec](./UI_UX_SPEC.md) - dashboard routes, controls, user journeys, and interaction rules.
 6. [Data Model Config And Migrations](./DATA_MODEL_CONFIG_AND_MIGRATIONS.md) - Supabase tables, config keys, RLS, env vars, and migrations.
 7. [Operations And Runbook](./OPERATIONS_AND_RUNBOOK.md) - setup, daily operation, incidents, and research scripts.
-8. [Roadmap](./ROADMAP.md) - planned broker expansion, security hardening, UI cleanup, and open decisions.
+8. [Platform Map](./PLATFORM_MAP.md) - live behavior snapshot, AMD tags, known issues, resolution status.
+9. [Roadmap](./ROADMAP.md) - planned broker expansion, security hardening, UI cleanup, and open decisions.
 
 ## Source Of Truth
 

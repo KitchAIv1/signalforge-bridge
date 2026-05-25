@@ -33,7 +33,8 @@ Credentials come from:
 | `placeMarketOrder()` | FOK market order with optional price bound, SL on fill, and TP on fill. |
 | `patchTradeTPSL()` | Rebuild RC1 TP/SL patch with retry. |
 | `closeTrade()` | Max-hold, trail stop, and Omega flip closes. |
-| `getClosedTradeDetails()` | Transaction lookup after OANDA no longer reports a trade as open. |
+| `getTradeById()` | Direct single-trade lookup by OANDA trade ID; returns state, close time, average close price, and realized P&L. |
+| `getClosedTradeDetails()` | Close lookup after OANDA no longer reports a trade as open. Tries `getTradeById` first, then transactions API fallback. |
 | `fetchLatestM5Candle()` | AMD/regime helpers. |
 | `fetchCompletedCandles()` | Regime, AMD, pre-entry, close-candle, and research helpers. |
 
@@ -111,6 +112,7 @@ export interface BrokerClient {
   placeMarketOrder(params: PlaceOrderParams): Promise<PlaceOrderResult>;
   patchTradeTPSL(tradeId: string, takeProfit: string, stopLoss: string): Promise<void>;
   closeTrade(tradeId: string, units?: string): Promise<CloseTradeResult>;
+  getTradeById(tradeId: string): Promise<TradeByIdDetails | null>;
   getClosedTradeDetails(tradeId: string, fromTime: string): Promise<ClosedTradeDetails>;
   fetchCompletedCandles(instrument: string, granularity: string, fromISO: string, toISO: string): Promise<unknown[]>;
 }
@@ -125,6 +127,16 @@ export interface BrokerClient {
 - Preserve max-hold, circuit breaker, engine pause, and kill switch behavior.
 - Confirm netting/hedging behavior before allowing Omega direction flips.
 - Confirm pip, unit, lot, and margin semantics before reusing position sizing.
+
+## Startup Reconciliation
+
+`src/startupReconciliation.ts` runs once at bridge startup (step 7 in `src/index.ts`):
+
+1. **Forward:** OANDA open trades missing from `bridge_trade_log` → insert reconciled open row.
+2. **Reverse:** Bridge rows still `status='open'` but absent from OANDA open set → `getTradeById()` → if `CLOSED`, update row with exit price, P&L, `pnl_r`, and `close_reason=reconciled_on_startup`.
+3. **Dedup:** Pre-populate conflict resolver from last 60 seconds of executed trades.
+
+Reverse reconciliation closes ghost open rows after Railway restarts when the bridge was down during trade close.
 
 ## Known Gaps
 
