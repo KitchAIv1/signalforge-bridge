@@ -16,6 +16,7 @@ import { RegimePanel } from '@/components/RegimePanel';
 import { AmdPanel } from '@/components/AmdPanel';
 import { AsianDirectionPanel } from '@/components/AsianDirectionPanel';
 import { OmegaWindowIndicator } from '@/components/OmegaWindowIndicator';
+import { AUDUSDChart } from '@/components/AUDUSDChart';
 import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
 
@@ -218,6 +219,11 @@ export default function ActivityPage() {
           <RegimePanel />
           <AmdPanel compact />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />
+        <AUDUSDChart symbol="OANDA:GBPUSD" interval="5" useResponsiveHeight />
       </div>
 
       <NewsEventStrip />
