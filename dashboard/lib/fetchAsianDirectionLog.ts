@@ -25,7 +25,7 @@ export async function fetchAsianDirectionLog(): Promise<AsianDirectionLogEntry[]
     .select(DIRECTION_SET_SELECT)
     .eq('trigger_type', 'DIRECTION_SET')
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(25);
 
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as AsianDirectionLogEntry[];

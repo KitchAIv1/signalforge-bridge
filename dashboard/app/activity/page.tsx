@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { EngineControls } from '@/components/EngineControls';
-import { AUDUSDChart } from '@/components/AUDUSDChart';
 import { AccountSnapshotBar } from '@/components/AccountSnapshotBar';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
@@ -212,14 +211,11 @@ export default function ActivityPage() {
       <AccountSnapshotBar />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <RegimePanel />
         <AsianDirectionPanel />
-      </div>
-      <AmdPanel />
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />
-        <AUDUSDChart symbol="OANDA:GBPUSD" interval="5" useResponsiveHeight />
+        <div className="flex flex-col gap-4">
+          <RegimePanel />
+          <AmdPanel compact />
+        </div>
       </div>
 
       <NewsEventStrip />
