@@ -15,6 +15,7 @@ import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobi
 import { RegimePanel } from '@/components/RegimePanel';
 import { AmdPanel } from '@/components/AmdPanel';
 import { AsianDirectionPanel } from '@/components/AsianDirectionPanel';
+import { OmegaWindowIndicator } from '@/components/OmegaWindowIndicator';
 import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
 
@@ -210,6 +211,7 @@ export default function ActivityPage() {
 
       <AccountSnapshotBar />
 
+      <OmegaWindowIndicator />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AsianDirectionPanel />
         <div className="flex flex-col gap-4">

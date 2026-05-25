@@ -298,6 +298,36 @@ function shouldBlockRebuild(
   return { blocked: false, reason: null };
 }
 
+/**
+ * Reads omega_direction_valid_until from bridge_config.
+ * Returns true only if current UTC time is strictly before the expiry.
+ * Any failure (missing row, parse error, fetch error) returns false — safe default is BLOCKED.
+ */
+async function isOmegaWindowActive(supabase: SupabaseClient): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('bridge_config')
+      .select('config_value')
+      .eq('config_key', 'omega_direction_valid_until')
+      .maybeSingle();
+
+    if (error || !data) return false;
+
+    const rawValue = data.config_value;
+    const isoString =
+      typeof rawValue === 'string'
+        ? rawValue.replace(/^"|"$/g, '')
+        : String(rawValue).replace(/^"|"$/g, '');
+
+    const expiryMs = Date.parse(isoString);
+    if (!Number.isFinite(expiryMs)) return false;
+
+    return Date.now() < expiryMs;
+  } catch {
+    return false;
+  }
+}
+
 export async function processSignal(
   payload: SignalInsertPayload,
   receivedAt: Date,
@@ -632,6 +662,32 @@ export async function processSignal(
       return;
     }
   }
+
+  // ── Omega window gate ────────────────────────────────────────────────────
+  // Omega only fires during active windows:
+  //   Asian session:    21:00–08:00 UTC (written by AsianDirectionService)
+  //   AMD distribution: tag entry hour–14:00 UTC (written by AmdDetectorService)
+  // Outside these windows omega_direction_valid_until is expired → BLOCKED.
+  if (norm.engineId === 'omega') {
+    const windowActive = await isOmegaWindowActive(supabase);
+    if (!windowActive) {
+      const blockMsg = 'OMEGA_WINDOW_EXPIRED: no active session window — direction validity expired';
+      logInfo('[Omega] Blocked — window expired or no direction set', { signalId });
+      await supabase.from('bridge_trade_log').insert(
+        buildTradeLogRow(
+          payload,
+          'BLOCKED',
+          blockMsg,
+          decisionLatencyMs,
+          cachedAccount?.equity ?? null,
+          openTrades.length,
+          norm.oandaInstrument,
+        ),
+      );
+      return;
+    }
+  }
+  // ── End Omega window gate ─────────────────────────────────────────────────
 
   let regimeState: ActiveRegimeState | null = null;
   let regimeSizeMultiplier = 1.0;

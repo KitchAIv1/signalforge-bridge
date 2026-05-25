@@ -237,6 +237,37 @@ export type AmdDirectionAlertContext = {
   amdTag: string;
 };
 
+/**
+ * Returns ISO string for 14:00:00 UTC today.
+ * AMD distribution window closes at 14:00 UTC.
+ * If already past 14:00 UTC, returns 14:00 UTC tomorrow (late-run edge case).
+ */
+function computeAmdWindowExpiry(): string {
+  const now = new Date();
+  const candidate = new Date(now);
+  candidate.setUTCHours(14, 0, 0, 0);
+  if (candidate.getTime() <= now.getTime()) {
+    candidate.setUTCDate(candidate.getUTCDate() + 1);
+  }
+  return candidate.toISOString();
+}
+
+async function writeAmdWindowExpiry(
+  supabaseDb: SupabaseClient,
+  expiryIso: string,
+): Promise<void> {
+  const { error } = await supabaseDb
+    .from('bridge_config')
+    .update({
+      config_value: expiryIso,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('config_key', 'omega_direction_valid_until');
+  if (error) {
+    console.warn('[AmdDetector] Failed to write omega_direction_valid_until:', error.message);
+  }
+}
+
 export async function applyAutoDirectionToBridgeConfig(
   supabaseDb: SupabaseClient,
   autoDirection: AutoDirection,
@@ -266,8 +297,9 @@ export async function applyAutoDirectionToBridgeConfig(
 
   if (autoDirection === 'neutral') {
     console.log(
-      `[AmdDetector] auto_direction=neutral — skipping omega_direction write. Reason: ${reason}`,
+      `[AmdDetector] auto_direction=neutral — expiring omega window. Reason: ${reason}`,
     );
+    await writeAmdWindowExpiry(supabaseDb, new Date().toISOString());
     return;
   }
 
@@ -284,7 +316,12 @@ export async function applyAutoDirectionToBridgeConfig(
     return;
   }
 
-  console.log(`[AmdDetector] AUTO direction → ${autoDirection.toUpperCase()} | ${reason}`);
+  const expiryIso = computeAmdWindowExpiry();
+  await writeAmdWindowExpiry(supabaseDb, expiryIso);
+
+  console.log(
+    `[AmdDetector] AUTO direction → ${autoDirection.toUpperCase()} | valid until ${expiryIso} | ${reason}`,
+  );
 
   if (alertContext) {
     void sendAutoDirectionAlert({

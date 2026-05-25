@@ -132,6 +132,44 @@ async function readOmegaDirection(
   }
 }
 
+/**
+ * Returns ISO string for the next 08:00:00 UTC occurrence.
+ * Asian session window: 21:00 UTC → next 08:00 UTC.
+ */
+function nextAsianSessionExpiry(): string {
+  const now = new Date();
+  const candidate = new Date(now);
+  candidate.setUTCHours(8, 0, 0, 0);
+  if (candidate.getTime() <= now.getTime()) {
+    candidate.setUTCDate(candidate.getUTCDate() + 1);
+  }
+  return candidate.toISOString();
+}
+
+/**
+ * Writes omega_direction_valid_until to bridge_config.
+ * Non-fatal — never throws.
+ */
+async function writeOmegaDirectionValidUntil(
+  supabase: SupabaseClient,
+  expiryIso: string,
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('bridge_config')
+      .update({
+        config_value: expiryIso,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('config_key', 'omega_direction_valid_until');
+    if (error) {
+      console.error('[AsianDirection] Failed to write valid_until:', error.message);
+    }
+  } catch (err: unknown) {
+    console.error('[AsianDirection] valid_until write error:', String(err));
+  }
+}
+
 async function writeOmegaDirection(
   supabase: SupabaseClient,
   directionToSet: string,
@@ -168,6 +206,7 @@ export async function runAsianDirectionSet(): Promise<void> {
     const amdLookup = await fetchTodayAmdTag(supabase, lookupDate);
 
     if (amdLookup.error || amdLookup.amdTag == null) {
+      await writeOmegaDirectionValidUntil(supabase, new Date().toISOString());
       await logAsianDirectionRow(supabase, {
         ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
         action: 'SKIPPED_NO_AMD',
@@ -180,6 +219,7 @@ export async function runAsianDirectionSet(): Promise<void> {
 
     const amdTag = amdLookup.amdTag;
     if (amdTag !== 'AMD_SHIFTED') {
+      await writeOmegaDirectionValidUntil(supabase, new Date().toISOString());
       await logAsianDirectionRow(supabase, {
         ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
         action: 'SKIPPED_NOT_SHIFTED',
@@ -194,6 +234,7 @@ export async function runAsianDirectionSet(): Promise<void> {
     const priorD1 = await fetchPriorD1Candle(todayUtc, oandaToken, oandaEnv);
 
     if (priorD1 == null) {
+      await writeOmegaDirectionValidUntil(supabase, new Date().toISOString());
       await logAsianDirectionRow(supabase, {
         ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
         action: 'SKIPPED_NO_D1',
@@ -210,6 +251,8 @@ export async function runAsianDirectionSet(): Promise<void> {
     const previousDirection = await readOmegaDirection(supabase);
 
     if (previousDirection === directionToSet) {
+      // Direction unchanged but window is still valid — extend to next 08:00 UTC
+      await writeOmegaDirectionValidUntil(supabase, nextAsianSessionExpiry());
       await logAsianDirectionRow(supabase, {
         ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
         action: 'NO_CHANGE',
@@ -246,6 +289,7 @@ export async function runAsianDirectionSet(): Promise<void> {
     });
 
     if (writeOk) {
+      await writeOmegaDirectionValidUntil(supabase, nextAsianSessionExpiry());
       console.log(
         `[AsianDirection] omega_direction set to ${directionToSet} for ${todayUtc}. ` +
           `AMD_SHIFTED + D1 ${priorD1Direction}. Previous: ${previousDirection}`,
