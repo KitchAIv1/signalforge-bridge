@@ -11,6 +11,10 @@ export type AmdDailyBiasSnapshot = {
   layer4_d1_bias: Layer4D1Bias;
   layer4_bullish_count: number | null;
   layer4_bearish_count: number | null;
+  // 7-candle window (AMD_SHIFTED only — threshold ≥4)
+  layer4_bullish_count_7: number | null;
+  layer4_bearish_count_7: number | null;
+  layer4_d1_bias_7: Layer4D1Bias;
   daily_bias_alignment: DailyBiasAlignment;
 };
 
@@ -56,6 +60,9 @@ export type AmdStateRow = {
   layer4_d1_bias: Layer4D1Bias;
   layer4_bullish_count: number | null;
   layer4_bearish_count: number | null;
+  layer4_bullish_count_7: number | null;
+  layer4_bearish_count_7: number | null;
+  layer4_d1_bias_7: Layer4D1Bias;
   daily_bias_alignment: DailyBiasAlignment;
   auto_direction: string | null;
   auto_direction_confidence: string | null;

@@ -89,6 +89,9 @@ function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
     layer4_d1_bias: dailyBias.layer4_d1_bias,
     layer4_bullish_count: dailyBias.layer4_bullish_count,
     layer4_bearish_count: dailyBias.layer4_bearish_count,
+    layer4_bullish_count_7: dailyBias.layer4_bullish_count_7,
+    layer4_bearish_count_7: dailyBias.layer4_bearish_count_7,
+    layer4_d1_bias_7: dailyBias.layer4_d1_bias_7,
     daily_bias_alignment: dailyBias.daily_bias_alignment,
     chart_url: null,
     chart_generated_at: null,
@@ -110,7 +113,9 @@ function logAmdPersistSummary(insertOpts: InsertAmdOpts): void {
       `${features.judas_pips ?? 'null'}pips | ` +
       `reversal=${features.reversal_confirmed ?? 'null'} | ` +
       `D1=${dailyBias.layer4_d1_bias ?? 'null'} ` +
-      `(${dailyBias.layer4_bullish_count ?? '—'}↑/${dailyBias.layer4_bearish_count ?? '—'}↓) | ` +
+      `(${dailyBias.layer4_bullish_count ?? '—'}↑/${dailyBias.layer4_bearish_count ?? '—'}↓) ` +
+      `D7=${dailyBias.layer4_d1_bias_7 ?? 'null'} ` +
+      `(${dailyBias.layer4_bullish_count_7 ?? '—'}↑/${dailyBias.layer4_bearish_count_7 ?? '—'}↓) | ` +
       `bias_align=${dailyBias.daily_bias_alignment ?? 'null'} | ` +
       `chart=none | ` +
       `auto=${autoDir.auto_direction} (${autoDir.auto_direction_confidence})`,
@@ -133,17 +138,20 @@ async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<boolean>
   return true;
 }
 
-function countTrendVotesFromFiveD1Bars(
-  lastFiveBars: ReadonlyArray<{ mid: { o: string; c: string } }>,
+function countTrendVotesFromD1Bars(
+  bars: ReadonlyArray<{ mid: { o: string; c: string } }>,
 ): { bullishCount: number; bearishCount: number } {
   let bullishCount = 0;
   let bearishCount = 0;
-  for (const candleEntry of lastFiveBars) {
+  for (const candleEntry of bars) {
     const openPx = parseFloat(candleEntry.mid.o);
     const closePx = parseFloat(candleEntry.mid.c);
     if (!Number.isFinite(openPx) || !Number.isFinite(closePx)) continue;
-    if (closePx > openPx) bullishCount++;
-    else if (openPx > closePx) bearishCount++;
+    if (closePx > openPx) {
+      bullishCount++;
+    } else if (closePx < openPx) {
+      bearishCount++;
+    }
   }
   return { bullishCount, bearishCount };
 }
@@ -168,36 +176,64 @@ function computeDailyBiasAlignment(
 
 function emptyD1VoteCounts(): Pick<
   AmdDailyBiasSnapshot,
-  'layer4_d1_bias' | 'layer4_bullish_count' | 'layer4_bearish_count'
+  | 'layer4_d1_bias'
+  | 'layer4_bullish_count'
+  | 'layer4_bearish_count'
+  | 'layer4_bullish_count_7'
+  | 'layer4_bearish_count_7'
+  | 'layer4_d1_bias_7'
 > {
   return {
     layer4_d1_bias: null,
     layer4_bullish_count: null,
     layer4_bearish_count: null,
+    layer4_bullish_count_7: null,
+    layer4_bearish_count_7: null,
+    layer4_d1_bias_7: null,
   };
 }
 
-function d1BiasVotesFromLastFive(
-  lastFiveCompleted: ReadonlyArray<{ mid: { o: string; c: string } }>,
+function d1BiasVotesFromBars(
+  completedBars: ReadonlyArray<{ mid: { o: string; h: string; l: string; c: string } }>,
 ): Pick<
   AmdDailyBiasSnapshot,
-  'layer4_d1_bias' | 'layer4_bullish_count' | 'layer4_bearish_count'
+  | 'layer4_d1_bias'
+  | 'layer4_bullish_count'
+  | 'layer4_bearish_count'
+  | 'layer4_bullish_count_7'
+  | 'layer4_bearish_count_7'
+  | 'layer4_d1_bias_7'
 > {
-  if (lastFiveCompleted.length === 0) return emptyD1VoteCounts();
+  if (completedBars.length === 0) {
+    return emptyD1VoteCounts();
+  }
 
-  const { bullishCount, bearishCount } =
-    countTrendVotesFromFiveD1Bars(lastFiveCompleted);
+  const last5 = completedBars.slice(-5);
+  const { bullishCount: bull5, bearishCount: bear5 } =
+    countTrendVotesFromD1Bars(last5);
   const layer4_d1_bias: Layer4D1Bias =
-    bullishCount >= 3
-      ? 'TRENDING_UP'
-      : bearishCount >= 3
-        ? 'TRENDING_DOWN'
-        : 'RANGING';
+    bull5 >= 3 ? 'TRENDING_UP' : bear5 >= 3 ? 'TRENDING_DOWN' : 'RANGING';
+
+  let bull7: number | null = null;
+  let bear7: number | null = null;
+  let bias7: Layer4D1Bias = null;
+
+  if (completedBars.length >= 7) {
+    const last7 = completedBars.slice(-7);
+    const votes7 = countTrendVotesFromD1Bars(last7);
+    bull7 = votes7.bullishCount;
+    bear7 = votes7.bearishCount;
+    bias7 =
+      bull7 >= 4 ? 'TRENDING_UP' : bear7 >= 4 ? 'TRENDING_DOWN' : 'RANGING';
+  }
 
   return {
     layer4_d1_bias,
-    layer4_bullish_count: bullishCount,
-    layer4_bearish_count: bearishCount,
+    layer4_bullish_count: bull5,
+    layer4_bearish_count: bear5,
+    layer4_bullish_count_7: bull7,
+    layer4_bearish_count_7: bear7,
+    layer4_d1_bias_7: bias7,
   };
 }
 
@@ -205,16 +241,24 @@ async function fetchD1BiasVotesForTradeDate(
   pair: string,
   tradeDate: string,
 ): Promise<
-  Pick<AmdDailyBiasSnapshot, 'layer4_d1_bias' | 'layer4_bullish_count' | 'layer4_bearish_count'>
+  Pick<
+    AmdDailyBiasSnapshot,
+    | 'layer4_d1_bias'
+    | 'layer4_bullish_count'
+    | 'layer4_bearish_count'
+    | 'layer4_bullish_count_7'
+    | 'layer4_bearish_count_7'
+    | 'layer4_d1_bias_7'
+  >
 > {
   try {
     const tradeDateMs = Date.parse(`${tradeDate}T00:00:00.000Z`);
-    const rangeStartUtc = new Date(tradeDateMs - 14 * 24 * 3600 * 1000);
+    const rangeStartUtc = new Date(tradeDateMs - 21 * 24 * 3600 * 1000);
     const fromISO =
       rangeStartUtc.toISOString().split('T')[0] + 'T00:00:00.000000000Z';
     const toISO = `${tradeDate}T00:00:00.000000000Z`;
     const d1Bars = await fetchCompletedCandles(pair, 'D', fromISO, toISO);
-    return d1BiasVotesFromLastFive(d1Bars.slice(-5));
+    return d1BiasVotesFromBars(d1Bars);
   } catch (biasErr: unknown) {
     console.warn(
       '[AmdDetector] D1 bias fetch failed — counts null:',
@@ -276,6 +320,8 @@ async function recordAmdInsightForEmptyH1(
     emptyDailyBias.layer4_d1_bias,
     emptyDailyBias.layer4_bullish_count,
     emptyDailyBias.layer4_bearish_count,
+    emptyDailyBias.layer4_bullish_count_7,
+    emptyDailyBias.layer4_bearish_count_7,
     emptyDailyBias.daily_bias_alignment,
     emptyFeatures.reversal_confirmed,
     emptyFeatures.judas_pips,
@@ -331,6 +377,8 @@ async function recordAmdInsightForH1Window(
     filledDailyBias.layer4_d1_bias,
     filledDailyBias.layer4_bullish_count,
     filledDailyBias.layer4_bearish_count,
+    filledDailyBias.layer4_bullish_count_7,
+    filledDailyBias.layer4_bearish_count_7,
     filledDailyBias.daily_bias_alignment,
     features.reversal_confirmed,
     features.judas_pips,

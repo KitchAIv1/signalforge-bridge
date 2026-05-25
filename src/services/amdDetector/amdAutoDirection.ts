@@ -16,19 +16,31 @@ export function computeAutoDirectionSnapshot(
   layer4D1Bias: Layer4D1Bias,
   layer4BullishCount: number | null,
   layer4BearishCount: number | null,
+  layer4BullishCount7: number | null,
+  layer4BearishCount7: number | null,
   dailyBiasAlignment: DailyBiasAlignment,
   reversalConfirmed: boolean | null,
   judasPips: number | null,
 ): AmdAutoDirectionSnapshot {
-  const bullish = layer4BullishCount ?? 0;
-  const bearish = layer4BearishCount ?? 0;
-  const strongConviction = bullish >= 4 || bearish >= 4;
+  let effectiveBull: number;
+  let effectiveBear: number;
+  let strongConviction: boolean;
+
+  if (amdTag === 'AMD_SHIFTED' && layer4BullishCount7 !== null && layer4BearishCount7 !== null) {
+    effectiveBull = layer4BullishCount7;
+    effectiveBear = layer4BearishCount7;
+    strongConviction = layer4BullishCount7 >= 5 || layer4BearishCount7 >= 5;
+  } else {
+    effectiveBull = layer4BullishCount ?? 0;
+    effectiveBear = layer4BearishCount ?? 0;
+    strongConviction = effectiveBull >= 4 || effectiveBear >= 4;
+  }
 
   // D1 tier based on dominant vote count
   // TRENDING_STRONG: dominant side >= 4 (high conviction)
   // TRENDING_WEAK: dominant side === 3 (bare majority — one candle from ranging)
   // Other: not used in this branch (neutral or unknown)
-  const dominantCount = Math.max(bullish, bearish);
+  const dominantCount = Math.max(effectiveBull, effectiveBear);
   const d1Tier: 'TRENDING_STRONG' | 'TRENDING_WEAK' | 'OTHER' =
     dominantCount >= 4 ? 'TRENDING_STRONG' :
     dominantCount === 3 ? 'TRENDING_WEAK' :
@@ -54,15 +66,15 @@ export function computeAutoDirectionSnapshot(
       if (dailyBiasAlignment === 'ALIGNED' && strongConviction) {
         auto_direction_confidence = 'high';
         amd_size_multiplier = 2.5;
-        auto_direction_reason = `AMD_TEXTBOOK ALIGNED strong D1 (${bullish}up/${bearish}dn)`;
+        auto_direction_reason = `AMD_TEXTBOOK ALIGNED strong D1 (${effectiveBull}up/${effectiveBear}dn)`;
       } else if (dailyBiasAlignment === 'ALIGNED') {
         auto_direction_confidence = 'medium';
         amd_size_multiplier = 1.5;
-        auto_direction_reason = `AMD_TEXTBOOK ALIGNED weak D1 (${bullish}up/${bearish}dn)`;
+        auto_direction_reason = `AMD_TEXTBOOK ALIGNED weak D1 (${effectiveBull}up/${effectiveBear}dn)`;
       } else {
         auto_direction_confidence = 'low';
         amd_size_multiplier = 0.5;
-        auto_direction_reason = `AMD_TEXTBOOK CONFLICTED D1 (${bullish}up/${bearish}dn) coin-flip`;
+        auto_direction_reason = `AMD_TEXTBOOK CONFLICTED D1 (${effectiveBull}up/${effectiveBear}dn) coin-flip`;
       }
     }
 
@@ -93,26 +105,31 @@ export function computeAutoDirectionSnapshot(
         auto_direction_confidence = 'medium';
         amd_size_multiplier = 1.75;
         auto_direction_reason =
-          `AMD_FAILED ALIGNED strong D1 (${bullish}up/${bearish}dn)`;
+          `AMD_FAILED ALIGNED strong D1 (${effectiveBull}up/${effectiveBear}dn)`;
       } else if (dailyBiasAlignment === 'ALIGNED') {
         auto_direction_confidence = 'low';
         amd_size_multiplier = 1.0;
         auto_direction_reason =
-          `AMD_FAILED ALIGNED weak D1 (${bullish}up/${bearish}dn)`;
+          `AMD_FAILED ALIGNED weak D1 (${effectiveBull}up/${effectiveBear}dn)`;
       } else {
         auto_direction_confidence = 'low';
         amd_size_multiplier = 0.25;
         auto_direction_reason =
-          `AMD_FAILED CONFLICTED D1 (${bullish}up/${bearish}dn) below-random`;
+          `AMD_FAILED CONFLICTED D1 (${effectiveBull}up/${effectiveBear}dn) below-random`;
       }
     }
 
   } else if (amdTag === 'AMD_SHIFTED') {
-    // D1 bias governs on SHIFTED days — validated 71% accuracy (272-day backtest)
-    // Judas inversion tested and reverted: 56% accuracy — worse than D1 on all slices
-    // judasPips retained in signature for future logging/analysis only
-    if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
-    else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
+    const shiftedD1Bias: Layer4D1Bias =
+      layer4BullishCount7 !== null && layer4BearishCount7 !== null
+        ? layer4BullishCount7 >= 4
+          ? 'TRENDING_UP'
+          : layer4BearishCount7 >= 4
+            ? 'TRENDING_DOWN'
+            : 'RANGING'
+        : layer4D1Bias;
+    if (shiftedD1Bias === 'TRENDING_UP') auto_direction = 'long';
+    else if (shiftedD1Bias === 'TRENDING_DOWN') auto_direction = 'short';
     else auto_direction = 'neutral';
 
     if (auto_direction !== 'neutral') {
@@ -120,12 +137,12 @@ export function computeAutoDirectionSnapshot(
         auto_direction_confidence = 'medium';
         amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.5 : 0.75;
         auto_direction_reason =
-          `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} strong D1 (${bullish}up/${bearish}dn)`;
+          `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} strong D1 (${effectiveBull}up/${effectiveBear}dn)`;
       } else {
         auto_direction_confidence = 'low';
         amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.0 : 0.5;
         auto_direction_reason =
-          `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} weak D1 (${bullish}up/${bearish}dn)`;
+          `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} weak D1 (${effectiveBull}up/${effectiveBear}dn)`;
       }
     }
 
@@ -139,7 +156,7 @@ export function computeAutoDirectionSnapshot(
       amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 0.75 : 0.5;
       auto_direction_reason =
         `AMD_NONE TRENDING_WEAK judas_fallback=${judasFallbackDirection} ` +
-        `(${bullish}up/${bearish}dn) d1_would_have=${layer4D1Bias === 'TRENDING_UP' ? 'long' : 'short'} ` +
+        `(${effectiveBull}up/${effectiveBear}dn) d1_would_have=${layer4D1Bias === 'TRENDING_UP' ? 'long' : 'short'} ` +
         `align=${dailyBiasAlignment ?? 'null'}`;
 
     } else if (d1Tier === 'TRENDING_WEAK' && judasFallbackDirection === null) {
@@ -152,7 +169,7 @@ export function computeAutoDirectionSnapshot(
         amd_size_multiplier = 0.5;
         auto_direction_reason =
           `AMD_NONE TRENDING_WEAK judas_flat_fallback_to_d1 ` +
-          `(${bullish}up/${bearish}dn) align=${dailyBiasAlignment ?? 'null'}`;
+          `(${effectiveBull}up/${effectiveBear}dn) align=${dailyBiasAlignment ?? 'null'}`;
       }
 
     } else if (d1Tier === 'TRENDING_STRONG') {
@@ -166,7 +183,7 @@ export function computeAutoDirectionSnapshot(
         amd_size_multiplier = dailyBiasAlignment === 'ALIGNED' ? 1.0 : 0.25;
         auto_direction_reason =
           `AMD_NONE TRENDING_STRONG d1=${auto_direction} ` +
-          `(${bullish}up/${bearish}dn) align=${dailyBiasAlignment ?? 'null'} ` +
+          `(${effectiveBull}up/${effectiveBear}dn) align=${dailyBiasAlignment ?? 'null'} ` +
           `judas_fwd_test=${judasFallbackDirection ?? 'none'}`;
       }
 
@@ -180,7 +197,7 @@ export function computeAutoDirectionSnapshot(
         amd_size_multiplier = 0.25;
         auto_direction_reason =
           `AMD_NONE OTHER_TIER d1=${auto_direction} ` +
-          `(${bullish}up/${bearish}dn) judas=${judasDirection ?? 'null'}`;
+          `(${effectiveBull}up/${effectiveBear}dn) judas=${judasDirection ?? 'null'}`;
       } else {
         auto_direction_reason =
           `AMD_NONE RANGING D1 — no directional signal ` +
