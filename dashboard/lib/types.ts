@@ -228,6 +228,9 @@ export interface AmdState {
   layer4_d1_bias?: string | null;
   layer4_bullish_count?: number | null;
   layer4_bearish_count?: number | null;
+  layer4_d1_bias_7?: string | null;
+  layer4_bullish_count_7?: number | null;
+  layer4_bearish_count_7?: number | null;
   daily_bias_alignment?: string | null;
   auto_direction?: string | null;
   auto_direction_confidence?: string | null;
