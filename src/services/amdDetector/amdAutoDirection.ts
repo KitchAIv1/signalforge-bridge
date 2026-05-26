@@ -92,16 +92,20 @@ export function computeAutoDirectionSnapshot(
     }
 
   } else if (amdTag === 'AMD_FAILED') {
-    // ── M5 signal layer (flat Asian + Judas >= 8 only) ──
-    // Backtest validated on 99 days (86 TEXTBOOK/COMPRESSION
-    // + 13 genuine FAILED):
-    //   WITH_JUDAS → 66.7% COMPRESSION (n=39)
-    //   AGAINST_JUDAS → 47.1% TEXTBOOK (n=34) — below coin flip
-    //   NEUTRAL → no edge
+    // ── M5 signal layer — RANGING D1 only ──
+    // M5 WITH_JUDAS only fires when D1 is RANGING
+    // (no macro conviction). When D1 is TRENDING,
+    // D1 governs regardless of M5 signal.
+    // Backtest proof:
+    //   D1 direction (Pass A): +7.0p avg, 6.9% SL
+    //   M5 WITH_JUDAS (Pass B): +0.6p avg, 20% SL
+    //   M5 overrides D1 on TRENDING days = worse
+    //   outcomes + 3x higher hard SL rate
     if (
       judasPips !== null &&
       judasPips >= 8 &&
-      m5VsJudas !== null
+      m5VsJudas !== null &&
+      (layer4D1Bias === 'RANGING' || layer4D1Bias === null)
     ) {
       if (m5VsJudas === 'WITH_JUDAS') {
         if (judasDirection === 'UP') {
@@ -113,9 +117,9 @@ export function computeAutoDirectionSnapshot(
           auto_direction_confidence = 'medium';
           amd_size_multiplier = 1.0;
           auto_direction_reason =
-            `AMD_FAILED M5_WITH_JUDAS judas=` +
-            `${judasDirection ?? 'null'} ` +
-            `(66.7% n=39)`;
+            `AMD_FAILED M5_WITH_JUDAS RANGING_D1 ` +
+            `judas=${judasDirection ?? 'null'} ` +
+            `(66.7% n=39 — D1 ranging fallback)`;
           return {
             auto_direction,
             auto_direction_confidence,
@@ -124,16 +128,13 @@ export function computeAutoDirectionSnapshot(
           };
         }
       }
-      // AGAINST_JUDAS and NEUTRAL: below coin flip
-      // Return neutral — do NOT fall through to D1
-      // 47.1% accuracy is below coin flip,
-      // D1 signal irrelevant when M5 has no edge
+      // AGAINST_JUDAS and NEUTRAL on RANGING D1:
+      // no edge — neutral
       auto_direction = 'neutral';
       auto_direction_confidence = 'low';
       auto_direction_reason =
-        `AMD_FAILED M5_${m5VsJudas} judas=` +
-        `${judasDirection ?? 'null'} — no edge ` +
-        `(AGAINST_JUDAS 47.1%, NEUTRAL no signal)`;
+        `AMD_FAILED M5_${m5VsJudas} RANGING_D1 ` +
+        `judas=${judasDirection ?? 'null'} — no edge`;
       return {
         auto_direction,
         auto_direction_confidence,
@@ -142,6 +143,7 @@ export function computeAutoDirectionSnapshot(
       };
     }
     // ── End M5 signal layer ──
+    // D1 TRENDING: use D1 direction regardless of M5
     if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
     else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
     else auto_direction = 'neutral';

@@ -29,11 +29,22 @@ const TAGS_REQUIRING_AMD_CONFIRMED = new Set([
 ]);
 
 const TAG_HARD_EXIT_HOUR: Record<string, number> = {
-  AMD_COMPRESSION_BREAKOUT: 14,
+  // AMD_NONE: tight 30-min window validated (+67%
+  //   with gate). Hard exit at H11 is correct.
   AMD_NONE: 11,
-  AMD_FAILED: 12,
+  // AMD_TEXTBOOK: marginal pip loss (-7%) but
+  //   +11pp win rate improvement. Keep gate.
   AMD_TEXTBOOK: 13,
-  AMD_SHIFTED: 13,
+  // AMD_COMPRESSION: gate removed (-25% damage).
+  //   Trail runs freely. Hard exit only as safety.
+  AMD_COMPRESSION_BREAKOUT: 16,
+  // AMD_FAILED: gate removed (-90% damage).
+  //   D1 direction on trending days produces
+  //   large moves that extend past H12.
+  AMD_FAILED: 16,
+  // AMD_SHIFTED: gate removed (-55% damage).
+  //   Trail runs freely until 16:00 UTC.
+  AMD_SHIFTED: 16,
 };
 
 const TAG_TIME_GATE_HOUR: Record<string, number | null> = {
