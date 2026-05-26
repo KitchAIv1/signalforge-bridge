@@ -15,7 +15,10 @@ import { runHeartbeat, getCachedAccountSummary } from './monitoring/heartbeat.js
 import { runTradeMonitor } from './monitoring/tradeMonitor.js';
 import { logInfo, logWarn } from './utils/logger.js';
 import { runRegimeDetection } from './services/RegimeDetectorService.js';
-import { runAmdDetection } from './services/AmdDetectorService.js';
+import {
+  runAmdDetection,
+  runAmdOutcomeDetection,
+} from './services/AmdDetectorService.js';
 import { runAsianDirectionSet, runAsianSessionClose } from './services/AsianDirectionService.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
@@ -93,6 +96,17 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
+  cron.schedule('30 16 * * *', async () => {
+    try {
+      await runAmdOutcomeDetection();
+    } catch (outcomeErr) {
+      console.error(
+        '[AmdOutcome] Scheduled run error:',
+        outcomeErr,
+      );
+    }
+  }, { timezone: 'UTC' });
+
   cron.schedule('0 21 * * *', async () => {
     try {
       console.log('[AsianDirection] 21:00 UTC cron fired — running direction set');
@@ -137,6 +151,19 @@ async function main(): Promise<void> {
     });
   } else {
     logInfo('[AmdDetector] Startup before 10:31 UTC — skipping startup run, cron handles daily detection');
+  }
+
+  // Outcome detection startup — only after 16:30 UTC
+  const _outcomeWindowOpen =
+    _amdUtcHour > 16 ||
+    (_amdUtcHour === 16 && _amdUtcMin >= 30);
+  if (_outcomeWindowOpen) {
+    runAmdOutcomeDetection().catch((outcomeStartErr) => {
+      console.error(
+        '[AmdOutcome] Startup run error:',
+        outcomeStartErr,
+      );
+    });
   }
 
   try {

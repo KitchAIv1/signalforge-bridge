@@ -220,6 +220,16 @@ export interface AmdState {
   amd_tag:                 string;
   chart_url:               string | null;
   chart_generated_at:      string | null;
+  // M5 signal (written at 10:31 UTC)
+  m5_first_3_net_pips?: number | null;
+  m5_vs_judas_direction?: string | null;
+  m5_first_candle_direction?: string | null;
+  m5_evaluated_at?: string | null;
+  // Outcome (written at 16:30 UTC)
+  amd_outcome_tag?: string | null;
+  reversal_confirmed_outcome?: boolean | null;
+  compression_breakout_outcome?: boolean | null;
+  outcome_evaluated_at?: string | null;
   chart_data:              Record<string, unknown> | null;
   amd_tag_manual_override: string | null;
   override_reason:          string | null;

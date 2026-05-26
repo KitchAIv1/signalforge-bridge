@@ -11,6 +11,7 @@ import type {
   AmdAutoDirectionSnapshot,
   AmdDailyBiasSnapshot,
   AmdDateFeatures,
+  AmdM5Signal,
   DailyBiasAlignment,
   JudasDirection,
   Layer4D1Bias,
@@ -62,6 +63,7 @@ type InsertAmdOpts = {
   features: AmdDateFeatures;
   dailyBias: AmdDailyBiasSnapshot;
   autoDir: AmdAutoDirectionSnapshot;
+  m5Signal: AmdM5Signal;
 };
 
 function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
@@ -100,6 +102,11 @@ function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
     auto_direction_confidence: insertOpts.autoDir.auto_direction_confidence,
     auto_direction_reason: insertOpts.autoDir.auto_direction_reason,
     amd_size_multiplier: insertOpts.autoDir.amd_size_multiplier,
+    m5_first_3_net_pips: insertOpts.m5Signal.m5_first_3_net_pips,
+    m5_vs_judas_direction: insertOpts.m5Signal.m5_vs_judas_direction,
+    m5_first_candle_direction:
+      insertOpts.m5Signal.m5_first_candle_direction,
+    m5_evaluated_at: insertOpts.m5Signal.m5_evaluated_at,
   };
 }
 
@@ -118,7 +125,9 @@ function logAmdPersistSummary(insertOpts: InsertAmdOpts): void {
       `(${dailyBias.layer4_bullish_count_7 ?? '—'}↑/${dailyBias.layer4_bearish_count_7 ?? '—'}↓) | ` +
       `bias_align=${dailyBias.daily_bias_alignment ?? 'null'} | ` +
       `chart=none | ` +
-      `auto=${autoDir.auto_direction} (${autoDir.auto_direction_confidence})`,
+      `auto=${autoDir.auto_direction} (${autoDir.auto_direction_confidence})` +
+      ` | m5=${insertOpts.m5Signal.m5_vs_judas_direction ?? 'null'} ` +
+      `(${insertOpts.m5Signal.m5_first_3_net_pips ?? '—'}pips)`,
   );
 }
 
@@ -298,6 +307,84 @@ async function pullAudUsdH1ForAmd(dayStamp: string): Promise<OhlcCandle[] | null
   }
 }
 
+async function fetchAmdM5Signal(
+  tradeDate: string,
+  judasDirection: JudasDirection | null,
+): Promise<AmdM5Signal> {
+  const empty: AmdM5Signal = {
+    m5_first_3_net_pips: null,
+    m5_vs_judas_direction: null,
+    m5_first_candle_direction: null,
+    m5_evaluated_at: null,
+  };
+
+  if (!judasDirection || judasDirection === 'FLAT') {
+    return empty;
+  }
+
+  try {
+    const fromISO = `${tradeDate}T10:00:00.000000000Z`;
+    const toISO = `${tradeDate}T10:30:00.000000000Z`;
+    const raw = await fetchCompletedCandles(
+      AUD_AMD_PAIR,
+      'M5',
+      fromISO,
+      toISO,
+    );
+
+    if (!raw || raw.length === 0) return empty;
+
+    const candles = raw
+      .map((c) => ({
+        o: parseFloat(c.mid.o),
+        c: parseFloat(c.mid.c),
+        time: c.time,
+      }))
+      .sort(
+        (a, b) =>
+          new Date(a.time).getTime() - new Date(b.time).getTime(),
+      );
+
+    if (candles.length === 0) return empty;
+
+    const first = candles[0];
+    const firstThree = candles.slice(0, 3);
+
+    const netPips =
+      firstThree.reduce((sum, candle) => sum + (candle.c - candle.o), 0) *
+      10000;
+
+    const firstBody = Math.abs(first.c - first.o);
+    const firstDir: 'bullish' | 'bearish' | 'doji' =
+      firstBody < 0.0002
+        ? 'doji'
+        : first.c > first.o
+          ? 'bullish'
+          : 'bearish';
+
+    const netDir: 'bullish' | 'bearish' | 'neutral' =
+      netPips > 1 ? 'bullish' : netPips < -1 ? 'bearish' : 'neutral';
+
+    let m5VsJudas: 'WITH_JUDAS' | 'AGAINST_JUDAS' | 'NEUTRAL';
+    if (netDir === 'neutral') {
+      m5VsJudas = 'NEUTRAL';
+    } else if (judasDirection === 'UP') {
+      m5VsJudas = netDir === 'bearish' ? 'AGAINST_JUDAS' : 'WITH_JUDAS';
+    } else {
+      m5VsJudas = netDir === 'bullish' ? 'AGAINST_JUDAS' : 'WITH_JUDAS';
+    }
+
+    return {
+      m5_first_3_net_pips: parseFloat(netPips.toFixed(4)),
+      m5_vs_judas_direction: m5VsJudas,
+      m5_first_candle_direction: firstDir,
+      m5_evaluated_at: new Date().toISOString(),
+    };
+  } catch {
+    return empty;
+  }
+}
+
 async function recordAmdInsightForEmptyH1(
   supabaseDb: SupabaseClient,
   tradeDate: string,
@@ -314,6 +401,12 @@ async function recordAmdInsightForEmptyH1(
     tradeDate,
     emptyFeatures.judas_direction,
   );
+  const emptyM5Signal: AmdM5Signal = {
+    m5_first_3_net_pips: null,
+    m5_vs_judas_direction: null,
+    m5_first_candle_direction: null,
+    m5_evaluated_at: null,
+  };
   const autoDir = computeAutoDirectionSnapshot(
     emptyFeatures.amd_tag,
     emptyFeatures.judas_direction,
@@ -325,6 +418,7 @@ async function recordAmdInsightForEmptyH1(
     emptyDailyBias.daily_bias_alignment,
     emptyFeatures.reversal_confirmed,
     emptyFeatures.judas_pips,
+    null,
   );
   const persisted = await persistAmdInsightRow({
     amdSupabase: supabaseDb,
@@ -334,6 +428,7 @@ async function recordAmdInsightForEmptyH1(
     features: emptyFeatures,
     dailyBias: emptyDailyBias,
     autoDir,
+    m5Signal: emptyM5Signal,
   });
   if (persisted) {
     const alertCtx: AmdDirectionAlertContext = {
@@ -371,6 +466,11 @@ async function recordAmdInsightForH1Window(
     features.judas_direction,
   );
 
+  const m5Signal = await fetchAmdM5Signal(
+    tradeDate,
+    features.judas_direction,
+  );
+
   const autoDir = computeAutoDirectionSnapshot(
     features.amd_tag,
     features.judas_direction,
@@ -382,6 +482,7 @@ async function recordAmdInsightForH1Window(
     filledDailyBias.daily_bias_alignment,
     features.reversal_confirmed,
     features.judas_pips,
+    m5Signal.m5_vs_judas_direction,
   );
 
   const persisted = await persistAmdInsightRow({
@@ -392,6 +493,7 @@ async function recordAmdInsightForH1Window(
     features,
     dailyBias: filledDailyBias,
     autoDir,
+    m5Signal,
   });
 
   if (persisted) {
@@ -431,6 +533,95 @@ export async function runAmdDetection(): Promise<void> {
   }
 
   await recordAmdInsightForH1Window(supabaseDb, tradeDate, evaluatedAtISO, h1Pull);
+}
+
+export async function runAmdOutcomeDetection(): Promise<void> {
+  const evaluatedAtISO = new Date().toISOString();
+  const tradeDate = utcTradeDateStamp();
+
+  console.log(
+    `[AmdOutcome] Running for ${AUD_AMD_PAIR} UTC date ${tradeDate}`,
+  );
+
+  const supabaseDb = buildAmdSupabaseClient();
+
+  const { data: existing, error: fetchErr } = await supabaseDb
+    .from('amd_state')
+    .select('id, amd_tag, judas_direction')
+    .eq('pair', AUD_AMD_PAIR)
+    .eq('trade_date', tradeDate)
+    .maybeSingle();
+
+  if (fetchErr || !existing) {
+    console.log(
+      `[AmdOutcome] No amd_state row for ${tradeDate} — skipping`,
+    );
+    return;
+  }
+
+  const outcomeEligible = [
+    'AMD_FAILED',
+    'AMD_TEXTBOOK',
+    'AMD_COMPRESSION_BREAKOUT',
+  ];
+  if (!outcomeEligible.includes(existing.amd_tag as string)) {
+    console.log(
+      `[AmdOutcome] Tag ${existing.amd_tag as string} ` +
+        `not outcome-eligible — skipping`,
+    );
+    return;
+  }
+
+  try {
+    const fromISO = `${tradeDate}T00:00:00.000000000Z`;
+    const toISO = `${tradeDate}T16:30:00.000000000Z`;
+    const h1Full = await fetchCompletedCandles(
+      AUD_AMD_PAIR,
+      'H1',
+      fromISO,
+      toISO,
+    );
+
+    if (!h1Full || h1Full.length === 0) {
+      console.log(
+        `[AmdOutcome] No H1 data for ${tradeDate} — skipping`,
+      );
+      return;
+    }
+
+    const outcomeFeatures = computeDateFeatures(h1Full, (badCandle, reason) => {
+      console.warn(`[AmdOutcome] Bad candle: ${reason}`, badCandle.time);
+    });
+
+    const { error: updateErr } = await supabaseDb
+      .from('amd_state')
+      .update({
+        amd_outcome_tag: outcomeFeatures.amd_tag,
+        reversal_confirmed_outcome: outcomeFeatures.reversal_confirmed,
+        compression_breakout_outcome: outcomeFeatures.compression_breakout,
+        outcome_evaluated_at: evaluatedAtISO,
+      })
+      .eq('pair', AUD_AMD_PAIR)
+      .eq('trade_date', tradeDate);
+
+    if (updateErr) {
+      console.error('[AmdOutcome] Update failed:', updateErr.message);
+      return;
+    }
+
+    console.log(
+      `[AmdOutcome] ${tradeDate} | ` +
+        `live=${existing.amd_tag as string} | ` +
+        `outcome=${outcomeFeatures.amd_tag} | ` +
+        `reversal=${outcomeFeatures.reversal_confirmed ?? 'null'} | ` +
+        `compression=${outcomeFeatures.compression_breakout}`,
+    );
+  } catch (err: unknown) {
+    console.error(
+      '[AmdOutcome] Error:',
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 if (isExecutedAsCliModule()) {

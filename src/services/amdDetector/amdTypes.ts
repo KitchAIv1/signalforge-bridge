@@ -70,6 +70,16 @@ export type AmdStateRow = {
   amd_size_multiplier: number | null;
   chart_url: string | null;
   chart_generated_at: string | null;
+  // M5 signal fields (written at 10:31 UTC)
+  m5_first_3_net_pips?: number | null;
+  m5_vs_judas_direction?: string | null;
+  m5_first_candle_direction?: string | null;
+  m5_evaluated_at?: string | null;
+  // Outcome fields (written at 16:30 UTC)
+  amd_outcome_tag?: string | null;
+  reversal_confirmed_outcome?: boolean | null;
+  compression_breakout_outcome?: boolean | null;
+  outcome_evaluated_at?: string | null;
 };
 
 /** Auto-direction output from AMD + D1 conviction analysis. */
@@ -84,4 +94,20 @@ export type AmdAutoDirectionSnapshot = {
   auto_direction_confidence: AutoDirectionConfidence;
   auto_direction_reason: string;
   amd_size_multiplier: number;
+};
+
+export type AmdM5Signal = {
+  m5_first_3_net_pips: number | null;
+  m5_vs_judas_direction:
+    'WITH_JUDAS' | 'AGAINST_JUDAS' | 'NEUTRAL' | null;
+  m5_first_candle_direction:
+    'bullish' | 'bearish' | 'doji' | null;
+  m5_evaluated_at: string | null;
+};
+
+export type AmdOutcomeResult = {
+  amd_outcome_tag: string | null;
+  reversal_confirmed_outcome: boolean | null;
+  compression_breakout_outcome: boolean | null;
+  outcome_evaluated_at: string | null;
 };

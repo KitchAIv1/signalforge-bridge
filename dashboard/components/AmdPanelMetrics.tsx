@@ -6,6 +6,8 @@ import {
   autoDirectionLabel,
   autoDirectionColor,
   autoDirectionConfidenceLabel,
+  m5SignalLabel,
+  m5SignalColor,
 } from '@/lib/amdPanelFormatters';
 import {
   describeAsianRangePips,
@@ -74,6 +76,31 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
             </div>
           </div>
         )}
+
+      {amdState?.m5_vs_judas_direction != null && (
+        <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            <span className="font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              M5 Signal
+            </span>
+            <span
+              className={`font-bold text-sm ${m5SignalColor(amdState.m5_vs_judas_direction)}`}
+            >
+              {m5SignalLabel(amdState.m5_vs_judas_direction)}
+            </span>
+            <span className="text-slate-600 dark:text-slate-300">
+              {amdState.m5_first_3_net_pips != null
+                ? `${amdState.m5_first_3_net_pips > 0 ? '+' : ''}${amdState.m5_first_3_net_pips.toFixed(1)} pips net`
+                : ''}
+            </span>
+            {amdState.m5_evaluated_at != null && (
+              <span className="italic text-slate-400">
+                {`evaluated ${new Date(amdState.m5_evaluated_at).getUTCHours().toString().padStart(2, '0')}:${new Date(amdState.m5_evaluated_at).getUTCMinutes().toString().padStart(2, '0')} UTC`}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <AmdIntelCompressionRow amdState={amdState} />
     </>

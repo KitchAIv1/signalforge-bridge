@@ -21,6 +21,7 @@ export function computeAutoDirectionSnapshot(
   dailyBiasAlignment: DailyBiasAlignment,
   reversalConfirmed: boolean | null,
   judasPips: number | null,
+  m5VsJudas: 'WITH_JUDAS' | 'AGAINST_JUDAS' | 'NEUTRAL' | null = null,
 ): AmdAutoDirectionSnapshot {
   let effectiveBull: number;
   let effectiveBear: number;
@@ -91,6 +92,56 @@ export function computeAutoDirectionSnapshot(
     }
 
   } else if (amdTag === 'AMD_FAILED') {
+    // ── M5 signal layer (flat Asian + Judas >= 8 only) ──
+    // Backtest validated on 99 days (86 TEXTBOOK/COMPRESSION
+    // + 13 genuine FAILED):
+    //   WITH_JUDAS → 66.7% COMPRESSION (n=39)
+    //   AGAINST_JUDAS → 47.1% TEXTBOOK (n=34) — below coin flip
+    //   NEUTRAL → no edge
+    if (
+      judasPips !== null &&
+      judasPips >= 8 &&
+      m5VsJudas !== null
+    ) {
+      if (m5VsJudas === 'WITH_JUDAS') {
+        if (judasDirection === 'UP') {
+          auto_direction = 'long';
+        } else if (judasDirection === 'DOWN') {
+          auto_direction = 'short';
+        }
+        if (auto_direction !== 'neutral') {
+          auto_direction_confidence = 'medium';
+          amd_size_multiplier = 1.0;
+          auto_direction_reason =
+            `AMD_FAILED M5_WITH_JUDAS judas=` +
+            `${judasDirection ?? 'null'} ` +
+            `(66.7% n=39)`;
+          return {
+            auto_direction,
+            auto_direction_confidence,
+            auto_direction_reason,
+            amd_size_multiplier,
+          };
+        }
+      }
+      // AGAINST_JUDAS and NEUTRAL: below coin flip
+      // Return neutral — do NOT fall through to D1
+      // 47.1% accuracy is below coin flip,
+      // D1 signal irrelevant when M5 has no edge
+      auto_direction = 'neutral';
+      auto_direction_confidence = 'low';
+      auto_direction_reason =
+        `AMD_FAILED M5_${m5VsJudas} judas=` +
+        `${judasDirection ?? 'null'} — no edge ` +
+        `(AGAINST_JUDAS 47.1%, NEUTRAL no signal)`;
+      return {
+        auto_direction,
+        auto_direction_confidence,
+        auto_direction_reason,
+        amd_size_multiplier: 1.0,
+      };
+    }
+    // ── End M5 signal layer ──
     if (layer4D1Bias === 'TRENDING_UP') auto_direction = 'long';
     else if (layer4D1Bias === 'TRENDING_DOWN') auto_direction = 'short';
     else auto_direction = 'neutral';

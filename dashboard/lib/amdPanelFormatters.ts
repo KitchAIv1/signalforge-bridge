@@ -135,3 +135,52 @@ export function autoDirectionConfidenceLabel(
   };
   return labels[confidence] ?? confidence;
 }
+
+export function m5SignalLabel(
+  signal: string | null | undefined,
+): string {
+  if (!signal) return '—';
+  const labels: Record<string, string> = {
+    WITH_JUDAS: '▶ With Judas',
+    AGAINST_JUDAS: '◀ Against Judas',
+    NEUTRAL: '◉ Neutral',
+  };
+  return labels[signal] ?? signal;
+}
+
+export function m5SignalColor(
+  signal: string | null | undefined,
+): string {
+  if (signal === 'WITH_JUDAS')
+    return 'text-blue-600 dark:text-blue-400';
+  if (signal === 'AGAINST_JUDAS')
+    return 'text-orange-600 dark:text-orange-400';
+  return 'text-slate-500 dark:text-slate-400';
+}
+
+export function outcomeTagLabel(
+  tag: string | null | undefined,
+): string {
+  if (!tag) return '—';
+  const labels: Record<string, string> = {
+    AMD_TEXTBOOK: '📚 Textbook',
+    AMD_COMPRESSION_BREAKOUT: '🚀 Compression',
+    AMD_FAILED: '❌ Failed',
+    AMD_SHIFTED: '➡️ Shifted',
+    AMD_NONE: '🚫 None',
+    INSUFFICIENT_DATA: '⏳ Insufficient',
+  };
+  return labels[tag] ?? tag;
+}
+
+export function outcomeTagColor(
+  tag: string | null | undefined,
+): string {
+  if (tag === 'AMD_TEXTBOOK')
+    return 'text-green-600 dark:text-green-400';
+  if (tag === 'AMD_COMPRESSION_BREAKOUT')
+    return 'text-blue-600 dark:text-blue-400';
+  if (tag === 'AMD_FAILED')
+    return 'text-red-600 dark:text-red-400';
+  return 'text-slate-500 dark:text-slate-400';
+}

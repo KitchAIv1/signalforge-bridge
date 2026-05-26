@@ -1,7 +1,7 @@
 'use client';
 
 import type { AmdState } from '@/lib/types';
-import { amdTagColor, amdTagLabel } from '@/lib/amdPanelFormatters';
+import { amdTagColor, amdTagLabel, m5SignalLabel, m5SignalColor, outcomeTagLabel, outcomeTagColor } from '@/lib/amdPanelFormatters';
 
 interface AmdHistoryTableProps {
   rows: AmdState[];
@@ -60,6 +60,8 @@ export function AmdHistoryTable({
               <th className="px-3 py-2 text-left">Pips</th>
               <th className="px-3 py-2 text-left">Asian</th>
               <th className="px-3 py-2 text-left">Reversal</th>
+              <th className="px-3 py-2 text-left">M5</th>
+              <th className="px-3 py-2 text-left">Outcome</th>
               <th className="px-3 py-2 text-left">Chart</th>
             </tr>
           </thead>
@@ -95,6 +97,12 @@ export function AmdHistoryTable({
                   ) : (
                     <span className="text-slate-400">—</span>
                   )}
+                </td>
+                <td className={`px-3 py-2 text-xs font-medium ${m5SignalColor(historyRow.m5_vs_judas_direction)}`}>
+                  {m5SignalLabel(historyRow.m5_vs_judas_direction)}
+                </td>
+                <td className={`px-3 py-2 text-xs font-medium ${outcomeTagColor(historyRow.amd_outcome_tag)}`}>
+                  {outcomeTagLabel(historyRow.amd_outcome_tag)}
                 </td>
                 <td className="px-3 py-2">
                   {historyRow.chart_data != null ? (
