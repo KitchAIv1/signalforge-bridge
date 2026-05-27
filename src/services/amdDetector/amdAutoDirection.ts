@@ -197,6 +197,10 @@ export function computeAutoDirectionSnapshot(
         auto_direction_reason =
           `AMD_SHIFTED ${dailyBiasAlignment ?? 'null'} weak D1 (${effectiveBull}up/${effectiveBear}dn)`;
       }
+    } else {
+      auto_direction_reason =
+        `AMD_SHIFTED RANGING D1 — no directional signal ` +
+        `(${effectiveBull}up/${effectiveBear}dn 7-candle)`;
     }
 
   } else if (amdTag === 'AMD_NONE') {
