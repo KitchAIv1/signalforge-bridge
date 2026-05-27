@@ -26,11 +26,36 @@ const ENGINE_ROWS = [
 ] as const;
 
 const BACKTEST_ROWS = [
-  { tag: 'AMD_TEXTBOOK',             s0: '5.5p', s1: '5.1p', decision: 'Keep gate',    winRate: '68.4%' },
-  { tag: 'AMD_COMPRESSION_BREAKOUT', s0: '8.8p', s1: '6.7p', decision: 'Removed gate', winRate: '75.5%' },
-  { tag: 'AMD_FAILED',               s0: '7.0p (D1)', s1: '0.7p', decision: 'Removed gate', winRate: '44.8%' },
-  { tag: 'AMD_SHIFTED',              s0: '4.0p', s1: '1.8p', decision: 'Removed gate', winRate: '63.2%' },
-  { tag: 'AMD_NONE',                 s0: '1.7p', s1: '2.8p', decision: 'Keep gate',    winRate: '52.9%' },
+  { tag: 'AMD_TEXTBOOK',
+    s0: '5.5p',
+    s1: '5.1p',
+    decision: 'Keep gate',
+    winRate: '68.4%',
+    note: '-7% pips, +11pp win rate' },
+  { tag: 'AMD_COMPRESSION_BREAKOUT',
+    s0: '8.8p',
+    s1: '6.7p',
+    decision: 'Removed gate',
+    winRate: '75.5%',
+    note: '-25% damage with gate' },
+  { tag: 'AMD_FAILED',
+    s0: '7.0p (D1)',
+    s1: '0.7p',
+    decision: 'Removed gate',
+    winRate: '44.8%',
+    note: '-90% damage with gate' },
+  { tag: 'AMD_SHIFTED',
+    s0: '4.05p',
+    s1: '1.83p',
+    decision: 'Removed gate',
+    winRate: '63.2%',
+    note: 'S0 optimal — 86.5% win, 39.8% peak capture, 2.5p trail' },
+  { tag: 'AMD_NONE',
+    s0: '1.7p',
+    s1: '2.8p',
+    decision: 'Keep gate',
+    winRate: '52.9%',
+    note: '+67% improvement with gate' },
 ] as const;
 
 const SYSTEM_GATES = [
@@ -91,7 +116,8 @@ export function AmdReferenceEngineTable() {
                 <TH>S0 No Gate</TH>
                 <TH>S1 With Gate</TH>
                 <TH>Decision</TH>
-                <TH>Window Confirmation Rate</TH>
+                <TH>Win Confirmation</TH>
+                <TH>Note</TH>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -102,6 +128,7 @@ export function AmdReferenceEngineTable() {
                   <TD className="font-mono text-slate-600 dark:text-slate-300">{row.s1}</TD>
                   <TD className="font-medium text-slate-700 dark:text-slate-200">{row.decision}</TD>
                   <TD className="text-slate-600 dark:text-slate-300">{row.winRate}</TD>
+                  <TD className="text-slate-500 dark:text-slate-400">{row.note}</TD>
                 </tr>
               ))}
             </tbody>
