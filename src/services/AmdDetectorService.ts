@@ -107,6 +107,11 @@ function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
     m5_first_candle_direction:
       insertOpts.m5Signal.m5_first_candle_direction,
     m5_evaluated_at: insertOpts.m5Signal.m5_evaluated_at,
+    judas_to_range_ratio: insertOpts.autoDir.judas_to_range_ratio ?? null,
+    asian_drift_ratio: insertOpts.autoDir.asian_drift_ratio ?? null,
+    asian_dominance_ratio: insertOpts.autoDir.asian_dominance_ratio ?? null,
+    market_structure_type: insertOpts.autoDir.market_structure_type ?? null,
+    asian_net_direction: insertOpts.autoDir.asian_net_direction ?? null,
   };
 }
 
@@ -419,6 +424,8 @@ async function recordAmdInsightForEmptyH1(
     emptyFeatures.reversal_confirmed,
     emptyFeatures.judas_pips,
     null,
+    emptyFeatures.asian_range_pips,
+    emptyFeatures.asian_net_pips,
   );
   const persisted = await persistAmdInsightRow({
     amdSupabase: supabaseDb,
@@ -483,6 +490,8 @@ async function recordAmdInsightForH1Window(
     features.reversal_confirmed,
     features.judas_pips,
     m5Signal.m5_vs_judas_direction,
+    features.asian_range_pips,
+    features.asian_net_pips,
   );
 
   const persisted = await persistAmdInsightRow({

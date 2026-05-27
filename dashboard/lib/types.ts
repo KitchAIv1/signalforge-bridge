@@ -233,6 +233,12 @@ export interface AmdState {
   reversal_confirmed_outcome?: boolean | null;
   compression_breakout_outcome?: boolean | null;
   outcome_evaluated_at?: string | null;
+  // Asian dominance signal fields (written at 10:31 UTC for AMD_SHIFTED)
+  judas_to_range_ratio?: number | null;
+  asian_drift_ratio?: number | null;
+  asian_dominance_ratio?: number | null;
+  market_structure_type?: string | null;
+  asian_net_direction?: string | null;
   chart_data:              Record<string, unknown> | null;
   amd_tag_manual_override: string | null;
   override_reason:          string | null;

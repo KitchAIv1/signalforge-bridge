@@ -80,6 +80,13 @@ export type AmdStateRow = {
   reversal_confirmed_outcome?: boolean | null;
   compression_breakout_outcome?: boolean | null;
   outcome_evaluated_at?: string | null;
+  // Asian dominance signal fields
+  // (written at 10:31 UTC for AMD_SHIFTED)
+  judas_to_range_ratio?: number | null;
+  asian_drift_ratio?: number | null;
+  asian_dominance_ratio?: number | null;
+  market_structure_type?: string | null;
+  asian_net_direction?: string | null;
 };
 
 /** Auto-direction output from AMD + D1 conviction analysis. */
@@ -94,6 +101,12 @@ export type AmdAutoDirectionSnapshot = {
   auto_direction_confidence: AutoDirectionConfidence;
   auto_direction_reason: string;
   amd_size_multiplier: number;
+  // Asian dominance signal (SHIFTED only)
+  judas_to_range_ratio?: number | null;
+  asian_drift_ratio?: number | null;
+  asian_dominance_ratio?: number | null;
+  market_structure_type?: string | null;
+  asian_net_direction?: string | null;
 };
 
 export type AmdM5Signal = {
