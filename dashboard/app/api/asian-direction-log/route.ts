@@ -8,20 +8,25 @@ const DIRECTION_SET_SELECT =
 
 export const dynamic = 'force-dynamic';
 
-function buildServiceClient() {
+function buildSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY;
+  // Prefer service key (bypasses RLS) but fall back to anon key so production
+  // environments that only expose NEXT_PUBLIC_ vars still work.
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Missing Supabase service environment for Asian direction log');
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment for Asian direction log');
   }
 
-  return createClient(supabaseUrl, serviceKey);
+  return createClient(supabaseUrl, supabaseKey);
 }
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const supabase = buildServiceClient();
+    const supabase = buildSupabaseClient();
     const { data: queriedRows, error } = await supabase
       .from('asian_direction_log')
       .select(DIRECTION_SET_SELECT)
