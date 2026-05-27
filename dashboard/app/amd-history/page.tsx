@@ -5,6 +5,7 @@ import { useAmdHistory } from '@/hooks/useAmdHistory';
 import { AmdHistoryTable } from '@/components/AmdHistoryTable';
 import { AmdHistoryDetailPanel } from '@/components/AmdHistoryDetailPanel';
 import type { AmdState } from '@/lib/types';
+import { AmdReferenceModal } from '@/components/amdReference/AmdReferenceModal';
 
 export default function AmdHistoryPage() {
   const { rows, loading, error } = useAmdHistory();
@@ -30,7 +31,10 @@ export default function AmdHistoryPage() {
   return (
     <div className="min-h-screen bg-white p-4 dark:bg-slate-950 sm:p-6">
       <header className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">AMD Intelligence History</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">AMD Intelligence History</h1>
+          <AmdReferenceModal />
+        </div>
         <p className="mt-1 text-sm text-slate-500">
           {rows.length} trading days — click any row to verify the AMD chart
         </p>
