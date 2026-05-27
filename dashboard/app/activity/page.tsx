@@ -221,12 +221,12 @@ export default function ActivityPage() {
         </div>
       </div>
 
+      <NewsEventStrip />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />
         <AUDUSDChart symbol="OANDA:GBPUSD" interval="5" useResponsiveHeight />
       </div>
-
-      <NewsEventStrip />
 
       <ActivityTradeMobileList rows={rows} isTradeListLoading={loading} />
       <ActivityTradeDesktopTable rows={rows} isTradeListLoading={loading} />

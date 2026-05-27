@@ -201,6 +201,9 @@ export interface NewsEventRow {
   pre_event_action:             string;
   post_event_direction?:        string | null;
   confirmation_delay_minutes?:  number | null;
+  currency?:                    string | null;
+  impact?:                      string | null;
+  tier?:                        number | null;
 }
 
 export interface AmdState {
