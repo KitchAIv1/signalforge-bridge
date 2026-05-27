@@ -4,6 +4,7 @@ import { useAsianDirectionLog } from '@/hooks/useAsianDirectionLog';
 import type { AsianDirectionLogEntry } from '@/lib/fetchAsianDirectionLog';
 import { amdTagColor } from '@/lib/amdPanelFormatters';
 import { AmdIntelStatTile } from '@/components/AmdIntelStatTile';
+import { AsianReferenceModal } from '@/components/asianReference/AsianReferenceModal';
 
 // ─── pure display helpers ────────────────────────────────────────────────────
 
@@ -115,7 +116,10 @@ export function AsianDirectionPanel() {
   const grouped = groupByDate(logRows);
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 px-4 py-3">
+    <div className="relative rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 px-4 py-3">
+      <div className="absolute left-36 top-3">
+        <AsianReferenceModal />
+      </div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-3">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-300">
           Asian Direction
