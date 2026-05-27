@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { AmdState } from '@/lib/types';
 import { AmdHistoryChart } from '@/components/AmdHistoryChart';
+import { AmdShiftedStructureSection } from '@/components/AmdShiftedStructureSection';
 
 interface AmdHistoryDetailPanelProps {
   selectedRow: AmdState;
@@ -212,6 +213,8 @@ export function AmdHistoryDetailPanel({ selectedRow, onClose }: AmdHistoryDetail
           />
         </div>
       </div>
+
+      <AmdShiftedStructureSection selectedRow={selectedRow} />
 
       {/* Static Tag Parameters */}
       <div>
