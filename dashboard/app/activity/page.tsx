@@ -212,7 +212,11 @@ export default function ActivityPage() {
 
       <AccountSnapshotBar />
 
-      <OmegaWindowIndicator />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <OmegaWindowIndicator />
+        <NewsEventStrip />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AsianDirectionPanel />
         <div className="flex flex-col gap-4">
@@ -220,8 +224,6 @@ export default function ActivityPage() {
           <AmdPanel compact />
         </div>
       </div>
-
-      <NewsEventStrip />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />

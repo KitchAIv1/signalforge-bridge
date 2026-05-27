@@ -23,7 +23,7 @@ export function AmdPanel({ compact = false }: AmdPanelProps) {
 
   if (compact) {
     return (
-      <div className="space-y-2">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 px-4 py-3 space-y-2">
         <AmdPanelMetrics amdState={amdState} displayTag={displayTag} />
         <div className="text-xs italic text-slate-600 dark:text-slate-300">
           Advisory only — no execution impact

@@ -25,7 +25,7 @@ export function RegimePanel() {
 
   if (isLoading) {
     return (
-      <div className="mb-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-sm text-slate-400 dark:text-slate-300">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-sm text-slate-400 dark:text-slate-300">
         Loading regime data…
       </div>
     );
@@ -33,7 +33,7 @@ export function RegimePanel() {
 
   if (fetchError || !regimeState) {
     return (
-      <div className="mb-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-600 dark:text-red-400">
         Regime data unavailable {fetchError ? `— ${fetchError}` : ''}
       </div>
     );
@@ -61,7 +61,7 @@ export function RegimePanel() {
   );
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 px-4 py-3 space-y-2">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-300">
         Omega regime — AUD/USD
       </p>
