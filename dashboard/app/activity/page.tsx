@@ -19,6 +19,7 @@ import { OmegaWindowIndicator } from '@/components/OmegaWindowIndicator';
 import { AUDUSDChart } from '@/components/AUDUSDChart';
 import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
+import { OandaConnectionStatus } from '@/components/OandaConnectionStatus';
 
 const PAGE_SIZE = 50;
 
@@ -208,6 +209,7 @@ export default function ActivityPage() {
         />
         <EngineControls hourGateControl={rebuildHourGateCtrl} />
         <PresenceIndicator />
+        <OandaConnectionStatus />
       </div>
 
       <AccountSnapshotBar />
