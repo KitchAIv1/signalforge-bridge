@@ -1,6 +1,9 @@
 'use client';
+
+import type { ReactNode } from 'react';
 import { useOmegaWindowStatus } from '@/hooks/useOmegaWindowStatus';
 import type { OmegaWindowType } from '@/lib/fetchOmegaWindowStatus';
+import { OmegaExitReferenceModal } from '@/components/omegaExitReference/OmegaExitReferenceModal';
 
 // ─── display helpers ──────────────────────────────────────────────────────────
 
@@ -161,21 +164,44 @@ function OmegaWindowSilent({ direction, validUntil }: SilentProps) {
 
 // ─── public export ────────────────────────────────────────────────────────────
 
+function OmegaWindowPanel({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative">
+      <div className="absolute right-3 top-3 z-10">
+        <OmegaExitReferenceModal />
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function OmegaWindowIndicator() {
   const { status, loading } = useOmegaWindowStatus();
 
-  if (loading || !status) return <OmegaWindowLoading />;
+  if (loading || !status) {
+    return (
+      <OmegaWindowPanel>
+        <OmegaWindowLoading />
+      </OmegaWindowPanel>
+    );
+  }
 
   if (!status.isActive) {
-    return <OmegaWindowSilent direction={status.direction} validUntil={status.validUntil} />;
+    return (
+      <OmegaWindowPanel>
+        <OmegaWindowSilent direction={status.direction} validUntil={status.validUntil} />
+      </OmegaWindowPanel>
+    );
   }
 
   return (
-    <OmegaWindowActive
-      direction={status.direction}
-      windowType={status.windowType}
-      validUntil={status.validUntil}
-      minutesRemaining={status.minutesRemaining}
-    />
+    <OmegaWindowPanel>
+      <OmegaWindowActive
+        direction={status.direction}
+        windowType={status.windowType}
+        validUntil={status.validUntil}
+        minutesRemaining={status.minutesRemaining}
+      />
+    </OmegaWindowPanel>
   );
 }
