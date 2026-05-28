@@ -166,11 +166,9 @@ async function main(): Promise<void> {
     });
   }
 
-  try {
-    await runAsianDirectionSet();
-  } catch (asianDirStartupErr) {
-    console.error('[AsianDirection] Startup run error:', asianDirStartupErr);
-  }
+  // Asian direction set removed from startup — the 21:00 UTC cron is the sole trigger.
+  // Startup runs were overwriting omega_direction_valid_until with NOW when no AMD state
+  // existed for today (before 10:31 UTC), destroying active Asian session windows.
 
   const channel = subscribeToSignalInserts(supabase, (payload) => {
     if (!ready) {
