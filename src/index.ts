@@ -107,9 +107,9 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
-  cron.schedule('0 21 * * *', async () => {
+  cron.schedule('10 21 * * *', async () => {
     try {
-      console.log('[AsianDirection] 21:00 UTC cron fired — running direction set');
+      console.log('[AsianDirection] 21:10 UTC cron fired — running direction set');
       await runAsianDirectionSet();
     } catch (asianDirSetErr) {
       console.error('[AsianDirection] Scheduled direction set error:', asianDirSetErr);
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     });
   }
 
-  // Asian direction set removed from startup — the 21:00 UTC cron is the sole trigger.
+  // Asian direction set removed from startup — the 21:10 UTC cron is the sole trigger.
   // Startup runs were overwriting omega_direction_valid_until with NOW when no AMD state
   // existed for today (before 10:31 UTC), destroying active Asian session windows.
 
