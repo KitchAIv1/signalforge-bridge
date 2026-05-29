@@ -503,6 +503,13 @@ export async function applyAutoDirectionToBridgeConfig(
     console.log(
       `[AmdDetector] auto_direction=neutral — expiring omega window. Reason: ${reason}`,
     );
+    const hourUtc = new Date().getUTCHours();
+    if (hourUtc >= 21 || hourUtc < 8) {
+      console.log(
+        `[AmdDetector] Skipping valid_until expiry — Asian window active (hour=${hourUtc})`,
+      );
+      return;
+    }
     await writeAmdWindowExpiry(supabaseDb, new Date().toISOString());
     return;
   }
