@@ -46,3 +46,16 @@ export async function sendAmdTelegramAlert(
   await sendTelegramMessage(text);
   console.log('[AmdTelegram] Alert sent for', tradeDate);
 }
+
+export async function sendAmdDetectionRerunBlockedAlert(
+  tradeDate: string,
+  lockedAt: string | null,
+  lockReason: string | null,
+): Promise<void> {
+  const text =
+    `⚠️ AMD rerun blocked for ${tradeDate} — ` +
+    `direction locked since ${lockedAt ?? 'unknown'}. ` +
+    `Reason: ${lockReason ?? 'unknown'}`;
+  await sendTelegramMessage(text);
+  console.log('[AmdTelegram] Rerun-blocked alert sent for', tradeDate);
+}

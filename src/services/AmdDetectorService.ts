@@ -21,7 +21,15 @@ import {
   computeAutoDirectionSnapshot,
   type AmdDirectionAlertContext,
 } from './amdDetector/amdAutoDirection.js';
-import { sendAmdTelegramAlert } from './amdDetector/sendAmdTelegramAlert.js';
+import {
+  buildInitialDetectionLockFields,
+  shouldSkipAmdDetectionForLockedRow,
+} from './amdDetector/amdDetectionLock.js';
+import {
+  sendAmdDetectionRerunBlockedAlert,
+  sendAmdTelegramAlert,
+} from './amdDetector/sendAmdTelegramAlert.js';
+import { logInfo } from '../utils/logger.js';
 
 const AUD_AMD_PAIR = 'AUD_USD';
 
@@ -112,6 +120,7 @@ function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
     asian_dominance_ratio: insertOpts.autoDir.asian_dominance_ratio ?? null,
     market_structure_type: insertOpts.autoDir.market_structure_type ?? null,
     asian_net_direction: insertOpts.autoDir.asian_net_direction ?? null,
+    ...buildInitialDetectionLockFields(evaluatedAtISO),
   };
 }
 
@@ -533,6 +542,32 @@ export async function runAmdDetection(): Promise<void> {
   console.log(`[AmdDetector] Running for ${AUD_AMD_PAIR} UTC date ${tradeDate}`);
 
   const supabaseDb = buildAmdSupabaseClient();
+
+  const { data: existingRow } = await supabaseDb
+    .from('amd_state')
+    .select('detection_locked, detection_locked_at, detection_locked_reason')
+    .eq('trade_date', tradeDate)
+    .eq('pair', AUD_AMD_PAIR)
+    .maybeSingle();
+
+  if (shouldSkipAmdDetectionForLockedRow(existingRow)) {
+    logInfo(
+      `[AmdDetector] detection_locked=true for ${tradeDate} ` +
+        `(locked at ${existingRow!.detection_locked_at}, ` +
+        `reason: ${existingRow!.detection_locked_reason}) — skipping direction overwrite`,
+    );
+    try {
+      await sendAmdDetectionRerunBlockedAlert(
+        tradeDate,
+        existingRow!.detection_locked_at,
+        existingRow!.detection_locked_reason,
+      );
+    } catch (tgErr: unknown) {
+      console.warn('[AmdDetector] Rerun-blocked Telegram alert failed:', tgErr);
+    }
+    return;
+  }
+
   const h1Pull = await pullAudUsdH1ForAmd(tradeDate);
   if (h1Pull === null) return;
 
@@ -609,6 +644,9 @@ export async function runAmdOutcomeDetection(): Promise<void> {
         reversal_confirmed_outcome: outcomeFeatures.reversal_confirmed,
         compression_breakout_outcome: outcomeFeatures.compression_breakout,
         outcome_evaluated_at: evaluatedAtISO,
+        detection_locked: false,
+        detection_locked_at: null,
+        detection_locked_reason: null,
       })
       .eq('pair', AUD_AMD_PAIR)
       .eq('trade_date', tradeDate);
