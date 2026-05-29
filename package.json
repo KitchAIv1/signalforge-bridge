@@ -19,7 +19,8 @@
     "regime-vs-amd-backtest": "tsx scripts/regimeVsAmdDirectionBacktest.ts",
     "amd-conflicted-weak-d1": "tsx scripts/amdConflictedWeakD1Backtest.ts",
     "amd-conflicted-shifted-audit": "tsx scripts/amdConflictedWeakD1/shiftedContaminationAudit.ts",
-    "test": "node --import tsx --test src/services/amdDetector/amdDetectionLock.test.ts"
+    "test": "node --import tsx --test src/services/amdDetector/amdDetectionLock.test.ts",
+    "amd-judas-window-backtest": "tsx scripts/amdJudasWindowBacktest.ts"
   },
   "engines": {
     "node": ">=18"
