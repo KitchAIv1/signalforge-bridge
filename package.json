@@ -17,7 +17,8 @@
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
     "regime-vs-amd-backtest": "tsx scripts/regimeVsAmdDirectionBacktest.ts",
-    "amd-conflicted-weak-d1": "tsx scripts/amdConflictedWeakD1Backtest.ts"
+    "amd-conflicted-weak-d1": "tsx scripts/amdConflictedWeakD1Backtest.ts",
+    "amd-conflicted-shifted-audit": "tsx scripts/amdConflictedWeakD1/shiftedContaminationAudit.ts"
   },
   "engines": {
     "node": ">=18"

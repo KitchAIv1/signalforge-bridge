@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendAutoDirectionAlert } from '../telegram/alertAutoDirection.js';
+import {
+  applyConflictedWeakD1Advisory,
+  type ConflictedWeakD1AdvisoryInput,
+} from './conflictedWeakD1Judas.js';
 import type {
   AmdAutoDirectionSnapshot,
   AmdTag,
@@ -25,6 +29,18 @@ export function computeAutoDirectionSnapshot(
   asianRangePips: number | null = null,
   asianNetPips: number | null = null,
 ): AmdAutoDirectionSnapshot {
+  const weakD1AdvisoryInput: ConflictedWeakD1AdvisoryInput = {
+    amdTag,
+    judasDirection,
+    layer4BullishCount,
+    layer4BearishCount,
+    layer4BullishCount7,
+    layer4BearishCount7,
+    dailyBiasAlignment,
+  };
+  const finalize = (snapshot: AmdAutoDirectionSnapshot): AmdAutoDirectionSnapshot =>
+    applyConflictedWeakD1Advisory(snapshot, weakD1AdvisoryInput);
+
   let effectiveBull: number;
   let effectiveBear: number;
   let strongConviction: boolean;
@@ -122,12 +138,12 @@ export function computeAutoDirectionSnapshot(
             `AMD_FAILED M5_WITH_JUDAS RANGING_D1 ` +
             `judas=${judasDirection ?? 'null'} ` +
             `(66.7% n=39 — D1 ranging fallback)`;
-          return {
+          return finalize({
             auto_direction,
             auto_direction_confidence,
             auto_direction_reason,
             amd_size_multiplier,
-          };
+          });
         }
       }
       // AGAINST_JUDAS and NEUTRAL on RANGING D1:
@@ -137,12 +153,12 @@ export function computeAutoDirectionSnapshot(
       auto_direction_reason =
         `AMD_FAILED M5_${m5VsJudas} RANGING_D1 ` +
         `judas=${judasDirection ?? 'null'} — no edge`;
-      return {
+      return finalize({
         auto_direction,
         auto_direction_confidence,
         auto_direction_reason,
         amd_size_multiplier: 1.0,
-      };
+      });
     }
     // ── End M5 signal layer ──
     // D1 TRENDING: use D1 direction regardless of M5
@@ -211,12 +227,12 @@ export function computeAutoDirectionSnapshot(
           ` weak D1 (${effectiveBull}up/` +
           `${effectiveBear}dn)`;
       }
-      return {
+      return finalize({
         auto_direction,
         auto_direction_confidence,
         auto_direction_reason,
         amd_size_multiplier,
-      };
+      });
     }
 
     // ── D1 RANGING: compute Asian dominance ratios ──
@@ -299,7 +315,7 @@ export function computeAutoDirectionSnapshot(
         `drift=${asianDriftRatio} ` +
         `asian_net=${asianNetPips}p` +
         reversalNote;
-      return {
+      return finalize({
         auto_direction,
         auto_direction_confidence,
         auto_direction_reason,
@@ -309,7 +325,7 @@ export function computeAutoDirectionSnapshot(
         asian_dominance_ratio: asianDominanceRatio,
         market_structure_type: marketStructureType,
         asian_net_direction: asianNetDir,
-      };
+      });
     }
 
     // Neutral — no signal available
@@ -321,7 +337,7 @@ export function computeAutoDirectionSnapshot(
         ? ` [${marketStructureType ?? 'NO_RATIO'}]`
         : '');
 
-    return {
+    return finalize({
       auto_direction,
       auto_direction_confidence,
       auto_direction_reason,
@@ -331,7 +347,7 @@ export function computeAutoDirectionSnapshot(
       asian_dominance_ratio: asianDominanceRatio,
       market_structure_type: marketStructureType,
       asian_net_direction: asianNetDir,
-    };
+    });
 
   } else if (amdTag === 'AMD_NONE') {
 
@@ -426,12 +442,12 @@ export function computeAutoDirectionSnapshot(
   // reversalConfirmed === null means insufficient data — no adjustment
   // reversalConfirmed === true means reversal confirmed — no adjustment needed
 
-  return {
+  return finalize({
     auto_direction,
     auto_direction_confidence,
     auto_direction_reason,
     amd_size_multiplier,
-  };
+  });
 }
 
 /** Extra context forwarded from the detector call-site for the Telegram alert. */
