@@ -137,26 +137,26 @@ export function AsianDirectionPanel() {
             <AmdIntelStatTile
               caption="AMD Tag"
               value={
-                <span className={amdTagColor(todayRow?.amd_tag ?? null)}>
-                  {todayRow?.amd_tag ?? '—'}
+                <span className={amdTagColor(lastActionable?.amd_tag ?? null)}>
+                  {lastActionable?.amd_tag ?? '—'}
                 </span>
               }
             />
             <AmdIntelStatTile
               caption="Prior D1"
-              value={todayRow?.prior_d1_direction ?? '—'}
-              accentClassName={priorD1Tone(todayRow?.prior_d1_direction ?? null)}
+              value={lastActionable?.prior_d1_direction ?? '—'}
+              accentClassName={priorD1Tone(lastActionable?.prior_d1_direction ?? null)}
             />
             <AmdIntelStatTile
               caption="Direction Set"
-              value={directionSetLabel(todayRow?.direction_set ?? null)}
-              accentClassName={directionSetTone(todayRow?.direction_set ?? null)}
+              value={directionSetLabel(lastActionable?.direction_set ?? null)}
+              accentClassName={directionSetTone(lastActionable?.direction_set ?? null)}
             />
             <AmdIntelStatTile
               caption="Action"
               value={
-                <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${actionBadgeTone(todayRow?.action ?? '')}`}>
-                  {todayRow?.action ?? '—'}
+                <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${actionBadgeTone(lastActionable?.action ?? '')}`}>
+                  {lastActionable?.action ?? '—'}
                 </span>
               }
             />
