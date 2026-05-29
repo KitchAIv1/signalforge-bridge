@@ -15,7 +15,9 @@
     "amd-simulate": "tsx scripts/amdSimulation.ts",
     "amd-detect": "tsx src/services/AmdDetectorService.ts",
     "dashboard:dev": "cd dashboard && npm run dev",
-    "dashboard:build": "cd dashboard && npm run build"
+    "dashboard:build": "cd dashboard && npm run build",
+    "regime-vs-amd-backtest": "tsx scripts/regimeVsAmdDirectionBacktest.ts",
+    "amd-conflicted-weak-d1": "tsx scripts/amdConflictedWeakD1Backtest.ts"
   },
   "engines": {
     "node": ">=18"
