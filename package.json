@@ -21,7 +21,9 @@
     "amd-conflicted-shifted-audit": "tsx scripts/amdConflictedWeakD1/shiftedContaminationAudit.ts",
     "test": "node --import tsx --test src/services/amdDetector/amdDetectionLock.test.ts",
     "amd-judas-window-backtest": "tsx scripts/amdJudasWindowBacktest.ts",
-    "amd-outcome-backfill": "tsx scripts/amdOutcomeBackfillFromChartData.ts"
+    "amd-outcome-backfill": "tsx scripts/amdOutcomeBackfillFromChartData.ts",
+    "amd-multi-signal-backtest": "tsx scripts/amdMultiSignalDirectionBacktest.ts",
+    "amd-dol-backtest": "tsx scripts/amdDolDirectionBacktest.ts"
   },
   "engines": {
     "node": ">=18"
