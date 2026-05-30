@@ -170,6 +170,11 @@ export function AmdReferenceDirectionTable() {
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
         Direction Logic
       </h3>
+      <p className="mb-3 rounded bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+        Direction logic below determines auto_direction at 10:31 UTC. The Asian Close Bias filter (Gate 4b)
+        then evaluates whether to act on that direction at execution time — DISAGREE days are blocked regardless
+        of the output below. See Direction Filter Layer section.
+      </p>
       <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
