@@ -2,6 +2,11 @@
 
 import type { ReactNode } from 'react';
 import type { AmdState } from '@/lib/types';
+import {
+  asianCloseBiasColor,
+  asianCloseBiasLabel,
+  asianCloseFilterStatus,
+} from '@/lib/asianCloseBiasHelpers';
 import { AmdHistoryChart } from '@/components/AmdHistoryChart';
 import { AmdShiftedStructureSection } from '@/components/AmdShiftedStructureSection';
 
@@ -162,6 +167,39 @@ export function AmdHistoryDetailPanel({ selectedRow, onClose }: AmdHistoryDetail
             value={selectedRow.amd_size_multiplier != null ? `${selectedRow.amd_size_multiplier}×` : '—'}
           />
         </div>
+        {(selectedRow.asian_close_bias_signal || selectedRow.asian_close_position_pct != null) && (
+          <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-700">
+            <p className="mb-1 text-xs uppercase tracking-wide text-slate-500">
+              Asian Close Bias
+            </p>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-semibold ${asianCloseBiasColor(selectedRow.asian_close_bias_signal)}`}>
+                {asianCloseBiasLabel(selectedRow.asian_close_bias_signal)}
+              </span>
+              {selectedRow.asian_close_position_pct != null && (
+                <span className="text-xs text-slate-400">
+                  {selectedRow.asian_close_position_pct.toFixed(1)}% of Asian range
+                </span>
+              )}
+              {(() => {
+                const status = asianCloseFilterStatus(
+                  selectedRow.asian_close_bias_signal,
+                  selectedRow.auto_direction,
+                );
+                return status ? (
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.color}`}>
+                    {status.label}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+            {asianCloseFilterStatus(selectedRow.asian_close_bias_signal, selectedRow.auto_direction)?.label === 'DISAGREE' && (
+              <p className="mt-1 text-xs text-slate-400">
+                Filter active — trade blocked on disagree days
+              </p>
+            )}
+          </div>
+        )}
         {selectedRow.auto_direction_reason && (
           <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
             {selectedRow.auto_direction_reason}

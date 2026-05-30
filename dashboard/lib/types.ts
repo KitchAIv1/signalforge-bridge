@@ -255,6 +255,8 @@ export interface AmdState {
   auto_direction_confidence?: string | null;
   auto_direction_reason?: string | null;
   amd_size_multiplier?: number | null;
+  asian_close_position_pct?: number | null;
+  asian_close_bias_signal?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
 }
 
 export interface IntelligenceSnapshotRow {

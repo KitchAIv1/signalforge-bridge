@@ -58,15 +58,21 @@ const BACKTEST_ROWS = [
     note: '+67% improvement with gate' },
 ] as const;
 
-const SYSTEM_GATES = [
-  'AMD_DISTRIBUTION_ENABLED = true',
-  "Today's amd_state row exists",
-  'auto_direction = long or short (not neutral)',
-  'Current UTC hour within entry/exit window (isEntryWindowOpen)',
-  'amd_state.evaluated_at = today (not stale)',
-  'No trade executed today (hasExecutedToday = false)',
-  'bridge_engines.engine_amd.is_active = true',
-  'No news blackout (±90 min window)',
+const SYSTEM_GATES: Array<{ number: string; gate: string; detail?: string }> = [
+  { number: '1', gate: 'AMD_DISTRIBUTION_ENABLED = true' },
+  { number: '2', gate: "Today's amd_state row exists" },
+  { number: '3', gate: 'auto_direction = long or short (not neutral)' },
+  {
+    number: '4b',
+    gate: 'Asian close bias filter',
+    detail:
+      'When AMD_ASIAN_CLOSE_FILTER_ENABLED=true: if asian_close_bias_signal opposes auto_direction → BLOCKED (ASIAN_CLOSE_DISAGREE). NEUTRAL or null → fall through.',
+  },
+  { number: '4', gate: 'Current UTC hour within entry/exit window (isEntryWindowOpen)' },
+  { number: '5', gate: 'amd_state.evaluated_at = today (not stale)' },
+  { number: '6', gate: 'No trade executed today (hasExecutedToday = false)' },
+  { number: '7', gate: 'bridge_engines.engine_amd.is_active = true' },
+  { number: '8', gate: 'No news blackout (±90 min window)' },
 ];
 
 export function AmdReferenceEngineTable() {
@@ -139,10 +145,15 @@ export function AmdReferenceEngineTable() {
       <div>
         <SectionHeading>System Gates — All Must Pass for Trade to Fire</SectionHeading>
         <ol className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
-          {SYSTEM_GATES.map((gate, idx) => (
-            <li key={gate} className="flex gap-2 py-0.5 text-xs text-slate-600 dark:text-slate-300">
-              <span className="w-4 flex-shrink-0 font-mono text-slate-400">{idx + 1}.</span>
-              <span>{gate}</span>
+          {SYSTEM_GATES.map((gateEntry) => (
+            <li key={gateEntry.number} className="flex gap-2 py-0.5 text-xs text-slate-600 dark:text-slate-300">
+              <span className="w-6 flex-shrink-0 font-mono text-slate-400">{gateEntry.number}.</span>
+              <span>
+                <span className="font-medium">{gateEntry.gate}</span>
+                {gateEntry.detail != null && (
+                  <span className="mt-0.5 block text-slate-500 dark:text-slate-400">{gateEntry.detail}</span>
+                )}
+              </span>
             </li>
           ))}
         </ol>

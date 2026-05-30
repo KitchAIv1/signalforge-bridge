@@ -15,6 +15,11 @@ import {
   reversalAccentClass,
 } from '@/lib/amdMetricPhrasing';
 import { formatJudasSwingSummary } from '@/lib/formatJudasSwingSummary';
+import {
+  asianCloseBiasColor,
+  asianCloseBiasLabel,
+  asianCloseFilterStatus,
+} from '@/lib/asianCloseBiasHelpers';
 import { AmdIntelSectionHeading } from '@/components/AmdIntelSectionHeading';
 import { AmdIntelPrimaryTag } from '@/components/AmdIntelPrimaryTag';
 import { AmdIntelStatTile } from '@/components/AmdIntelStatTile';
@@ -67,13 +72,39 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
               <span className="text-slate-600 dark:text-slate-300">
                 {autoDirectionConfidenceLabel(amdState.auto_direction_confidence)}
               </span>
-              <span className="max-w-xs truncate italic text-slate-500 dark:text-slate-400">
-                {amdState.auto_direction_reason !== '' &&
-                amdState.auto_direction_reason != null
-                  ? amdState.auto_direction_reason
-                  : 'No directional signal — direction unchanged'}
-              </span>
             </div>
+            {amdState.asian_close_bias_signal !== undefined && (
+              <div className="mt-1 flex items-center gap-2">
+                <span className="w-32 shrink-0 text-xs uppercase tracking-wide text-slate-500">
+                  Asian Close Bias
+                </span>
+                <span className={`text-sm font-medium ${asianCloseBiasColor(amdState.asian_close_bias_signal)}`}>
+                  {asianCloseBiasLabel(amdState.asian_close_bias_signal)}
+                </span>
+                {amdState.asian_close_position_pct != null && (
+                  <span className="text-xs text-slate-400">
+                    {amdState.asian_close_position_pct.toFixed(1)}%
+                  </span>
+                )}
+                {(() => {
+                  const status = asianCloseFilterStatus(
+                    amdState.asian_close_bias_signal,
+                    amdState.auto_direction,
+                  );
+                  return status ? (
+                    <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${status.color}`}>
+                      {status.label}
+                    </span>
+                  ) : null;
+                })()}
+              </div>
+            )}
+            <p className="mt-1 max-w-xs truncate text-xs italic text-slate-500 dark:text-slate-400">
+              {amdState.auto_direction_reason !== '' &&
+              amdState.auto_direction_reason != null
+                ? amdState.auto_direction_reason
+                : 'No directional signal — direction unchanged'}
+            </p>
           </div>
         )}
 

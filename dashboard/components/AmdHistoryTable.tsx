@@ -2,6 +2,7 @@
 
 import type { AmdState } from '@/lib/types';
 import { amdTagColor, amdTagLabel, m5SignalLabel, m5SignalColor, outcomeTagLabel, outcomeTagColor } from '@/lib/amdPanelFormatters';
+import { asianCloseBiasColor } from '@/lib/asianCloseBiasHelpers';
 
 interface AmdHistoryTableProps {
   rows: AmdState[];
@@ -59,6 +60,7 @@ export function AmdHistoryTable({
               <th className="px-3 py-2 text-left">Judas</th>
               <th className="px-3 py-2 text-left">Pips</th>
               <th className="px-3 py-2 text-left">Asian</th>
+              <th className="px-3 py-2 text-left">Asian Bias</th>
               <th className="px-3 py-2 text-left">Reversal</th>
               <th className="px-3 py-2 text-left">M5</th>
               <th className="px-3 py-2 text-left">Outcome</th>
@@ -88,6 +90,19 @@ export function AmdHistoryTable({
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{historyRow.judas_pips ?? '—'}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                   {historyRow.asian_range_pips ?? '—'}p {historyRow.asian_is_flat ? '✓' : ''}
+                </td>
+                <td className="px-3 py-2">
+                  {historyRow.asian_close_bias_signal ? (
+                    <span className={`text-xs font-medium ${asianCloseBiasColor(historyRow.asian_close_bias_signal)}`}>
+                      {historyRow.asian_close_bias_signal === 'BULLISH' ? '↑'
+                        : historyRow.asian_close_bias_signal === 'BEARISH' ? '↓'
+                        : '—'}
+                      {' '}
+                      {historyRow.asian_close_position_pct?.toFixed(0)}%
+                    </span>
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   {historyRow.reversal_confirmed === true ? (
