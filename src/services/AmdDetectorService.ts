@@ -29,6 +29,7 @@ import {
   sendAmdDetectionRerunBlockedAlert,
   sendAmdTelegramAlert,
 } from './amdDetector/sendAmdTelegramAlert.js';
+import { applyAsianCloseAdvisory } from './amdDetector/asianCloseAdvisory.js';
 import { logInfo } from '../utils/logger.js';
 
 const AUD_AMD_PAIR = 'AUD_USD';
@@ -120,6 +121,8 @@ function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
     asian_dominance_ratio: insertOpts.autoDir.asian_dominance_ratio ?? null,
     market_structure_type: insertOpts.autoDir.market_structure_type ?? null,
     asian_net_direction: insertOpts.autoDir.asian_net_direction ?? null,
+    asian_close_position_pct: features.asian_close_position_pct ?? null,
+    asian_close_bias_signal: features.asian_close_bias_signal ?? null,
     ...buildInitialDetectionLockFields(evaluatedAtISO),
   };
 }
@@ -421,7 +424,7 @@ async function recordAmdInsightForEmptyH1(
     m5_first_candle_direction: null,
     m5_evaluated_at: null,
   };
-  const autoDir = computeAutoDirectionSnapshot(
+  let autoDir = computeAutoDirectionSnapshot(
     emptyFeatures.amd_tag,
     emptyFeatures.judas_direction,
     emptyDailyBias.layer4_d1_bias,
@@ -435,6 +438,11 @@ async function recordAmdInsightForEmptyH1(
     null,
     emptyFeatures.asian_range_pips,
     emptyFeatures.asian_net_pips,
+  );
+  autoDir = applyAsianCloseAdvisory(
+    autoDir,
+    emptyFeatures.asian_close_bias_signal ?? null,
+    emptyFeatures.asian_close_position_pct ?? null,
   );
   const persisted = await persistAmdInsightRow({
     amdSupabase: supabaseDb,
@@ -487,7 +495,7 @@ async function recordAmdInsightForH1Window(
     features.judas_direction,
   );
 
-  const autoDir = computeAutoDirectionSnapshot(
+  let autoDir = computeAutoDirectionSnapshot(
     features.amd_tag,
     features.judas_direction,
     filledDailyBias.layer4_d1_bias,
@@ -501,6 +509,11 @@ async function recordAmdInsightForH1Window(
     m5Signal.m5_vs_judas_direction,
     features.asian_range_pips,
     features.asian_net_pips,
+  );
+  autoDir = applyAsianCloseAdvisory(
+    autoDir,
+    features.asian_close_bias_signal ?? null,
+    features.asian_close_position_pct ?? null,
   );
 
   const persisted = await persistAmdInsightRow({

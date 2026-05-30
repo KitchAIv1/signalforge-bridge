@@ -1,4 +1,4 @@
-import type { AmdTag, AmdDateFeatures, JudasDirection } from './amdTypes.js';
+import type { AmdTag, AmdDateFeatures, AsianCloseBiasSignal, JudasDirection } from './amdTypes.js';
 
 export type OhlcCandle = {
   time: string;
@@ -150,6 +150,50 @@ function asianNetAndFlatFromCandles(
     }
   }
   return { asian_net_pips, asian_is_flat };
+}
+
+function asianCloseBiasFromCandles(
+  asianCandles: OhlcCandle[],
+): {
+  asian_close_position_pct: number | null;
+  asian_close_bias_signal: AsianCloseBiasSignal;
+} {
+  if (asianCandles.length === 0) {
+    return { asian_close_position_pct: null, asian_close_bias_signal: null };
+  }
+
+  const hourSeven = asianCandles.find(
+    (bar) => new Date(bar.time).getUTCHours() === 7,
+  );
+  if (!hourSeven) {
+    return { asian_close_position_pct: null, asian_close_bias_signal: null };
+  }
+
+  const highs = asianCandles.map((bar) => safeParseMid(bar, 'h'));
+  const lows = asianCandles.map((bar) => safeParseMid(bar, 'l'));
+  const validHighs = highs.filter((n): n is number => n !== null);
+  const validLows = lows.filter((n): n is number => n !== null);
+  if (validHighs.length === 0 || validLows.length === 0) {
+    return { asian_close_position_pct: null, asian_close_bias_signal: null };
+  }
+
+  const asianHigh = Math.max(...validHighs);
+  const asianLow = Math.min(...validLows);
+  const asianClose = safeParseMid(hourSeven, 'c');
+
+  if (asianClose === null || asianHigh === asianLow) {
+    return { asian_close_position_pct: null, asian_close_bias_signal: null };
+  }
+
+  const positionPct = ((asianClose - asianLow) / (asianHigh - asianLow)) * 100;
+  const rounded = Math.round(positionPct * 100) / 100;
+
+  let signal: AsianCloseBiasSignal;
+  if (rounded >= 60) signal = 'BULLISH';
+  else if (rounded <= 40) signal = 'BEARISH';
+  else signal = 'NEUTRAL';
+
+  return { asian_close_position_pct: rounded, asian_close_bias_signal: signal };
 }
 
 type JudasTriple = {
@@ -332,6 +376,19 @@ export function computeDateFeatures(
     asianCandles,
     asian_range_pips
   );
+
+  let closeBias: ReturnType<typeof asianCloseBiasFromCandles> = {
+    asian_close_position_pct: null,
+    asian_close_bias_signal: null,
+  };
+  try {
+    closeBias = asianCloseBiasFromCandles(asianCandles);
+  } catch (err) {
+    console.error(
+      `[amdFeatures] asianCloseBiasFromCandles error: ${(err as Error).message}`,
+    );
+  }
+
   const { judas_direction, judas_pips, judasExtreme } =
     judasFromLondonCandles(londonCandles);
   const reversal_confirmed = reversalFromDist(
@@ -342,7 +399,7 @@ export function computeDateFeatures(
   );
   const londonOpenPrice =
     londonCandles.length > 0 ? safeParseMid(londonCandles[0], 'o') : null;
-  return assembleAmdDateFeatures({
+  const features = assembleAmdDateFeatures({
     asian_range_pips,
     asian_net_pips,
     asian_is_flat,
@@ -361,6 +418,9 @@ export function computeDateFeatures(
       londonOpenPrice
     ),
   });
+  features.asian_close_position_pct = closeBias.asian_close_position_pct;
+  features.asian_close_bias_signal = closeBias.asian_close_bias_signal;
+  return features;
 }
 
 function resolveAmdTag(

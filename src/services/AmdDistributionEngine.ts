@@ -68,6 +68,10 @@ function isEnabled(): boolean {
   return process.env.AMD_DISTRIBUTION_ENABLED === 'true';
 }
 
+function isAsianCloseFilterEnabled(): boolean {
+  return process.env.AMD_ASIAN_CLOSE_FILTER_ENABLED === 'true';
+}
+
 function utcNowParts(): { todayStr: string; hourUtc: number; minUtc: number } {
   const nowUtc = new Date();
   return {
@@ -99,7 +103,8 @@ async function loadTodayAmdState(todayStr: string): Promise<AmdStateRow | null> 
     .select(
       'amd_tag, amd_tag_manual_override, auto_direction, daily_bias_alignment, ' +
         'layer4_d1_bias, evaluated_at, judas_direction, auto_direction_reason, ' +
-        'amd_size_multiplier, reversal_confirmed',
+        'amd_size_multiplier, reversal_confirmed, ' +
+        'asian_close_bias_signal, asian_close_position_pct',
     )
     .eq('pair', INSTRUMENT)
     .eq('trade_date', todayStr)
@@ -115,6 +120,24 @@ async function hasExecutedToday(todayStr: string): Promise<boolean> {
     .eq('engine_id', ENGINE_ID)
     .eq('decision', 'EXECUTED')
     .gte('created_at', `${todayStr}T00:00:00Z`);
+  return (count ?? 0) > 0;
+}
+
+async function hasBlockedToday(
+  todayStr: string,
+  blockReason: string,
+): Promise<boolean> {
+  const { count, error } = await supabaseDb()
+    .from('bridge_trade_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('engine_id', ENGINE_ID)
+    .eq('decision', 'BLOCKED')
+    .eq('block_reason', blockReason)
+    .gte('created_at', `${todayStr}T00:00:00Z`);
+  if (error) {
+    console.error(`[AmdDistribution] hasBlockedToday error: ${error.message}`);
+    return false;
+  }
   return (count ?? 0) > 0;
 }
 
@@ -380,6 +403,23 @@ async function passesExecutionGates(
   if (autoDirection !== 'long' && autoDirection !== 'short') {
     logInfo('[AmdDistribution] auto_direction neutral — no trade today', { autoDirection });
     return { ok: false };
+  }
+  if (isAsianCloseFilterEnabled()) {
+    const biasSignal = amdRow.asian_close_bias_signal as string | null;
+    if (biasSignal !== null && biasSignal !== 'NEUTRAL') {
+      const biasDirection = biasSignal === 'BULLISH' ? 'long' : 'short';
+      if (biasDirection !== autoDirection) {
+        const biasPct = amdRow.asian_close_position_pct as number | null;
+        const blockReason =
+          `ASIAN_CLOSE_DISAGREE: auto=${autoDirection} bias=${biasSignal} pct=${biasPct ?? 'null'}`;
+        const alreadyBlocked = await hasBlockedToday(todayStr, blockReason);
+        if (!alreadyBlocked) {
+          logInfo(`[AmdDistribution] BLOCKED ${blockReason}`);
+          await writeBlockedLog(blockReason, tag, amdRow, 0.635, autoDirection.toUpperCase());
+        }
+        return { ok: false };
+      }
+    }
   }
   if (!isEntryWindowOpen(tag, hourUtc, minUtc)) return { ok: false };
   const evaluatedAt = new Date(amdRow.evaluated_at as string);

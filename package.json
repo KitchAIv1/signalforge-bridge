@@ -23,7 +23,8 @@
     "amd-judas-window-backtest": "tsx scripts/amdJudasWindowBacktest.ts",
     "amd-outcome-backfill": "tsx scripts/amdOutcomeBackfillFromChartData.ts",
     "amd-multi-signal-backtest": "tsx scripts/amdMultiSignalDirectionBacktest.ts",
-    "amd-dol-backtest": "tsx scripts/amdDolDirectionBacktest.ts"
+    "amd-dol-backtest": "tsx scripts/amdDolDirectionBacktest.ts",
+    "asian-close-bias-backfill": "tsx scripts/asianCloseBiasBackfill.ts"
   },
   "engines": {
     "node": ">=18"

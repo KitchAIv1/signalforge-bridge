@@ -38,9 +38,13 @@ export type DateFeatures = {
   amd_tag: AmdTag;
 };
 
+export type AsianCloseBiasSignal = 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+
 /** Production return of computeDateFeatures — includes DB column judas_extreme_price. */
 export type AmdDateFeatures = DateFeatures & {
   judas_extreme_price: number | null;
+  asian_close_position_pct?: number | null;
+  asian_close_bias_signal?: AsianCloseBiasSignal;
 };
 
 export type AmdStateRow = {
@@ -87,6 +91,9 @@ export type AmdStateRow = {
   asian_dominance_ratio?: number | null;
   market_structure_type?: string | null;
   asian_net_direction?: string | null;
+  // Asian close bias (written at 10:31 UTC)
+  asian_close_position_pct?: number | null;
+  asian_close_bias_signal?: AsianCloseBiasSignal;
 };
 
 /** Auto-direction output from AMD + D1 conviction analysis. */
