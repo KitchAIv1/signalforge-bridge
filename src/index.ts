@@ -22,6 +22,11 @@ import {
 import { runAsianDirectionSet, runAsianSessionClose } from './services/AsianDirectionService.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
+import {
+  hardClose as scalperHardClose,
+  initializeDayState as scalperInitDay,
+  runMonitors as scalperRunMonitors,
+} from './services/scalper/ScalperEngine.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -138,6 +143,29 @@ async function main(): Promise<void> {
       console.error('[AmdTrail] Monitor error:', amdTrailErr);
     });
   }, 30000);
+
+  // Scalper engine — price-ratchet pullback on AUD_USD AGREE days.
+  // Controlled by SCALPER_ENABLED env var. Set to 'true' on Railway to activate.
+  if (process.env.SCALPER_ENABLED === 'true') {
+    // AMD detector runs at 10:31 UTC (cron '31 10 * * *'); first viable AMD state check is 10:32.
+    // Three crons provide retries at 10:32, 10:37, 10:42; initializeDayState() is DB-idempotent.
+    cron.schedule('32 10 * * 1-5', () => {
+      void scalperInitDay().catch((e) => console.error('[Scalper] Init 10:32 error:', e));
+    }, { timezone: 'UTC' });
+    cron.schedule('37 10 * * 1-5', () => {
+      void scalperInitDay().catch((e) => console.error('[Scalper] Init 10:37 retry:', e));
+    }, { timezone: 'UTC' });
+    cron.schedule('42 10 * * 1-5', () => {
+      void scalperInitDay().catch((e) => console.error('[Scalper] Init 10:42 retry:', e));
+    }, { timezone: 'UTC' });
+    setInterval(() => {
+      void scalperRunMonitors().catch((e) => console.error('[Scalper] Monitor error:', e));
+    }, 30000);
+    cron.schedule('0 16 * * 1-5', () => {
+      void scalperHardClose().catch((e) => console.error('[Scalper] HardClose error:', e));
+    }, { timezone: 'UTC' });
+    logInfo('[Scalper] Engine registered — SCALPER_ENABLED=true');
+  }
 
   // Skip AMD startup run if before 10:31 UTC — H1 fetch uses toISO=10:30Z, OANDA rejects future timestamps
   // The 10:31 UTC cron handles the daily run; startup call only needed if bridge restarts mid-day after 10:31
