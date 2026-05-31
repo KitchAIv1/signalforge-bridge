@@ -96,6 +96,80 @@ Omega has the richest live control surface:
 - Omega uses trail-stop handling instead of sending a normal SL to OANDA.
 - Pre-entry M5 and H1 candles are captured after fill with a three-second timeout.
 
+### Omega direction windows and crons
+
+Registered in `src/index.ts`:
+
+| Cron | UTC time | Service | Role |
+| --- | --- | --- | --- |
+| `'10 21 * * *'` | 21:10 daily | `runAsianDirectionSet()` | Asian open direction for `AMD_SHIFTED` days |
+| `'0 8 * * *'` | 08:00 daily | `runAsianSessionClose()` | Close all open Omega positions at Asian session end |
+| `'31 10 * * *'` | 10:31 daily | `runAmdDetection()` | AMD tag + `auto_direction`; may write `omega_direction` when `direction_mode=auto` |
+| `'30 16 * * *'` | 16:30 daily | `runAmdOutcomeDetection()` | Post-hoc `amd_outcome_tag` for eligible tags; unlocks `detection_locked` |
+
+No Omega-specific cron exists — Omega fires on signals from the external engine. Bridge gates execution using `omega_direction_valid_until`.
+
+### `omega_direction_valid_until`
+
+Stored in `bridge_config.config_key = 'omega_direction_valid_until'`.
+
+Bridge function `isOmegaWindowActive()` (`signalRouter.ts`) returns true only when `Date.now() < expiry`. Missing or invalid expiry → **BLOCKED** (`OMEGA_WINDOW_EXPIRED`).
+
+**Writers:**
+
+| Writer | Expiry set to | Window |
+| --- | --- | --- |
+| `AsianDirectionService.runAsianDirectionSet()` | Next 08:00 UTC | Asian session 21:00 → 08:00 |
+| `AsianDirectionService` (skip/fail paths) | `now()` (immediate expiry) | Blocks Omega until next valid set |
+| `applyAutoDirectionToBridgeConfig()` | 14:00 UTC today (or tomorrow if past 14:00) | AMD distribution window |
+| `applyAutoDirectionToBridgeConfig()` when neutral | `now()` if not in Asian hours (21:00–08:00) | Expires direction |
+
+**Omega window gate** (`signalRouter.ts`): Omega signals blocked when `isOmegaWindowActive()` is false.
+
+Active windows (from code comments):
+- Asian session: 21:00–08:00 UTC (written by `AsianDirectionService`)
+- AMD distribution: tag entry hour through 14:00 UTC (written by AMD auto-direction path)
+
+### Direction source hierarchy
+
+When `direction_mode = 'auto'` (checked in `applyAutoDirectionToBridgeConfig` and Asian direction service):
+
+1. **Manual override** — `direction_mode = 'manual'`: dashboard/env `omega_direction` only; AMD and Asian automation skip writes to `omega_direction`.
+2. **Asian direction set** — Cron `'10 21 * * *'`: on `AMD_SHIFTED` days only, sets `omega_direction` from **prior D1 candle** close vs open (`long` if bullish, `short` if bearish). Sets `omega_direction_valid_until` to next 08:00 UTC.
+3. **AMD auto_direction** — Cron `'31 10 * * *'`: when `direction_mode=auto` and `auto_direction` is long/short, writes `omega_direction` and sets validity until 14:00 UTC. Skipped when Asian window is active (hour 21–08) and direction is neutral.
+
+When `direction_mode = 'manual'`, steps 2–3 do not overwrite `omega_direction`.
+
+### Asian session close (08:00 UTC)
+
+Cron `'0 8 * * *'` → `runAsianSessionClose()`:
+- Calls `closeAllOpenOmegaPositions()`
+- Logs to `asian_direction_log` with `trigger_type = 'SESSION_CLOSE'`
+
+### AMD outcome detection (16:30 UTC)
+
+Cron `'30 16 * * *'` → `runAmdOutcomeDetection()`:
+- Fetches H1 candles through 16:30 UTC
+- Writes `amd_outcome_tag`, `reversal_confirmed_outcome`, `compression_breakout_outcome` for tags: `AMD_FAILED`, `AMD_TEXTBOOK`, `AMD_COMPRESSION_BREAKOUT`
+- Sets `detection_locked = false` (unlocks row after morning detection lock)
+
+Does **not** change `omega_direction` — research/audit only.
+
+### Omega size multiplier (from AMD)
+
+When AMD state is present on an Omega signal, `amd_size_multiplier` from `amd_state` scales units (`signalRouter.ts`). Computed in `computeAutoDirectionSnapshot()` (`amdAutoDirection.ts`). Examples:
+
+| Tag / condition | `daily_bias_alignment` | Multiplier |
+| --- | --- | --- |
+| AMD_TEXTBOOK | ALIGNED + strong D1 | 2.5 |
+| AMD_TEXTBOOK | ALIGNED weak D1 | 1.5 |
+| AMD_TEXTBOOK | CONFLICTED | 0.5 |
+| AMD_NONE | TRENDING_STRONG ALIGNED | 1.0 |
+| AMD_NONE | TRENDING_STRONG CONFLICTED | 0.25 |
+| AMD_FAILED | CONFLICTED D1 | 0.25 |
+
+Full matrix in `src/services/amdDetector/amdAutoDirection.ts`.
+
 ## AMD Influence
 
 AMD detection runs daily at 10:31 UTC and writes `amd_state`. The service computes Asian range, Judas direction, reversal status, AMD tag, D1 bias, auto direction, confidence, reason, and size multiplier.

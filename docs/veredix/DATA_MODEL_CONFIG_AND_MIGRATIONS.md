@@ -22,6 +22,9 @@ Supabase is the shared control and audit plane. Engines write source signals, th
 | `regime_state` | H4/D1 regime snapshots for AUD_USD. |
 | `amd_state` | Daily AMD snapshot for AUD_USD. |
 | `amd_m5_distribution_candles` | Stored M5 candle payloads for AMD distribution analysis. |
+| `asian_m5_candles` | Asian session M5 candles (00:00–08:00 UTC). Migration 028. |
+| `asian_direction_log` | Asian direction automation audit log. Migration 020. |
+| `scalper_day_state` / `scalper_trades` | Scalper engine daily state and trades. Migration 027. |
 | `intelligence_snapshots` | Dashboard Intelligence evaluation snapshots. |
 
 ## Shadow Tables
@@ -61,6 +64,21 @@ These are research or engine-owned sources. Product docs should not assume the b
 | `016_amd_auto_direction.sql` | AMD auto direction, direction source, size multiplier, and `direction_mode`. |
 | `017_amd_trade_log_audit.sql` | Expanded AMD audit columns on trade log. |
 | `018_amd_m5_distribution_candles.sql` | M5 distribution candle storage. |
+
+### Migrations 019–028 (May 2026)
+
+| Migration | Date | Purpose |
+| --- | --- | --- |
+| `019_asian_clean_trend.sql` | [VERIFY — untracked in git] | Creates `asian_clean_trend_analysis` — one row per trade date with Asian session labels, H1/H4 predictors, Judas/reversal fields for `scripts/asianCleanTrendBacktest.ts` research. |
+| `020_asian_direction_log.sql` | 2026-05-23 | Creates `asian_direction_log` — audit log for `AsianDirectionService` (direction set at 21:10 UTC, session close at 08:00 UTC). Key columns: `trigger_type`, `direction_set`, `action`, `positions_closed`. |
+| `021_amd_7candle_bias.sql` | [VERIFY — untracked in git] | Adds to `amd_state`: `layer4_bullish_count_7`, `layer4_bearish_count_7`, `layer4_d1_bias_7` — 7-candle D1 window for `AMD_SHIFTED` auto-direction (threshold ≥4). |
+| `022_amd_m5_outcome.sql` | 2026-05-26 | Adds to `amd_state`: M5 signal columns (`m5_first_3_net_pips`, `m5_vs_judas_direction`, etc.) written at 10:31 UTC; outcome columns (`amd_outcome_tag`, `reversal_confirmed_outcome`, `compression_breakout_outcome`, `outcome_evaluated_at`) written at 16:30 UTC. |
+| `023_amd_window_outcome.sql` | [VERIFY — untracked in git] | Adds to `amd_state`: distribution window outcome fields (`window_tag_used`, `window_candles`, `window_direction_confirmed`, etc.) for tag-specific entry/exit validation. |
+| `024_amd_shifted_asian_signal.sql` | 2026-05-27 | Adds to `amd_state`: Asian dominance ratio columns (`judas_to_range_ratio`, `asian_drift_ratio`, `asian_dominance_ratio`, `market_structure_type`, `asian_net_direction`) — data collection for RANGING D1 AMD_SHIFTED days. |
+| `025_amd_detection_lock.sql` | 2026-05-29 | Adds to `amd_state`: `detection_locked`, `detection_locked_at`, `detection_locked_reason` — prevents redeploy from overwriting `auto_direction`; unlocked by 16:30 UTC outcome cron. |
+| `026_asian_close_bias_columns.sql` | 2026-05-30 | Adds to `amd_state`: `asian_close_position_pct`, `asian_close_bias_signal` (`BULLISH` / `BEARISH` / `NEUTRAL`) — computed at 10:31 UTC; gates `AmdDistributionEngine` when `AMD_ASIAN_CLOSE_FILTER_ENABLED=true`. |
+| `027_scalper.sql` | 2026-05-31 | Creates `scalper_day_state` and `scalper_trades` — production AUD_USD price-ratchet scalper state and trade audit. See [ENGINE_Scalper_Reference_v1_0_0_May2026.md](../ENGINE_Scalper_Reference_v1_0_0_May2026.md). |
+| `028_asian_m5_candles.sql` | 2026-05-31 | Creates `asian_m5_candles` — M5 OHLC JSONB for Asian session 00:00–08:00 UTC. See [SERVICE_AsianM5Candles_May2026.md](../SERVICE_AsianM5Candles_May2026.md). |
 
 Known gap: `migrations/` and `supabase/migrations/` overlap for some files. The production canonical migration path should be decided and documented.
 
