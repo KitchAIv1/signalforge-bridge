@@ -1,6 +1,15 @@
 # AMD Intelligence System — Complete Reference
-**SignalForge / Veredix | Updated: 2026-05-27**
+**SignalForge / Veredix | v2.4.0 | Updated: 2026-05-31**
 **Status: Phase 4 Live — Forward Testing Active**
+
+---
+
+## Changelog
+
+| Date | Version | Change |
+|------|---------|--------|
+| 2026-05-31 | v2.4.0 | Added ASIAN_CLOSE_FILTER gate (§5.7), Scalper engine integration (§5.8), migrations 027/028 table refs |
+| 2026-05-27 | v2.3.0 | Phase 4 live reference baseline |
 
 ---
 
@@ -20,13 +29,16 @@ structure AUDUSD each trading day in three phases:
   institutional move begins — either reversing the
   Judas (TEXTBOOK) or continuing it (COMPRESSION).
 
-The system runs two separate services daily:
+The system runs three live trading/intelligence paths daily:
 
 1. **AmdDetectorService** — fires at 10:31 UTC,
    classifies the day, sets omega_direction
 2. **AmdDistributionEngine** — fires every 5
    minutes, places one trade per day at the
    tag-specific entry hour
+3. **ScalperEngine** — price-ratchet pullback on
+   AGREE+NEUTRAL days (see
+   [ENGINE_Scalper_Reference_v1_0_0_May2026.md](./ENGINE_Scalper_Reference_v1_0_0_May2026.md))
 
 ---
 
@@ -248,11 +260,45 @@ timeGateHour != null (processOpenState line 231).
 1. AMD_DISTRIBUTION_ENABLED = 'true'
 2. amd_state row exists for today
 3. auto_direction = 'long' or 'short' (not neutral)
-4. isEntryWindowOpen = true (within entry/exit hours)
-5. amd_state.evaluated_at = today (not stale)
-6. hasExecutedToday = false
-7. bridge_engines.engine_amd.is_active = true
-8. No news blackout
+4. **ASIAN_CLOSE_FILTER** (when enabled — see §5.7)
+5. isEntryWindowOpen = true (within entry/exit hours)
+6. amd_state.evaluated_at = today (not stale)
+7. hasExecutedToday = false
+8. bridge_engines.engine_amd.is_active = true
+9. No news blackout
+
+### 5.7 ASIAN_CLOSE_FILTER
+
+**Env var:** `AMD_ASIAN_CLOSE_FILTER_ENABLED=true`
+**Source:** `passesExecutionGates()` in `AmdDistributionEngine.ts`
+
+When enabled, blocks distribution entry when Asian close bias **disagrees** with `auto_direction`:
+
+| `asian_close_bias_signal` | Behavior |
+|---------------------------|----------|
+| `NEUTRAL` | Pass — no strong bias, `auto_direction` governs |
+| `BULLISH` + `auto_direction=long` | Pass |
+| `BEARISH` + `auto_direction=short` | Pass |
+| `BULLISH` + `auto_direction=short` | **BLOCK** — `ASIAN_CLOSE_DISAGREE` |
+| `BEARISH` + `auto_direction=long` | **BLOCK** — `ASIAN_CLOSE_DISAGREE` |
+
+Block is logged once per day to `bridge_trade_log` with `decision=BLOCKED`.
+
+**Differs from Scalper gate:** Scalper also **arms** on NEUTRAL (same as distribution). Scalper blocks only DISAGREE pairs. Both engines read live `asian_close_bias_signal` — not `amd_outcome_tag`.
+
+### 5.8 Scalper Engine (parallel path)
+
+Separate from distribution — does not share `hasExecutedToday` gate.
+
+| Item | Value |
+|------|-------|
+| Enable | `SCALPER_ENABLED=true` |
+| Init crons | `32/37/42 10 * * 1-5` UTC |
+| Hard close | `0 16 * * 1-5` UTC |
+| Tables | `scalper_day_state`, `scalper_trades` (migration 027) |
+| Direction gate | AGREE + NEUTRAL (since 2026-05-31) |
+| Full reference | [ENGINE_Scalper_Reference_v1_0_0_May2026.md](./ENGINE_Scalper_Reference_v1_0_0_May2026.md) |
+| Backtest results | [BACKTEST_ScalperValidation_May2026.md](./BACKTEST_ScalperValidation_May2026.md) |
 
 ---
 
@@ -322,7 +368,16 @@ One row per open AMD distribution trade.
 ### 7.3 amd_m5_distribution_candles
 One row per trading day. M5 candles 10:00–16:00 UTC.
 275 rows populated (May 2025 – May 2026).
-Used by exit strategy simulation scripts.
+Used by exit strategy simulation scripts and scalper backtests.
+
+### 7.4 asian_m5_candles (migration 028)
+One row per trading day. M5 candles 00:00–08:00 UTC.
+Populated by `scripts/asianM5BackfetchFull.ts` and daily cron `5 8 * * 1-5`.
+See [SERVICE_AsianM5Candles_May2026.md](./SERVICE_AsianM5Candles_May2026.md).
+
+### 7.5 scalper_day_state / scalper_trades (migration 027)
+Scalper engine state and trade audit. One day-state row per `(trade_date, pair)`.
+See [ENGINE_Scalper_Reference_v1_0_0_May2026.md](./ENGINE_Scalper_Reference_v1_0_0_May2026.md).
 
 ---
 
@@ -473,8 +528,22 @@ vs M5 WITH_JUDAS +0.6p avg (20% SL).
 | Variable | Purpose |
 |----------|---------|
 | AMD_DISTRIBUTION_ENABLED | 'true' to enable live trading |
+| AMD_ASIAN_CLOSE_FILTER_ENABLED | 'true' to block when Asian close bias disagrees with auto_direction |
+
+### ScalperEngine (bridge Railway service)
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| SCALPER_ENABLED | off | 'true' to enable scalper crons |
+| SCALPER_PULLBACK_PIPS | 5 | Pullback from 10:00 reference |
+| SCALPER_TP_PIPS | 10 | Take profit pips |
+| SCALPER_SL_PIPS | 10 | Stop loss pips |
+| SCALPER_MAX_RATCHETS | 3 | Max ratchets per day |
+| SCALPER_RISK_PCT | 0.01 | Risk fraction per trade |
+| SCALPER_PAIR | AUD_USD | Instrument |
+
+See [ENGINE_Scalper_Reference_v1_0_0_May2026.md](./ENGINE_Scalper_Reference_v1_0_0_May2026.md) for full scalper env reference.
 
 ---
 
-*AMD System Reference | SignalForge / Veredix |
-Updated 2026-05-27 | Confidential*
+*AMD System Reference v2.4.0 | SignalForge / Veredix |
+Updated 2026-05-31 | Confidential*
