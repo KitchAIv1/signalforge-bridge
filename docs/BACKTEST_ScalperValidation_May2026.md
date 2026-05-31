@@ -1,6 +1,6 @@
 # Scalper Backtest Validation — May 2026
 
-**Purpose:** Consolidated reference for all scalper-related backtests. Every performance figure below traces to an exact row in `scripts/output/*.csv`. Numbers not present in CSV are marked `[DATA NEEDED]`.
+**Purpose:** Consolidated reference for all scalper-related backtests. Every performance figure traces to an exact row in `scripts/output/*.csv`. Spread-adjusted figures use `expectancy_net = expectancy_gross - 1.04` from `scalper_net_after_spread_summary.csv`.
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Date | Change |
 |------|--------|
+| 2026-05-31 | Added agree_status split + net-after-spread from output CSVs |
 | 2026-05-31 | Initial validation doc |
 
 ---
@@ -72,14 +73,16 @@ Source: `scripts/asianScalperBacktest/loadCohorts.ts`
 
 **Script:** `scripts/scalperExtendedWindowBacktest.ts`
 **CSV:** `scripts/output/scalper_extended_window_grid.csv`
-**Cohort:** AGREE, 124 days
-**Date range:** [DATA NEEDED — not in CSV header; cohort filter is `trade_date >= 2025-05-01` per loader]
+**Cohort:** AGREE, 124 days (`scalper_extended_window_grid.csv`)
+**Date range:** Cohort loader filters `trade_date >= 2025-05-01` (`loadAgreeDirectionalCohort.ts`); exact end date not stored in grid CSV.
 
-| Run | pullback | window | n_days | total_trades | trades/day | win_pct | net_pips_total | expectancy/trade | days_stopped_by_sl | days_no_trigger |
-|-----|----------|--------|--------|--------------|------------|---------|----------------|------------------|--------------------|-----------------|
-| A | 3 | 10:05–16:00 | 124 | 330 | 2.66 | 68.4 | 893.4 | 2.71 | 74 | 15 |
-| **B** | **5** | **10:05–16:00** | **124** | **269** | **2.17** | **73.3** | **1054.6** | **3.92** | **55** | **26** |
-| C | 5 | 10:05–14:00 | 124 | 205 | 1.65 | 73.5 | 896.8 | 4.37 | 48 | 32 |
+| Run | pullback | window | n_days | total_trades | trades/day | win_pct | net_pips_total | expectancy/trade (gross) | expectancy/trade (net) | days_stopped_by_sl | days_no_trigger |
+|-----|----------|--------|--------|--------------|------------|---------|----------------|--------------------------|------------------------|--------------------|-----------------|
+| A | 3 | 10:05–16:00 | 124 | 330 | 2.66 | 68.4 | 893.4 | 2.71 | 1.67 | 74 | 15 |
+| **B** | **5** | **10:05–16:00** | **124** | **269** | **2.17** | **73.3** | **1054.6** | **3.92** | **2.88** | **55** | **26** |
+| C | 5 | 10:05–14:00 | 124 | 205 | 1.65 | 73.5 | 896.8 | 4.37 | 3.33 | 48 | 32 |
+
+Net column source: `scripts/output/scalper_net_after_spread_summary.csv` (`extended_window_run_*`, spread=1.04).
 
 **Run B selected for production:** pullback=5, tp=10, sl=10, max_ratchets=3, window 10:05–16:00.
 
@@ -178,7 +181,19 @@ All pullback=5 rows show **negative** expectancy (e.g. 1443 trades, -1570 net pi
 
 ### AGREE / NEUTRAL / DISAGREE split
 
-**[DATA NEEDED]** — No CSV file exists for the agree_status join. The split was computed ad-hoc from `distribution_no_gate_daily.csv` + `amd_state` but not written to `scripts/output/`. Re-run join and save to CSV before citing split numbers in permanent docs.
+**CSV:** `scripts/output/distribution_agree_split.csv`
+**Method:** Join `distribution_no_gate_daily.csv` to `amd_state` on `trade_date`; classify by `asian_close_bias_signal` vs `auto_direction`.
+
+| agree_status | n_days | total_trades | total_wins | total_losses | win_pct | net_pips_total | expectancy/trade (gross) | expectancy/trade (net) | days_no_trigger |
+|--------------|--------|--------------|------------|--------------|---------|----------------|--------------------------|------------------------|-----------------|
+| AGREE | 124 | 269 | 151 | 55 | 73.3 | 1054.6 | 3.92 | 2.88 | 26 |
+| NEUTRAL | 44 | 75 | 44 | 14 | 75.9 | 299.3 | 3.99 | 2.95 | 18 |
+| DISAGREE | 86 | 137 | 54 | 35 | 60.7 | 154.0 | 1.12 | 0.08 | 29 |
+| UNKNOWN | 0 | 0 | 0 | 0 | — | 0.0 | — | — | 0 |
+
+Net column source: `scalper_net_after_spread_summary.csv` (`agree_split_*`, spread=1.04).
+
+**Live operating population (AGREE + NEUTRAL):** 168 days, combined gross +1353.9 net pips (+1054.6 + +299.3 from table above).
 
 ---
 
@@ -201,13 +216,31 @@ All pullback=5 rows show **negative** expectancy (e.g. 1443 trades, -1570 net pi
 
 **Script:** `scripts/scalperBacktest.ts`
 **CSV:** `scripts/output/scalper_backtest_grid.csv`
-**Cohort:** [DATA NEEDED — CSV shows n=22, not AGREE 124; different early cohort]
+**Cohort:** 22 days per grid rows (`n=22` in CSV) — early exploratory cohort, not AGREE 124-day validation set.
 
 Not used for production decisions.
 
 ---
 
-## 11. Contamination Checks Performed
+## 11. Net After Spread Summary
+
+**CSV:** `scripts/output/scalper_net_after_spread_summary.csv`
+**Formula:** `expectancy_net = expectancy_gross - 1.04`
+
+| config | n_days | total_trades | win_pct | net_pips_total | expectancy_gross | expectancy_net |
+|--------|--------|--------------|---------|----------------|------------------|----------------|
+| extended_window_run_B (production) | 124 | 269 | 73.3 | 1054.6 | 3.92 | 2.88 |
+| agree_split_AGREE | 124 | 269 | 73.3 | 1054.6 | 3.92 | 2.88 |
+| agree_split_NEUTRAL | 44 | 75 | 75.9 | 299.3 | 3.99 | 2.95 |
+| agree_split_DISAGREE | 86 | 137 | 60.7 | 154.0 | 1.12 | 0.08 |
+| no_gate_cohort_A | 254 | 481 | 70.5 | 1507.9 | 3.13 | 2.09 |
+| asian_scalper_cohort_B | 255 | 409 | 61.7 | 674.5 | 1.65 | 0.61 |
+
+Full table (14 configs) in CSV.
+
+---
+
+## 12. Contamination Checks Performed
 
 | Backtest | Checks | Result |
 |----------|--------|--------|
@@ -217,25 +250,24 @@ Not used for production decisions.
 
 ---
 
-## 12. Conclusions (from CSV data only)
+## 13. Conclusions (from CSV data only)
 
-1. **Production config validated:** Extended Window Run B — 124 days, +1054.6 net pips, +3.92/trade gross (`scalper_extended_window_grid.csv`).
-2. **16:00 window matters:** Same pullback=5/max_ratchets=3 with 14:00 cutoff yields +896.8 (`scalper_price_ratchet_grid.csv` row 5) vs +1054.6 with 16:00 window.
+1. **Production config validated:** Extended Window Run B — 124 days, +1054.6 net pips, +3.92/trade gross, **+2.88/trade net** (`scalper_extended_window_grid.csv` + `scalper_net_after_spread_summary.csv`).
+2. **16:00 window matters:** Same pullback=5/max_ratchets=3 with 14:00 cutoff yields +896.8 gross (`scalper_price_ratchet_grid.csv` row 5) vs +1054.6 with 16:00 window.
 3. **Multi-trade ratchet fires:** Run B avg 2.17 trades/day; max concurrent observed = 3 (same CSV).
-4. **No-gate confirms DISAGREE drag:** Full cohort +3.13/trade vs AGREE-only +3.92/trade (compare grid CSVs — AGREE count from extended window).
-5. **Asian session:** Cohort B +1.65/trade over 255 days; Cohort A sample too small (2 days).
-
-Net-after-spread figures: **[DATA NEEDED]** — no spread deduction column in CSV outputs.
+4. **DISAGREE near zero edge:** +0.08/trade net (`distribution_agree_split.csv` DISAGREE row).
+5. **NEUTRAL strong bucket:** +2.95/trade net over 44 days — live engine arms NEUTRAL post-2026-05-31.
+6. **Asian session:** Cohort B +0.61/trade net over 255 days; Cohort A sample too small (2 days).
 
 ---
 
-## 13. Limitations
+## 14. Limitations
 
 - Backtests use bar OHLC, not live mid-price entry.
-- AGREE cohort excludes NEUTRAL (backtest) but live engine includes NEUTRAL (post-2026-05-31).
-- No CSV for agree_status split — see §8.
-- Asian Cohort A not viable for inference.
+- AGREE-only backtests exclude NEUTRAL; live engine includes NEUTRAL (post-2026-05-31).
+- Asian Cohort A not viable for inference (2 days).
 - `scalper_backtest_grid.csv` uses n=22 — different from production AGREE cohort.
+- Spread assumed flat 1.04 pips/trade — not per-config slippage modeled.
 
 ---
 
