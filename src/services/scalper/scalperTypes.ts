@@ -22,6 +22,7 @@ export interface ScalperDayState {
   trade_date: string;
   pair: string;
   direction: ScalperDirection | null;
+  amd_tag: string | null;
   reference_price: number | null;
   trigger_level: number | null;
   ratchet_count: number;
@@ -37,6 +38,7 @@ export interface ScalperTrade {
   trade_date: string;
   pair: string;
   oanda_trade_id: string | null;
+  units: number | null;
   direction: ScalperDirection;
   entry_price: number;
   tp_price: number;

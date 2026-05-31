@@ -32,6 +32,7 @@ export type DayStateUpsertFields = {
   trade_date: string;
   pair?: string;
   direction?: string | null;
+  amd_tag?: string | null;
   reference_price?: number | null;
   trigger_level?: number | null;
   ratchet_count?: number;
@@ -92,6 +93,7 @@ export type TradeInsertFields = {
   trade_date: string;
   pair?: string;
   oanda_trade_id: string | null;
+  units: number;
   direction: string;
   entry_price: number;
   tp_price: number;

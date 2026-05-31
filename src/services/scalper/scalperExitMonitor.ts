@@ -13,6 +13,7 @@
  */
 
 import { closeTrade, getTradeById } from '../../connectors/oanda.js';
+import { syncScalperTradeToBridgeLog } from './scalperBridgeSync.js';
 import {
   loadFailedForceFlatTrades,
   loadOpenTrades,
@@ -24,6 +25,7 @@ import {
 } from './scalperDayState.js';
 import { scalperError, scalperLog, scalperWarn } from './scalperLogger.js';
 import type { ScalperConfig, ScalperDirection, ScalperTrade } from './scalperTypes.js';
+import type { ScalperTradeResult } from './scalperTypes.js';
 import { pipsToPrice, signedPips, todayUtcString } from './scalperTypes.js';
 
 function inferResult(
@@ -36,9 +38,28 @@ function inferResult(
     : averageClosePrice <= trade.tp_price ? 'win' : 'loss';
 }
 
+async function syncClosedTrade(
+  trade: ScalperTrade,
+  fields: {
+    result: ScalperTradeResult;
+    exit_price?: number;
+    pnl_pips?: number;
+    pnl_pips_actual?: number;
+    closed_at?: string;
+    close_reason?: string;
+  },
+  tradeDate: string,
+  pair: string,
+): Promise<void> {
+  const dayState = await loadTodayDayState(tradeDate, pair);
+  if (!dayState) return;
+  await syncScalperTradeToBridgeLog({ ...trade, ...fields }, dayState);
+}
+
 async function forceCloseOne(
   trade: ScalperTrade,
   tradeDate: string,
+  pair: string,
 ): Promise<void> {
   try {
     const closeResult = await closeTrade(trade.oanda_trade_id!);
@@ -46,18 +67,16 @@ async function forceCloseOne(
       ? Number(closeResult.orderFillTransaction.price)
       : trade.entry_price;
     const pnlActual = signedPips(trade.entry_price, fillPrice, trade.direction as ScalperDirection);
-    await updateTrade(
-      trade.id,
-      {
-        result: 'force_flat',
-        exit_price: fillPrice,
-        pnl_pips: 0,            // backtest accounting convention
-        pnl_pips_actual: pnlActual,
-        closed_at: new Date().toISOString(),
-        close_reason: 'circuit_breaker',
-      },
-      tradeDate,
-    );
+    const closeFields = {
+      result: 'force_flat' as const,
+      exit_price: fillPrice,
+      pnl_pips: 0,
+      pnl_pips_actual: pnlActual,
+      closed_at: new Date().toISOString(),
+      close_reason: 'circuit_breaker',
+    };
+    await updateTrade(trade.id, closeFields, tradeDate);
+    await syncClosedTrade(trade, closeFields, tradeDate, pair);
     scalperLog('Force-closed trade (circuit breaker)', {
       id: trade.id,
       oandaTradeId: trade.oanda_trade_id,
@@ -83,7 +102,7 @@ async function retryFailedForceFlats(tradeDate: string, pair: string): Promise<v
   scalperWarn('Retrying force_flat_failed trades', { count: failed.length, tradeDate });
   for (const trade of failed) {
     if (!trade.oanda_trade_id) continue;
-    await forceCloseOne(trade, tradeDate);
+    await forceCloseOne(trade, tradeDate, pair);
   }
 }
 
@@ -94,18 +113,16 @@ async function handleWin(
   config: ScalperConfig,
 ): Promise<void> {
   const pnlActual = signedPips(trade.entry_price, averageClosePrice, trade.direction as ScalperDirection);
-  await updateTrade(
-    trade.id,
-    {
-      result: 'win',
-      exit_price: averageClosePrice,
-      pnl_pips: config.tpPips,
-      pnl_pips_actual: pnlActual,
-      closed_at: new Date().toISOString(),
-      close_reason: 'tp_hit',
-    },
-    tradeDate,
-  );
+  const closeFields = {
+    result: 'win' as const,
+    exit_price: averageClosePrice,
+    pnl_pips: config.tpPips,
+    pnl_pips_actual: pnlActual,
+    closed_at: new Date().toISOString(),
+    close_reason: 'tp_hit',
+  };
+  await updateTrade(trade.id, closeFields, tradeDate);
+  await syncClosedTrade(trade, closeFields, tradeDate, config.pair);
 
   // IRON LAW 5: new reference can only move in direction of trade
   const newReference = trade.tp_price;
@@ -159,23 +176,21 @@ async function handleLoss(
   config: ScalperConfig,
 ): Promise<void> {
   const pnlActual = signedPips(lossTrade.entry_price, averageClosePrice, lossTrade.direction as ScalperDirection);
-  await updateTrade(
-    lossTrade.id,
-    {
-      result: 'loss',
-      exit_price: averageClosePrice,
-      pnl_pips: -config.slPips,
-      pnl_pips_actual: pnlActual,
-      closed_at: new Date().toISOString(),
-      close_reason: 'sl_hit',
-    },
-    tradeDate,
-  );
+  const closeFields = {
+    result: 'loss' as const,
+    exit_price: averageClosePrice,
+    pnl_pips: -config.slPips,
+    pnl_pips_actual: pnlActual,
+    closed_at: new Date().toISOString(),
+    close_reason: 'sl_hit',
+  };
+  await updateTrade(lossTrade.id, closeFields, tradeDate);
+  await syncClosedTrade(lossTrade, closeFields, tradeDate, config.pair);
 
   // IRON LAW 3: circuit breaker — force-close every other open position
   const others = allOpenTrades.filter((t) => t.id !== lossTrade.id && t.oanda_trade_id);
   for (const other of others) {
-    await forceCloseOne(other, tradeDate);
+    await forceCloseOne(other, tradeDate, config.pair);
   }
 
   await stopDay(tradeDate, 'sl', config.pair);

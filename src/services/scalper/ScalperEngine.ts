@@ -18,6 +18,7 @@
 
 import { closeTrade, fetchLatestM5Candle } from '../../connectors/oanda.js';
 import { getSupabaseClient } from '../../connectors/supabase.js';
+import { syncScalperTradeToBridgeLog } from './scalperBridgeSync.js';
 import {
   loadOpenTrades,
   loadTodayDayState,
@@ -42,6 +43,7 @@ import type { ScalperDirection } from './scalperTypes.js';
 type AmdStateRow = {
   auto_direction: string | null;
   asian_close_bias_signal: string | null;
+  amd_tag: string | null;
 };
 
 function isAgree(row: AmdStateRow): row is AmdStateRow & { auto_direction: ScalperDirection } {
@@ -54,7 +56,7 @@ function isAgree(row: AmdStateRow): row is AmdStateRow & { auto_direction: Scalp
 async function fetchAmdStateForToday(tradeDate: string): Promise<AmdStateRow | null> {
   const { data, error } = await getSupabaseClient()
     .from('amd_state')
-    .select('auto_direction, asian_close_bias_signal')
+    .select('auto_direction, asian_close_bias_signal, amd_tag')
     .eq('pair', 'AUD_USD')
     .eq('trade_date', tradeDate)
     .maybeSingle();
@@ -108,6 +110,7 @@ export async function initializeDayState(): Promise<void> {
       trade_date: tradeDate,
       pair: config.pair,
       direction: amdRow.auto_direction,
+      amd_tag: amdRow.amd_tag ?? null,
       day_stopped: true,
       stop_reason: 'no_agree',
     });
@@ -131,6 +134,7 @@ export async function initializeDayState(): Promise<void> {
     trade_date: tradeDate,
     pair: config.pair,
     direction,
+    amd_tag: amdRow.amd_tag ?? null,
     reference_price: referencePrice,
     trigger_level: triggerLevel,
     ratchet_count: 0,
@@ -182,18 +186,19 @@ export async function hardClose(): Promise<void> {
         ? Number(closeResult.orderFillTransaction.price)
         : trade.entry_price;
       const pnl = signedPips(trade.entry_price, fillPrice, trade.direction as ScalperDirection);
-      await updateTrade(
-        trade.id,
-        {
-          result: 'timeout_16h',
-          exit_price: fillPrice,
-          pnl_pips: pnl,        // actual P&L for timeout (no special accounting)
-          pnl_pips_actual: pnl,
-          closed_at: new Date().toISOString(),
-          close_reason: 'hard_close_1600',
-        },
-        tradeDate,
-      );
+      const closeFields = {
+        result: 'timeout_16h' as const,
+        exit_price: fillPrice,
+        pnl_pips: pnl,
+        pnl_pips_actual: pnl,
+        closed_at: new Date().toISOString(),
+        close_reason: 'hard_close_1600',
+      };
+      await updateTrade(trade.id, closeFields, tradeDate);
+      const dayState = await loadTodayDayState(tradeDate, config.pair);
+      if (dayState) {
+        await syncScalperTradeToBridgeLog({ ...trade, ...closeFields }, dayState);
+      }
       scalperLog('Hard closed trade', { id: trade.id, fillPrice, pnl, tradeDate });
     } catch (err) {
       scalperError('Hard close failed for trade', {

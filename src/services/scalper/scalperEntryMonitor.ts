@@ -134,6 +134,7 @@ export async function runEntryMonitor(config: ScalperConfig): Promise<void> {
     trade_date: tradeDate,
     pair: config.pair,
     oanda_trade_id: tradeId,
+    units,
     direction: dayState.direction,
     entry_price: fillPrice,
     // tp_price and sl_price match what was sent to OANDA (trigger_level ± pips)
