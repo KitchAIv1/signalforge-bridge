@@ -20,6 +20,7 @@ import {
   runAmdOutcomeDetection,
 } from './services/AmdDetectorService.js';
 import { runAsianDirectionSet, runAsianSessionClose } from './services/AsianDirectionService.js';
+import { fetchTodayAsianCandles } from './services/asianM5/asianM5CandleFetch.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
 import {
@@ -127,6 +128,15 @@ async function main(): Promise<void> {
       await runAsianSessionClose();
     } catch (asianCloseErr) {
       console.error('[AsianDirection] Scheduled session close error:', asianCloseErr);
+    }
+  }, { timezone: 'UTC' });
+
+  // 08:05 UTC — Asian session closed, fetch today's M5 candles
+  cron.schedule('5 8 * * 1-5', async () => {
+    try {
+      await fetchTodayAsianCandles();
+    } catch (asianM5Err) {
+      console.error('[AsianM5] Daily fetch error:', asianM5Err);
     }
   }, { timezone: 'UTC' });
 
