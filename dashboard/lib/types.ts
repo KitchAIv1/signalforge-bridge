@@ -259,6 +259,60 @@ export interface AmdState {
   asian_close_bias_signal?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
 }
 
+export type ScalperDirection = 'long' | 'short';
+
+export type ScalperTradeResult =
+  | 'win'
+  | 'loss'
+  | 'force_flat'
+  | 'force_flat_failed'
+  | 'timeout_16h';
+
+export type ScalperStopReason =
+  | 'sl'
+  | 'max_ratchets'
+  | 'hard_close'
+  | 'no_trigger'
+  | 'no_agree'
+  | 'amd_not_ready';
+
+export interface ScalperDayState {
+  id: number;
+  trade_date: string;
+  pair: string;
+  direction: ScalperDirection | null;
+  amd_tag: string | null;
+  reference_price: number | null;
+  trigger_level: number | null;
+  ratchet_count: number;
+  day_stopped: boolean;
+  stop_reason: ScalperStopReason | null;
+  net_pips_day: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScalperTrade {
+  id: number;
+  trade_date: string;
+  pair: string;
+  oanda_trade_id: string | null;
+  units: number | null;
+  direction: ScalperDirection;
+  entry_price: number;
+  tp_price: number;
+  sl_price: number;
+  exit_price: number | null;
+  pnl_pips: number | null;
+  pnl_pips_actual: number | null;
+  result: ScalperTradeResult | null;
+  ratchet_index: number | null;
+  opened_at: string | null;
+  closed_at: string | null;
+  close_reason: string | null;
+  created_at: string;
+}
+
 export interface IntelligenceSnapshotRow {
   id: string;
   snapshot_date: string;

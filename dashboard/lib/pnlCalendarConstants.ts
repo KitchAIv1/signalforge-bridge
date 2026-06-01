@@ -9,4 +9,5 @@ export const CALENDAR_START = new Date('2026-04-30T00:00:00Z');
 export const ENGINE_COLORS: Record<string, string> = {
   omega: '#7c3aed',
   engine_rebuild: '#d97706',
+  scalper: '#1D9E75',
 };

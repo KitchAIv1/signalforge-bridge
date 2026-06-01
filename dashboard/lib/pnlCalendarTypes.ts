@@ -23,6 +23,7 @@ export type DaySummary = {
   breakevens: number;
   omegaNetR: number;
   rebuildNetR: number;
+  scalperNetR: number;
   winRate: number;
   longNetR: number;
   shortNetR: number;

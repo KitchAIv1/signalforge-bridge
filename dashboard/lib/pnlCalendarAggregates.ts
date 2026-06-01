@@ -13,6 +13,7 @@ function createEmptyDaySummary(isoDateKey: string): DaySummary {
     breakevens: 0,
     omegaNetR: 0,
     rebuildNetR: 0,
+    scalperNetR: 0,
     winRate: 0,
     longNetR: 0,
     shortNetR: 0,
@@ -38,6 +39,7 @@ function foldTradeIntoDay(day: DaySummary, trade: PnlTradeRow): void {
   else day.breakevens += 1;
   if (trade.engine_id === 'omega') day.omegaNetR += rComponent;
   if (trade.engine_id === 'engine_rebuild') day.rebuildNetR += rComponent;
+  if (trade.engine_id === 'scalper') day.scalperNetR += rComponent;
   const side = trade.direction?.toLowerCase();
   if (side === 'long') {
     day.longNetR += rComponent;
@@ -56,6 +58,7 @@ function roundDayRollups(day: DaySummary): void {
   day.netDollars = Math.round(day.netDollars * 100) / 100;
   day.omegaNetR = Math.round(day.omegaNetR * 1000) / 1000;
   day.rebuildNetR = Math.round(day.rebuildNetR * 1000) / 1000;
+  day.scalperNetR = Math.round(day.scalperNetR * 1000) / 1000;
 }
 
 export function buildDaySummaries(trades: PnlTradeRow[]): Map<string, DaySummary> {

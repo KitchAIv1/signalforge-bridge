@@ -6,16 +6,11 @@ import { AccountSnapshotBar } from '@/components/AccountSnapshotBar';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
-import { EngineStatusIndicator } from '@/components/EngineStatusIndicator';
-import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
 import { usePresencePing } from '@/hooks/usePresencePing';
 import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDesktopTable';
 import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobileList';
-import { RegimePanel } from '@/components/RegimePanel';
-import { AmdPanel } from '@/components/AmdPanel';
-import { AsianDirectionPanel } from '@/components/AsianDirectionPanel';
-import { OmegaWindowIndicator } from '@/components/OmegaWindowIndicator';
+import { DirectionDecisionPanel } from '@/components/directionDecision/DirectionDecisionPanel';
 import { AUDUSDChart } from '@/components/AUDUSDChart';
 import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
@@ -96,7 +91,6 @@ export default function ActivityPage() {
   const [decision, setDecision] = useState('EXECUTED');
   const [engine, setEngine] = useState('');
   const [engines, setEngines] = useState<string[]>([]);
-  const { omegaDir } = useEngineControlsState();
   const rebuildHourGateCtrl = useRebuildHourGate();
   usePresencePing(); // 60s heartbeat — bridge can treat as watching for omega sizing
 
@@ -203,10 +197,6 @@ export default function ActivityPage() {
         >
           Export CSV
         </button>
-        <EngineStatusIndicator
-          omegaDir={omegaDir}
-          rebuildHourGateEnabled={rebuildHourGateCtrl.hourGateEnabled}
-        />
         <EngineControls hourGateControl={rebuildHourGateCtrl} />
         <PresenceIndicator />
         <OandaConnectionStatus />
@@ -214,18 +204,9 @@ export default function ActivityPage() {
 
       <AccountSnapshotBar />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <OmegaWindowIndicator />
-        <NewsEventStrip />
-      </div>
+      <DirectionDecisionPanel />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AsianDirectionPanel />
-        <div className="flex flex-col gap-4">
-          <RegimePanel />
-          <AmdPanel compact />
-        </div>
-      </div>
+      <NewsEventStrip />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AUDUSDChart symbol="OANDA:AUDUSD" interval="5" useResponsiveHeight />
