@@ -21,6 +21,7 @@ import {
 } from './services/AmdDetectorService.js';
 import { runAsianDirectionSet, runAsianSessionClose } from './services/AsianDirectionService.js';
 import { fetchTodayAsianCandles } from './services/asianM5/asianM5CandleFetch.js';
+import { fetchTodayDistributionCandles } from './services/distributionM5/distributionM5CandleFetch.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
 import {
@@ -137,6 +138,15 @@ async function main(): Promise<void> {
       await fetchTodayAsianCandles();
     } catch (asianM5Err) {
       console.error('[AsianM5] Daily fetch error:', asianM5Err);
+    }
+  }, { timezone: 'UTC' });
+
+  // 16:05 UTC — distribution window closed, fetch today's M5 candles
+  cron.schedule('5 16 * * 1-5', async () => {
+    try {
+      await fetchTodayDistributionCandles();
+    } catch (distributionM5Err) {
+      console.error('[DistributionM5] Daily fetch error:', distributionM5Err);
     }
   }, { timezone: 'UTC' });
 
