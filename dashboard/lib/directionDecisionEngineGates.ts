@@ -5,7 +5,6 @@ import { REBUILD_BLOCKED_HOURS_UTC } from '@/lib/rebuildHourBlockedHoursUtc';
 import type {
   AlignmentSummary,
   AsianCloseGate,
-  AsianSessionVerdict,
   DirectionDecisionSnapshot,
   DistributionVerdict,
   EngineGateRow,
@@ -17,9 +16,9 @@ import {
   buildDistributionChecklist,
   buildGateExplanation,
   computeAlignment,
-  findLastActionableAsianRow,
   resolveAsianCloseGate,
 } from '@/lib/directionDecisionChecklist';
+import { buildAsianVerdict } from '@/lib/asianSessionDisplay';
 import {
   isForexWeekendClosed,
   resolveAsianSessionPhase,
@@ -186,36 +185,6 @@ export function buildDistributionVerdict(
     headline: `ARMED — ${dirLabel}`,
     subline: alignLabel,
     tone: 'armed',
-  };
-}
-
-export function buildAsianVerdict(
-  asianRows: AsianDirectionLogEntry[],
-  amdState: AmdState | null,
-): AsianSessionVerdict {
-  const actionable = findLastActionableAsianRow(asianRows);
-  const amdTag = actionable?.amd_tag ?? amdState?.amd_tag ?? null;
-  const phase = resolveAsianSessionPhase();
-
-  if (amdTag !== 'AMD_SHIFTED') {
-    return {
-      headline: 'SKIPPED — not AMD_SHIFTED',
-      subline: 'Asian direction set runs only on AMD_SHIFTED days at 21:00 UTC',
-      tone: 'skipped',
-    };
-  }
-  const direction = actionable?.direction_set ?? null;
-  if (direction === 'long' || direction === 'short') {
-    return {
-      headline: `Direction: ${direction.toUpperCase()}`,
-      subline: actionable?.reason ?? 'Prior D1 + AMD_SHIFTED overnight set',
-      tone: phase === 'active' ? 'active' : 'complete',
-    };
-  }
-  return {
-    headline: 'AMD_SHIFTED — awaiting direction set',
-    subline: 'Scheduled run at 21:00 UTC',
-    tone: 'pending',
   };
 }
 

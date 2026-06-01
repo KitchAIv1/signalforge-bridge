@@ -170,6 +170,15 @@ export async function hardClose(): Promise<void> {
   // IRON LAW 6: Hard close at 16:00 regardless of open position P&L
   const tradeDate = todayUtcString();
   const config = loadScalperConfig();
+
+  const dayState = await loadTodayDayState(tradeDate, config.pair);
+  if (!dayState || dayState.day_stopped) {
+    scalperLog('Hard close skipped — day already stopped', {
+      stop_reason: dayState?.stop_reason,
+    });
+    return;
+  }
+
   const openTrades = await loadOpenTrades(tradeDate, config.pair);
 
   if (!openTrades.length) {
@@ -215,6 +224,6 @@ export async function hardClose(): Promise<void> {
   await stopDay(tradeDate, 'hard_close', config.pair);
   await refreshDayNetPips(tradeDate, config.pair);
 
-  const dayState = await loadTodayDayState(tradeDate, config.pair);
-  scalperLog('Hard close complete', { netPipsDay: dayState?.net_pips_day ?? 0, tradeDate });
+  const finalDayState = await loadTodayDayState(tradeDate, config.pair);
+  scalperLog('Hard close complete', { netPipsDay: finalDayState?.net_pips_day ?? 0, tradeDate });
 }

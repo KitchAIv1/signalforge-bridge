@@ -23,11 +23,12 @@ export {
 } from '@/lib/directionDecisionChecklist';
 
 export {
-  buildAsianVerdict,
   buildDirectionDecisionSnapshot,
   buildDistributionVerdict,
   buildEngineGates,
 } from '@/lib/directionDecisionEngineGates';
+
+export { buildAsianVerdict } from '@/lib/asianSessionDisplay';
 
 export {
   resolveAsianSessionPhase,

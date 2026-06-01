@@ -9,23 +9,13 @@ import type {
   DirectionSide,
 } from '@/lib/directionDecisionTypes';
 import { asianCloseFilterStatus } from '@/lib/asianCloseBiasHelpers';
-import { todayUtcDate } from '@/lib/directionDecisionPhases';
-
-function findTodayAsianRow(rows: AsianDirectionLogEntry[]): AsianDirectionLogEntry | null {
-  const today = todayUtcDate();
-  return rows.find((row) => row.trade_date === today) ?? null;
-}
-
-function findLastActionableAsianRow(
-  rows: AsianDirectionLogEntry[],
-): AsianDirectionLogEntry | null {
-  return (
-    rows.find(
-      (row) =>
-        row.action === 'SET_LONG' || row.action === 'SET_SHORT' || row.action === 'NO_CHANGE',
-    ) ?? null
-  );
-}
+import {
+  findTodayAsianRows,
+  findTodayDirectionSetRow,
+  findTodaySkipRow,
+  resolveTodayAmdTag,
+  resolveTodayAsianContextRow,
+} from '@/lib/asianSessionDisplay';
 
 function judasImpliedDirection(judas: string | null | undefined): DirectionSide | null {
   if (judas === 'UP') return 'short';
@@ -172,13 +162,23 @@ export function buildAsianChecklist(
   asianRows: AsianDirectionLogEntry[],
   amdState: AmdState | null,
 ): ChecklistRow[] {
-  const todayRow = findTodayAsianRow(asianRows);
-  const actionable = findLastActionableAsianRow(asianRows);
-  const amdTag = actionable?.amd_tag ?? amdState?.amd_tag ?? null;
+  const todayRows = findTodayAsianRows(asianRows);
+  const contextRow = resolveTodayAsianContextRow(todayRows, amdState);
+  const directionRow = findTodayDirectionSetRow(todayRows);
+  const skipRow = findTodaySkipRow(todayRows);
+  const amdTag = resolveTodayAmdTag(todayRows, amdState);
   const isShifted = amdTag === 'AMD_SHIFTED';
-  const priorD1 = actionable?.prior_d1_direction ?? '—';
+  const priorD1 = contextRow?.prior_d1_direction ?? '—';
   const priorDir: DirectionSide | null =
     priorD1 === 'BULLISH' ? 'long' : priorD1 === 'BEARISH' ? 'short' : null;
+
+  const omegaValue = directionRow
+    ? `Direction set (${directionRow.action})`
+    : skipRow
+      ? skipRow.action.replace('SKIPPED_', 'Skipped — ')
+      : todayRows.some((row) => row.action === 'ASIAN_CLOSE')
+        ? 'Asian close logged — pending 21:00 UTC'
+        : 'Session window';
 
   return [
     {
@@ -205,11 +205,9 @@ export function buildAsianChecklist(
     {
       id: 'omega_asian',
       label: 'Omega',
-      value: todayRow?.action === 'SET_LONG' || todayRow?.action === 'SET_SHORT'
-        ? `Direction set (${todayRow.action})`
-        : 'Session window',
+      value: omegaValue,
       impliedDirection: null,
-      status: 'pass',
+      status: skipRow ? 'fail' : directionRow ? 'pass' : 'pending',
     },
   ];
 }
@@ -254,5 +252,3 @@ export function buildGateExplanation(gate: AsianCloseGate, amdState: AmdState | 
   if (gate === 'NEUTRAL') return `Asian Close NEUTRAL → fall through to Auto Direction ${auto}`;
   return 'Gate pending — AMD evaluation not complete';
 }
-
-export { findLastActionableAsianRow };
