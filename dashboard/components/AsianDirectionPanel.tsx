@@ -70,11 +70,11 @@ function groupByDate(rows: AsianDirectionLogEntry[]): Array<{ row: AsianDirectio
   return Array.from(seen.values());
 }
 
-/** Scheduled = within ±5 min of 21:00 UTC (the Asian open cron). Else Startup. */
+/** Scheduled = within ±15 min of 21:00 UTC (cron fires at 21:10). Else Startup. */
 function detectRunType(triggeredAt: string): 'Scheduled' | 'Startup' {
   const d = new Date(triggeredAt);
   const totalMins = d.getUTCHours() * 60 + d.getUTCMinutes();
-  return Math.abs(totalMins - 21 * 60) <= 5 ? 'Scheduled' : 'Startup';
+  return Math.abs(totalMins - 21 * 60) <= 15 ? 'Scheduled' : 'Startup';
 }
 
 function formatActionableTime(row: AsianDirectionLogEntry | null): string {

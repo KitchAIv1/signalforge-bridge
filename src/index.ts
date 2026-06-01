@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     console.error('[RegimeDetector] Startup run error:', startupError);
   });
 
-  cron.schedule('31 10 * * *', async () => {
+  cron.schedule('31 10 * * 1-5', async () => {
     try {
       await runAmdDetection();
     } catch (amdError) {
