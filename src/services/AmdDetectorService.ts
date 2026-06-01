@@ -22,6 +22,11 @@ import {
   type AmdDirectionAlertContext,
 } from './amdDetector/amdAutoDirection.js';
 import {
+  fetchExistingDecisionSnapshot,
+  resolveDecisionSnapshotFields,
+  type DecisionSnapshotFields,
+} from './amdDetector/amdDecisionSnapshot.js';
+import {
   buildInitialDetectionLockFields,
   shouldSkipAmdDetectionForLockedRow,
 } from './amdDetector/amdDetectionLock.js';
@@ -75,8 +80,12 @@ type InsertAmdOpts = {
   m5Signal: AmdM5Signal;
 };
 
-function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
-  const { tradeDate, evaluatedAtISO, candlesForChart, features, dailyBias } =
+type PersistAmdRowOpts = InsertAmdOpts & {
+  decisionSnapshot: DecisionSnapshotFields;
+};
+
+function buildAmdStateUpsertRow(insertOpts: PersistAmdRowOpts) {
+  const { tradeDate, evaluatedAtISO, candlesForChart, features, dailyBias, decisionSnapshot } =
     insertOpts;
   const chartPayload = buildAmdChartDataPayload(
     tradeDate,
@@ -123,6 +132,8 @@ function buildAmdStateUpsertRow(insertOpts: InsertAmdOpts) {
     asian_net_direction: insertOpts.autoDir.asian_net_direction ?? null,
     asian_close_position_pct: features.asian_close_position_pct ?? null,
     asian_close_bias_signal: features.asian_close_bias_signal ?? null,
+    decision_auto_direction: decisionSnapshot.decision_auto_direction,
+    decision_evaluated_at: decisionSnapshot.decision_evaluated_at,
     ...buildInitialDetectionLockFields(evaluatedAtISO),
   };
 }
@@ -149,8 +160,14 @@ function logAmdPersistSummary(insertOpts: InsertAmdOpts): void {
 }
 
 async function persistAmdInsightRow(insertOpts: InsertAmdOpts): Promise<boolean> {
-  const { amdSupabase } = insertOpts;
-  const upsertRow = buildAmdStateUpsertRow(insertOpts);
+  const { amdSupabase, tradeDate, autoDir, evaluatedAtISO } = insertOpts;
+  const existingSnapshot = await fetchExistingDecisionSnapshot(amdSupabase, tradeDate);
+  const decisionSnapshot = resolveDecisionSnapshotFields(
+    existingSnapshot,
+    autoDir,
+    evaluatedAtISO,
+  );
+  const upsertRow = buildAmdStateUpsertRow({ ...insertOpts, decisionSnapshot });
   const { error } = await amdSupabase
     .from('amd_state')
     .upsert(upsertRow, { onConflict: 'trade_date,pair' });

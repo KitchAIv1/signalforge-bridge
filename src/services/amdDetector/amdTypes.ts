@@ -94,6 +94,9 @@ export type AmdStateRow = {
   // Asian close bias (written at 10:31 UTC)
   asian_close_position_pct?: number | null;
   asian_close_bias_signal?: AsianCloseBiasSignal;
+  // Immutable first-detection snapshot (written once, never overwritten)
+  decision_auto_direction?: string | null;
+  decision_evaluated_at?: string | null;
 };
 
 /** Auto-direction output from AMD + D1 conviction analysis. */
