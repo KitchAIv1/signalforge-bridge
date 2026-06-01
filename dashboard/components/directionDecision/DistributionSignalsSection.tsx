@@ -1,24 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import type { AmdState } from '@/lib/types';
-import type {
-  AsianSessionVerdict,
-  ChecklistRow,
-  SessionPhase,
-} from '@/lib/directionDecisionLogic';
+import type { AmdState, RegimeState } from '@/lib/types';
+import type { AlignmentSummary, ChecklistRow, SessionPhase } from '@/lib/directionDecisionLogic';
 import { DirectionChecklist } from '@/components/directionDecision/DirectionChecklist';
+import { SignalAlignmentBadge } from '@/components/directionDecision/SignalAlignmentBadge';
 import { IconChevronDown } from '@/lib/directionDecisionTablerIcons';
 import {
   DIRECTION_COLUMN_CARD_CLASS,
   sessionStatusBadgeClass,
 } from '@/components/directionDecision/directionDecisionLayout';
 
-interface AsianSessionSectionProps {
+interface DistributionSignalsSectionProps {
   phase: SessionPhase;
-  verdict: AsianSessionVerdict;
   checklist: ChecklistRow[];
+  alignment: AlignmentSummary;
   amdState: AmdState | null;
+  regimeState: RegimeState | null;
 }
 
 function phaseLabel(phase: SessionPhase): string {
@@ -27,52 +25,57 @@ function phaseLabel(phase: SessionPhase): string {
   return 'PENDING';
 }
 
-function verdictToneClass(tone: AsianSessionVerdict['tone']): string {
-  if (tone === 'complete') return 'text-emerald-700 dark:text-emerald-300';
-  if (tone === 'skipped') return 'text-slate-600 dark:text-slate-400';
-  if (tone === 'active') return 'text-blue-700 dark:text-blue-300';
-  return 'text-amber-700 dark:text-amber-300';
-}
-
-function AsianDetailsPanel({ amdState }: { amdState: AmdState | null }) {
-  if (!amdState) {
-    return <p className="text-xs text-slate-500">No AMD state for investigation details.</p>;
-  }
+function DistributionDetailsPanel({
+  amdState,
+  regimeState,
+}: {
+  amdState: AmdState | null;
+  regimeState: RegimeState | null;
+}) {
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
       <div>
-        <dt className="text-slate-400">Asian range</dt>
-        <dd>{amdState.asian_range_pips ?? '—'} pips</dd>
-      </div>
-      <div>
-        <dt className="text-slate-400">Asian net</dt>
-        <dd>{amdState.asian_net_pips ?? '—'} pips</dd>
-      </div>
-      <div>
         <dt className="text-slate-400">Judas pips</dt>
-        <dd>{amdState.judas_pips ?? '—'}</dd>
+        <dd>{amdState?.judas_pips ?? '—'}</dd>
       </div>
       <div>
-        <dt className="text-slate-400">Evaluated</dt>
-        <dd>{amdState.evaluated_at?.slice(11, 16) ?? '—'} UTC</dd>
+        <dt className="text-slate-400">Asian close %</dt>
+        <dd>{amdState?.asian_close_position_pct?.toFixed(1) ?? '—'}</dd>
+      </div>
+      <div>
+        <dt className="text-slate-400">M5 net (first 3)</dt>
+        <dd>{amdState?.m5_first_3_net_pips ?? '—'}</dd>
+      </div>
+      <div>
+        <dt className="text-slate-400">Auto reason</dt>
+        <dd className="truncate">{amdState?.auto_direction_reason ?? '—'}</dd>
+      </div>
+      <div>
+        <dt className="text-slate-400">Regime L5</dt>
+        <dd>{regimeState?.layer5_result ?? '—'}</dd>
+      </div>
+      <div>
+        <dt className="text-slate-400">Size multiplier</dt>
+        <dd>{amdState?.amd_size_multiplier ?? '—'}</dd>
       </div>
     </dl>
   );
 }
 
-export function AsianSessionSection({
+export function DistributionSignalsSection({
   phase,
-  verdict,
   checklist,
+  alignment,
   amdState,
-}: AsianSessionSectionProps) {
+  regimeState,
+}: DistributionSignalsSectionProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
     <section className={DIRECTION_COLUMN_CARD_CLASS}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Asian session
+          Distribution signals
         </p>
         <span
           className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${sessionStatusBadgeClass(phase)}`}
@@ -81,15 +84,11 @@ export function AsianSessionSection({
         </span>
       </div>
 
-      <p className="mb-3 text-[10px] text-slate-400 dark:text-slate-500">00:00–08:00 UTC</p>
+      <p className="mb-3 text-[10px] text-slate-400 dark:text-slate-500">10:00–16:00 UTC</p>
 
-      <div className="mb-3">
-        <p className={`text-sm font-bold ${verdictToneClass(verdict.tone)}`}>{verdict.headline}</p>
-        <p className="text-xs text-slate-600 dark:text-slate-300">{verdict.subline}</p>
-      </div>
-
-      <div className="flex-1">
+      <div className="flex-1 space-y-3">
         <DirectionChecklist rows={checklist} />
+        <SignalAlignmentBadge alignment={alignment} />
       </div>
 
       <button
@@ -105,7 +104,7 @@ export function AsianSessionSection({
       </button>
       {detailsOpen && (
         <div className="mt-2 rounded border border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-          <AsianDetailsPanel amdState={amdState} />
+          <DistributionDetailsPanel amdState={amdState} regimeState={regimeState} />
         </div>
       )}
     </section>

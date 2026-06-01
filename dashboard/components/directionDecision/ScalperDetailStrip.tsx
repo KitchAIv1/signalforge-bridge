@@ -25,7 +25,7 @@ export function ScalperDetailStrip({
   const ratchetCount = scalperDayState?.ratchet_count ?? 0;
 
   return (
-    <div className="rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2 dark:border-teal-800 dark:bg-teal-900/15">
+    <div className="mt-auto rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2 dark:border-teal-800 dark:bg-teal-900/15">
       <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
         Scalper detail
       </p>
