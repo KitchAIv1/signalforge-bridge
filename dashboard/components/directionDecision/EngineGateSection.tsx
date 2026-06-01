@@ -9,6 +9,8 @@ import type {
   SessionPhase,
 } from '@/lib/directionDecisionLogic';
 import { ScalperDetailStrip } from '@/components/directionDecision/ScalperDetailStrip';
+import { DecisionVerificationRow } from '@/components/directionDecision/DecisionVerificationRow';
+import type { DecisionVerificationProps } from '@/components/directionDecision/DecisionVerificationRow';
 import {
   IconCheck,
   IconClock,
@@ -24,6 +26,7 @@ interface EngineGateSectionProps {
   engineGates: EngineGateRow[];
   scalperDayState: ScalperDayState | null;
   scalperSummary: ScalperTradeSummary;
+  verificationStatus: DecisionVerificationProps;
 }
 
 function verdictBannerClass(tone: DistributionVerdict['tone'], phase: SessionPhase): string {
@@ -68,6 +71,7 @@ export function EngineGateSection({
   engineGates,
   scalperDayState,
   scalperSummary,
+  verificationStatus,
 }: EngineGateSectionProps) {
   return (
     <section className={DIRECTION_COLUMN_CARD_CLASS}>
@@ -104,6 +108,13 @@ export function EngineGateSection({
         scalperDayState={scalperDayState}
         tradeSummary={scalperSummary}
         visible
+      />
+
+      <DecisionVerificationRow
+        liveDirection={verificationStatus.liveDirection}
+        reconstructedDirection={verificationStatus.reconstructedDirection}
+        match={verificationStatus.match}
+        available={verificationStatus.available}
       />
     </section>
   );

@@ -37,7 +37,7 @@ function DirectionDecisionError({ message }: { message: string }) {
 }
 
 export function DirectionDecisionPanel() {
-  const { snapshot, amdState, regimeState, scalperDayState, loading, error } =
+  const { snapshot, amdState, regimeState, scalperDayState, verificationStatus, loading, error } =
     useDirectionDecisionData();
   const [lastUpdatedUtc, setLastUpdatedUtc] = useState('');
 
@@ -95,6 +95,7 @@ export function DirectionDecisionPanel() {
             engineGates={snapshot.engineGates}
             scalperDayState={scalperDayState}
             scalperSummary={snapshot.scalperSummary}
+            verificationStatus={verificationStatus}
           />
         </div>
       </div>

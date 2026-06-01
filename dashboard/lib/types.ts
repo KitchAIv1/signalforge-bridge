@@ -254,6 +254,8 @@ export interface AmdState {
   auto_direction?: string | null;
   auto_direction_confidence?: string | null;
   auto_direction_reason?: string | null;
+  decision_auto_direction?: string | null;
+  decision_evaluated_at?: string | null;
   amd_size_multiplier?: number | null;
   asian_close_position_pct?: number | null;
   asian_close_bias_signal?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;

@@ -20,6 +20,12 @@ export interface UseDirectionDecisionDataResult {
   amdState: AmdState | null;
   regimeState: RegimeState | null;
   scalperDayState: ScalperDayState | null;
+  verificationStatus: {
+    liveDirection: string | null;
+    reconstructedDirection: string | null;
+    match: boolean;
+    available: boolean;
+  };
   loading: boolean;
   error: string | null;
   refetch: () => void;
@@ -148,8 +154,27 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
     void loadAll();
   }, [loadAll]);
 
-  return useMemo(
-    () => ({ snapshot, amdState, regimeState, scalperDayState, loading, error, refetch }),
-    [snapshot, amdState, regimeState, scalperDayState, loading, error, refetch],
-  );
+  return useMemo(() => {
+    const verificationStatus = {
+      liveDirection: scalperDayState?.direction ?? null,
+      reconstructedDirection: amdState?.decision_auto_direction ?? null,
+      match:
+        scalperDayState?.direction != null &&
+        amdState?.decision_auto_direction != null &&
+        scalperDayState.direction === amdState.decision_auto_direction,
+      available:
+        scalperDayState?.direction != null && amdState?.decision_auto_direction != null,
+    };
+
+    return {
+      snapshot,
+      amdState,
+      regimeState,
+      scalperDayState,
+      verificationStatus,
+      loading,
+      error,
+      refetch,
+    };
+  }, [snapshot, amdState, regimeState, scalperDayState, loading, error, refetch]);
 }
