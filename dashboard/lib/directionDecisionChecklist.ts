@@ -1,5 +1,6 @@
 import type { AmdState, RegimeState } from '@/lib/types';
 import type { AsianDirectionLogEntry } from '@/lib/fetchAsianDirectionLog';
+import { resolveEffectiveAutoDirection } from '@/lib/effectiveAutoDirection';
 import { layer4Label } from '@/lib/regimePanelFormatters';
 import type {
   AlignmentSummary,
@@ -76,11 +77,12 @@ function formatAsianCloseValue(amdState: AmdState | null): string {
 }
 
 function formatAutoDirectionValue(amdState: AmdState | null): string {
-  if (!amdState?.auto_direction) return '—';
-  const conf = amdState.auto_direction_confidence
+  const effectiveDirection = resolveEffectiveAutoDirection(amdState);
+  if (!effectiveDirection) return '—';
+  const conf = amdState?.auto_direction_confidence
     ? ` (${amdState.auto_direction_confidence} confidence)`
     : '';
-  return `${amdState.auto_direction.toUpperCase()}${conf}`;
+  return `${effectiveDirection.toUpperCase()}${conf}`;
 }
 
 function formatRegimeValue(regime: RegimeState | null): string {
@@ -104,7 +106,7 @@ export function buildDistributionChecklist(
   amdState: AmdState | null,
   regime: RegimeState | null,
 ): ChecklistRow[] {
-  const autoDir = amdState?.auto_direction ?? null;
+  const autoDir = resolveEffectiveAutoDirection(amdState);
   const d1Dir = d1ImpliedDirection(amdState, regime);
   const judasDir = judasImpliedDirection(amdState?.judas_direction);
   const asianDir = asianCloseImpliedDirection(amdState?.asian_close_bias_signal);
@@ -233,20 +235,18 @@ export function computeAlignment(checklist: ChecklistRow[]): AlignmentSummary {
 }
 
 export function resolveAsianCloseGate(amdState: AmdState | null): AsianCloseGate {
-  const filter = asianCloseFilterStatus(
-    amdState?.asian_close_bias_signal,
-    amdState?.auto_direction,
-  );
+  const effectiveDirection = resolveEffectiveAutoDirection(amdState);
+  const filter = asianCloseFilterStatus(amdState?.asian_close_bias_signal, effectiveDirection);
   if (filter?.label === 'AGREE') return 'AGREE';
   if (filter?.label === 'DISAGREE') return 'DISAGREE';
   if (amdState?.asian_close_bias_signal === 'NEUTRAL') return 'NEUTRAL';
-  if (!amdState?.asian_close_bias_signal || !amdState.auto_direction) return 'UNKNOWN';
+  if (!amdState?.asian_close_bias_signal || !effectiveDirection) return 'UNKNOWN';
   return 'NEUTRAL';
 }
 
 export function buildGateExplanation(gate: AsianCloseGate, amdState: AmdState | null): string {
   const bias = amdState?.asian_close_bias_signal ?? '—';
-  const auto = amdState?.auto_direction?.toUpperCase() ?? '—';
+  const auto = resolveEffectiveAutoDirection(amdState)?.toUpperCase() ?? '—';
   if (gate === 'AGREE') return `Asian Close ${bias} = Auto Direction ${auto} → AGREE`;
   if (gate === 'DISAGREE') return `Asian Close ${bias} ≠ Auto Direction ${auto} → DISAGREE`;
   if (gate === 'NEUTRAL') return `Asian Close NEUTRAL → fall through to Auto Direction ${auto}`;

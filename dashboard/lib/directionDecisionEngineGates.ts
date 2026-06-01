@@ -1,6 +1,7 @@
 import type { AmdState, RegimeState, ScalperDayState, ScalperTrade } from '@/lib/types';
 import type { AsianDirectionLogEntry } from '@/lib/fetchAsianDirectionLog';
 import type { OmegaWindowStatus } from '@/lib/fetchOmegaWindowStatus';
+import { resolveEffectiveAutoDirection } from '@/lib/effectiveAutoDirection';
 import { REBUILD_BLOCKED_HOURS_UTC } from '@/lib/rebuildHourBlockedHoursUtc';
 import type {
   AlignmentSummary,
@@ -28,11 +29,12 @@ import {
 } from '@/lib/directionDecisionPhases';
 
 function isScalperAgree(amdState: AmdState | null): boolean {
-  if (!amdState?.auto_direction) return false;
-  if (amdState.auto_direction !== 'long' && amdState.auto_direction !== 'short') return false;
-  const bias = amdState.asian_close_bias_signal;
-  if (bias === 'BULLISH' && amdState.auto_direction === 'long') return true;
-  if (bias === 'BEARISH' && amdState.auto_direction === 'short') return true;
+  const effectiveDirection = resolveEffectiveAutoDirection(amdState);
+  if (!effectiveDirection) return false;
+  if (effectiveDirection !== 'long' && effectiveDirection !== 'short') return false;
+  const bias = amdState?.asian_close_bias_signal;
+  if (bias === 'BULLISH' && effectiveDirection === 'long') return true;
+  if (bias === 'BEARISH' && effectiveDirection === 'short') return true;
   if (bias === 'NEUTRAL') return true;
   return false;
 }
@@ -72,7 +74,7 @@ export function buildEngineGates(input: {
   const hourUtc = utcHourNow();
   const rebuildBlocked =
     rebuildHourGateEnabled && REBUILD_BLOCKED_HOURS_UTC.includes(hourUtc);
-  const autoDir = amdState?.auto_direction ?? null;
+  const autoDir = resolveEffectiveAutoDirection(amdState);
 
   let scalperState: EngineGateState = 'blocked';
   let scalperDetail = 'Not initialized';
@@ -124,14 +126,22 @@ export function buildEngineGates(input: {
   } else if (isForexWeekendClosed()) {
     omegaState = 'blocked';
     omegaDetail = 'Weekend — market closed';
-  } else if (omegaWindow?.isActive) {
-    omegaState = 'active';
-    const until = omegaWindow.validUntil
-      ? new Date(omegaWindow.validUntil).toISOString().slice(11, 16)
-      : '—';
-    omegaDetail = `${omegaDir.toUpperCase()} · window until ${until} UTC`;
   } else {
-    omegaDetail = `Set ${omegaDir.toUpperCase()} · no active window`;
+    const validUntilMs = omegaWindow?.validUntil ? Date.parse(omegaWindow.validUntil) : null;
+    const windowExpired =
+      validUntilMs != null && Number.isFinite(validUntilMs) && Date.now() > validUntilMs;
+    if (omegaWindow?.isActive && !windowExpired) {
+      omegaState = 'active';
+      const until = omegaWindow.validUntil
+        ? new Date(omegaWindow.validUntil).toISOString().slice(11, 16)
+        : '—';
+      omegaDetail = `${omegaDir.toUpperCase()} · window until ${until} UTC`;
+    } else if (windowExpired) {
+      omegaState = 'done';
+      omegaDetail = 'EXPIRED — window closed';
+    } else {
+      omegaDetail = `Set ${omegaDir.toUpperCase()} · no active window`;
+    }
   }
 
   let rebuildState: EngineGateState = rebuildBlocked ? 'blocked' : 'active';
@@ -154,7 +164,7 @@ export function buildDistributionVerdict(
   amdState: AmdState | null,
   alignment: AlignmentSummary,
 ): DistributionVerdict {
-  const auto = amdState?.auto_direction;
+  const auto = resolveEffectiveAutoDirection(amdState);
   if (resolveDistributionSessionPhase() === 'pending') {
     return {
       headline: 'PENDING — distribution opens 10:00 UTC',
