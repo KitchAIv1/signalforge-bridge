@@ -22,6 +22,7 @@ import { syncScalperTradeToBridgeLog } from './scalperBridgeSync.js';
 import {
   loadOpenTrades,
   loadTodayDayState,
+  loadTradeById,
   refreshDayNetPips,
   stopDay,
   updateTrade,
@@ -187,12 +188,25 @@ export async function hardClose(): Promise<void> {
     return;
   }
 
+  // V7 fix: set day_stopped BEFORE closing trades
+  // Prevents exit monitor from racing on the same trades
+  await stopDay(tradeDate, 'hard_close', config.pair);
+
   for (const trade of openTrades) {
     if (!trade.oanda_trade_id) {
       scalperWarn('Open trade missing oanda_trade_id at hard close', { id: trade.id });
       continue;
     }
     try {
+      const current = await loadTradeById(trade.id);
+      if (current?.result != null) {
+        scalperLog('Trade already closed — skipping', {
+          id: trade.id,
+          existingResult: current.result,
+        });
+        continue;
+      }
+
       const closeResult = await closeTrade(trade.oanda_trade_id);
       const fillPrice = closeResult.orderFillTransaction?.price != null
         ? Number(closeResult.orderFillTransaction.price)
@@ -221,7 +235,16 @@ export async function hardClose(): Promise<void> {
     }
   }
 
-  await stopDay(tradeDate, 'hard_close', config.pair);
+  // V7 fix: any trade that failed to close gets marked for retry
+  const stillOpen = await loadOpenTrades(tradeDate, config.pair);
+  for (const trade of stillOpen) {
+    await updateTrade(trade.id, { result: 'force_flat_failed' }, tradeDate);
+    scalperWarn('Trade not closed during hardClose — marked for retry', {
+      id: trade.id,
+      oandaTradeId: trade.oanda_trade_id,
+    });
+  }
+
   await refreshDayNetPips(tradeDate, config.pair);
 
   const finalDayState = await loadTodayDayState(tradeDate, config.pair);

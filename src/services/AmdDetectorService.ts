@@ -39,6 +39,10 @@ import { logInfo } from '../utils/logger.js';
 
 const AUD_AMD_PAIR = 'AUD_USD';
 
+// V5 fix: in-memory mutex to prevent concurrent detection runs
+let amdDetectionInProgress = false;
+let amdOutcomeInProgress = false;
+
 function buildAmdSupabaseClient() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey =
@@ -566,138 +570,158 @@ async function recordAmdInsightForH1Window(
 }
 
 export async function runAmdDetection(): Promise<void> {
-  const evaluatedAtISO = new Date().toISOString();
-  const tradeDate = utcTradeDateStamp();
+  if (amdDetectionInProgress) {
+    console.log('[AmdDetector] Detection already in progress — skipping concurrent run');
+    return;
+  }
+  amdDetectionInProgress = true;
 
-  console.log(`[AmdDetector] Running for ${AUD_AMD_PAIR} UTC date ${tradeDate}`);
+  try {
+    const evaluatedAtISO = new Date().toISOString();
+    const tradeDate = utcTradeDateStamp();
 
-  const supabaseDb = buildAmdSupabaseClient();
+    console.log(`[AmdDetector] Running for ${AUD_AMD_PAIR} UTC date ${tradeDate}`);
 
-  const { data: existingRow } = await supabaseDb
-    .from('amd_state')
-    .select('detection_locked, detection_locked_at, detection_locked_reason')
-    .eq('trade_date', tradeDate)
-    .eq('pair', AUD_AMD_PAIR)
-    .maybeSingle();
+    const supabaseDb = buildAmdSupabaseClient();
 
-  if (shouldSkipAmdDetectionForLockedRow(existingRow)) {
-    logInfo(
-      `[AmdDetector] detection_locked=true for ${tradeDate} ` +
-        `(locked at ${existingRow!.detection_locked_at}, ` +
-        `reason: ${existingRow!.detection_locked_reason}) — skipping direction overwrite`,
-    );
-    try {
-      await sendAmdDetectionRerunBlockedAlert(
-        tradeDate,
-        existingRow!.detection_locked_at,
-        existingRow!.detection_locked_reason,
+    const { data: existingRow } = await supabaseDb
+      .from('amd_state')
+      .select('detection_locked, detection_locked_at, detection_locked_reason')
+      .eq('trade_date', tradeDate)
+      .eq('pair', AUD_AMD_PAIR)
+      .maybeSingle();
+
+    if (shouldSkipAmdDetectionForLockedRow(existingRow)) {
+      logInfo(
+        `[AmdDetector] detection_locked=true for ${tradeDate} ` +
+          `(locked at ${existingRow!.detection_locked_at}, ` +
+          `reason: ${existingRow!.detection_locked_reason}) — skipping direction overwrite`,
       );
-    } catch (tgErr: unknown) {
-      console.warn('[AmdDetector] Rerun-blocked Telegram alert failed:', tgErr);
+      try {
+        await sendAmdDetectionRerunBlockedAlert(
+          tradeDate,
+          existingRow!.detection_locked_at,
+          existingRow!.detection_locked_reason,
+        );
+      } catch (tgErr: unknown) {
+        console.warn('[AmdDetector] Rerun-blocked Telegram alert failed:', tgErr);
+      }
+      return;
     }
-    return;
+
+    const h1Pull = await pullAudUsdH1ForAmd(tradeDate);
+    if (h1Pull === null) return;
+
+    if (h1Pull.length === 0) {
+      await recordAmdInsightForEmptyH1(supabaseDb, tradeDate, evaluatedAtISO);
+      return;
+    }
+
+    await recordAmdInsightForH1Window(supabaseDb, tradeDate, evaluatedAtISO, h1Pull);
+  } finally {
+    amdDetectionInProgress = false;
   }
-
-  const h1Pull = await pullAudUsdH1ForAmd(tradeDate);
-  if (h1Pull === null) return;
-
-  if (h1Pull.length === 0) {
-    await recordAmdInsightForEmptyH1(supabaseDb, tradeDate, evaluatedAtISO);
-    return;
-  }
-
-  await recordAmdInsightForH1Window(supabaseDb, tradeDate, evaluatedAtISO, h1Pull);
 }
 
 export async function runAmdOutcomeDetection(): Promise<void> {
-  const evaluatedAtISO = new Date().toISOString();
-  const tradeDate = utcTradeDateStamp();
-
-  console.log(
-    `[AmdOutcome] Running for ${AUD_AMD_PAIR} UTC date ${tradeDate}`,
-  );
-
-  const supabaseDb = buildAmdSupabaseClient();
-
-  const { data: existing, error: fetchErr } = await supabaseDb
-    .from('amd_state')
-    .select('id, amd_tag, judas_direction')
-    .eq('pair', AUD_AMD_PAIR)
-    .eq('trade_date', tradeDate)
-    .maybeSingle();
-
-  if (fetchErr || !existing) {
-    console.log(
-      `[AmdOutcome] No amd_state row for ${tradeDate} — skipping`,
-    );
+  if (amdOutcomeInProgress) {
+    console.log('[AmdOutcome] Outcome detection already in progress — skipping');
     return;
   }
-
-  const outcomeEligible = [
-    'AMD_FAILED',
-    'AMD_TEXTBOOK',
-    'AMD_COMPRESSION_BREAKOUT',
-  ];
-  if (!outcomeEligible.includes(existing.amd_tag as string)) {
-    console.log(
-      `[AmdOutcome] Tag ${existing.amd_tag as string} ` +
-        `not outcome-eligible — skipping`,
-    );
-    return;
-  }
+  amdOutcomeInProgress = true;
 
   try {
-    const fromISO = `${tradeDate}T00:00:00.000000000Z`;
-    const toISO = `${tradeDate}T16:30:00.000000000Z`;
-    const h1Full = await fetchCompletedCandles(
-      AUD_AMD_PAIR,
-      'H1',
-      fromISO,
-      toISO,
+    const evaluatedAtISO = new Date().toISOString();
+    const tradeDate = utcTradeDateStamp();
+
+    console.log(
+      `[AmdOutcome] Running for ${AUD_AMD_PAIR} UTC date ${tradeDate}`,
     );
 
-    if (!h1Full || h1Full.length === 0) {
+    const supabaseDb = buildAmdSupabaseClient();
+
+    const { data: existing, error: fetchErr } = await supabaseDb
+      .from('amd_state')
+      .select('id, amd_tag, judas_direction')
+      .eq('pair', AUD_AMD_PAIR)
+      .eq('trade_date', tradeDate)
+      .maybeSingle();
+
+    if (fetchErr || !existing) {
       console.log(
-        `[AmdOutcome] No H1 data for ${tradeDate} — skipping`,
+        `[AmdOutcome] No amd_state row for ${tradeDate} — skipping`,
       );
       return;
     }
 
-    const outcomeFeatures = computeDateFeatures(h1Full, (badCandle, reason) => {
-      console.warn(`[AmdOutcome] Bad candle: ${reason}`, badCandle.time);
-    });
-
-    const { error: updateErr } = await supabaseDb
-      .from('amd_state')
-      .update({
-        amd_outcome_tag: outcomeFeatures.amd_tag,
-        reversal_confirmed_outcome: outcomeFeatures.reversal_confirmed,
-        compression_breakout_outcome: outcomeFeatures.compression_breakout,
-        outcome_evaluated_at: evaluatedAtISO,
-        detection_locked: false,
-        detection_locked_at: null,
-        detection_locked_reason: null,
-      })
-      .eq('pair', AUD_AMD_PAIR)
-      .eq('trade_date', tradeDate);
-
-    if (updateErr) {
-      console.error('[AmdOutcome] Update failed:', updateErr.message);
+    const outcomeEligible = [
+      'AMD_FAILED',
+      'AMD_TEXTBOOK',
+      'AMD_COMPRESSION_BREAKOUT',
+    ];
+    if (!outcomeEligible.includes(existing.amd_tag as string)) {
+      console.log(
+        `[AmdOutcome] Tag ${existing.amd_tag as string} ` +
+          `not outcome-eligible — skipping`,
+      );
       return;
     }
 
-    console.log(
-      `[AmdOutcome] ${tradeDate} | ` +
-        `live=${existing.amd_tag as string} | ` +
-        `outcome=${outcomeFeatures.amd_tag} | ` +
-        `reversal=${outcomeFeatures.reversal_confirmed ?? 'null'} | ` +
-        `compression=${outcomeFeatures.compression_breakout}`,
-    );
-  } catch (err: unknown) {
-    console.error(
-      '[AmdOutcome] Error:',
-      err instanceof Error ? err.message : err,
-    );
+    try {
+      const fromISO = `${tradeDate}T00:00:00.000000000Z`;
+      const toISO = `${tradeDate}T16:30:00.000000000Z`;
+      const h1Full = await fetchCompletedCandles(
+        AUD_AMD_PAIR,
+        'H1',
+        fromISO,
+        toISO,
+      );
+
+      if (!h1Full || h1Full.length === 0) {
+        console.log(
+          `[AmdOutcome] No H1 data for ${tradeDate} — skipping`,
+        );
+        return;
+      }
+
+      const outcomeFeatures = computeDateFeatures(h1Full, (badCandle, reason) => {
+        console.warn(`[AmdOutcome] Bad candle: ${reason}`, badCandle.time);
+      });
+
+      const { error: updateErr } = await supabaseDb
+        .from('amd_state')
+        .update({
+          amd_outcome_tag: outcomeFeatures.amd_tag,
+          reversal_confirmed_outcome: outcomeFeatures.reversal_confirmed,
+          compression_breakout_outcome: outcomeFeatures.compression_breakout,
+          outcome_evaluated_at: evaluatedAtISO,
+          detection_locked: false,
+          detection_locked_at: null,
+          detection_locked_reason: null,
+        })
+        .eq('pair', AUD_AMD_PAIR)
+        .eq('trade_date', tradeDate);
+
+      if (updateErr) {
+        console.error('[AmdOutcome] Update failed:', updateErr.message);
+        return;
+      }
+
+      console.log(
+        `[AmdOutcome] ${tradeDate} | ` +
+          `live=${existing.amd_tag as string} | ` +
+          `outcome=${outcomeFeatures.amd_tag} | ` +
+          `reversal=${outcomeFeatures.reversal_confirmed ?? 'null'} | ` +
+          `compression=${outcomeFeatures.compression_breakout}`,
+      );
+    } catch (err: unknown) {
+      console.error(
+        '[AmdOutcome] Error:',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  } finally {
+    amdOutcomeInProgress = false;
   }
 }
 

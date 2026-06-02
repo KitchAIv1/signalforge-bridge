@@ -194,9 +194,39 @@ async function main(): Promise<void> {
   const _amdUtcMin = _amdNow.getUTCMinutes();
   const _amdWindowOpen = _amdUtcHour > 10 || (_amdUtcHour === 10 && _amdUtcMin >= 31);
   if (_amdWindowOpen) {
-    runAmdDetection().catch(startupAmdErr => {
-      console.error('[AmdDetector] Startup run error:', startupAmdErr);
-    });
+    // V10 fix: if today's decision snapshot already exists,
+    // detection already ran at 10:31 — skip restart rerun
+    try {
+      const _v10Today = new Date().toISOString().slice(0, 10);
+      const { data: _v10Row } = await supabase
+        .from('amd_state')
+        .select('decision_auto_direction')
+        .eq('pair', 'AUD_USD')
+        .eq('trade_date', _v10Today)
+        .maybeSingle();
+
+      if (_v10Row?.decision_auto_direction != null) {
+        console.log(
+          '[AmdDetector] Startup: decision snapshot already exists for ' +
+            _v10Today +
+            ' (' +
+            _v10Row.decision_auto_direction +
+            ') — skipping detection rerun to protect 10:31 decision',
+        );
+      } else {
+        runAmdDetection().catch((startupAmdErr) => {
+          console.error('[AmdDetector] Startup run error:', startupAmdErr);
+        });
+      }
+    } catch (_v10Err) {
+      console.warn(
+        '[AmdDetector] V10 snapshot check failed — running detection as fallback:',
+        _v10Err,
+      );
+      runAmdDetection().catch((startupAmdErr) => {
+        console.error('[AmdDetector] Startup run error:', startupAmdErr);
+      });
+    }
   } else {
     logInfo('[AmdDetector] Startup before 10:31 UTC — skipping startup run, cron handles daily detection');
   }

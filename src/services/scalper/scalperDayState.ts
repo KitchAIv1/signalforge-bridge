@@ -61,6 +61,16 @@ export async function stopDay(
 
 // ─── scalper_trades ──────────────────────────────────────────────────────────
 
+export async function loadTradeById(id: number): Promise<ScalperTrade | null> {
+  const { data, error } = await db()
+    .from('scalper_trades')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`loadTradeById: ${error.message}`);
+  return (data as ScalperTrade | null) ?? null;
+}
+
 export async function loadOpenTrades(
   tradeDate: string,
   pair = 'AUD_USD',
