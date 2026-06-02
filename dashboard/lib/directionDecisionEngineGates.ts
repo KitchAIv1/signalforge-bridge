@@ -78,16 +78,28 @@ export function buildEngineGates(input: {
 
   let scalperState: EngineGateState = 'blocked';
   let scalperDetail = 'Not initialized';
-  if (pausedIds.includes('scalper')) {
+  if (isForexWeekendClosed()) {
+    scalperState = 'blocked';
+    scalperDetail = 'Weekend — market closed';
+  } else if (pausedIds.includes('scalper')) {
     scalperState = 'paused';
     scalperDetail = 'Paused in bridge controls';
-  } else if (scalperDayState?.day_stopped && scalperDayState.stop_reason === 'no_agree') {
+  } else if (!scalperDayState) {
+    const hour = utcHourNow();
+    if (hour < 10 || (hour === 10 && new Date().getUTCMinutes() < 32)) {
+      scalperState = 'pending';
+      scalperDetail = 'Init at 10:32 UTC';
+    } else {
+      scalperState = 'pending';
+      scalperDetail = 'Init pending — check Railway logs';
+    }
+  } else if (scalperDayState.day_stopped && scalperDayState.stop_reason === 'no_agree') {
     scalperState = 'blocked';
     scalperDetail = 'BLOCKED (DISAGREE)';
-  } else if (scalperDayState?.day_stopped) {
+  } else if (scalperDayState.day_stopped) {
     scalperState = 'done';
     scalperDetail = scalperDayState.stop_reason ?? 'Day stopped';
-  } else if (scalperDayState?.reference_price != null) {
+  } else if (scalperDayState.reference_price != null) {
     scalperState = 'armed';
     scalperDetail = `ref ${scalperDayState.reference_price} · trigger ${scalperDayState.trigger_level ?? '—'}`;
   } else if (!isScalperAgree(amdState)) {
@@ -100,12 +112,26 @@ export function buildEngineGates(input: {
 
   let amdStateGate: EngineGateState = 'blocked';
   let amdDetail = 'No AMD state';
-  if (!engineActiveMap.engine_amd) {
+  if (isForexWeekendClosed()) {
+    amdStateGate = 'blocked';
+    amdDetail = 'Weekend — market closed';
+  } else if (!engineActiveMap.engine_amd) {
     amdStateGate = 'paused';
     amdDetail = 'engine_amd inactive';
+  } else if (!amdState || !amdState.decision_auto_direction) {
+    const hour = utcHourNow();
+    amdStateGate = 'pending';
+    amdDetail =
+      hour < 10
+        ? 'Detection at 10:31 UTC'
+        : hour === 10 && new Date().getUTCMinutes() < 31
+          ? 'Detection at 10:31 UTC'
+          : 'Detection in progress';
   } else if (asianCloseGate === 'DISAGREE') {
+    amdStateGate = 'blocked';
     amdDetail = 'BLOCKED (ASIAN_CLOSE_DISAGREE)';
   } else if (!autoDir || autoDir === 'neutral') {
+    amdStateGate = 'blocked';
     amdDetail = 'Auto direction neutral';
   } else if (resolveDistributionSessionPhase() === 'pending') {
     amdStateGate = 'active';
@@ -146,7 +172,10 @@ export function buildEngineGates(input: {
 
   let rebuildState: EngineGateState = rebuildBlocked ? 'blocked' : 'active';
   let rebuildDetail = rebuildBlocked ? `Hour ${hourUtc} blocked` : 'Clean window';
-  if (pausedIds.includes('engine_rebuild')) {
+  if (isForexWeekendClosed()) {
+    rebuildState = 'blocked';
+    rebuildDetail = 'Weekend — market closed';
+  } else if (pausedIds.includes('engine_rebuild')) {
     rebuildState = 'paused';
     rebuildDetail = 'Paused';
   }
@@ -164,6 +193,14 @@ export function buildDistributionVerdict(
   amdState: AmdState | null,
   alignment: AlignmentSummary,
 ): DistributionVerdict {
+  if (isForexWeekendClosed()) {
+    return {
+      headline: 'WEEKEND — markets closed',
+      subline: 'Next session Monday 00:00 UTC',
+      tone: 'neutral',
+    };
+  }
+
   const auto = resolveEffectiveAutoDirection(amdState);
   if (resolveDistributionSessionPhase() === 'pending') {
     return {
@@ -188,9 +225,11 @@ export function buildDistributionVerdict(
   }
   const dirLabel = auto === 'long' ? 'LONG' : 'SHORT';
   const alignLabel =
-    alignment.kind === 'unanimous'
-      ? 'All core signals aligned'
-      : 'Core gate passed with mixed alignment';
+    alignment.kind === 'insufficient'
+      ? 'Partial signal set — see alignment'
+      : alignment.kind === 'unanimous'
+        ? 'All core signals aligned'
+        : 'Core gate passed with mixed alignment';
   return {
     headline: `ARMED — ${dirLabel}`,
     subline: alignLabel,

@@ -10,7 +10,7 @@ export interface ChecklistRow {
   status: ChecklistStatus;
 }
 
-export type AlignmentKind = 'unanimous' | 'split' | 'blocked' | 'neutral';
+export type AlignmentKind = 'unanimous' | 'split' | 'blocked' | 'neutral' | 'insufficient';
 
 export interface AlignmentSummary {
   kind: AlignmentKind;
@@ -19,7 +19,14 @@ export interface AlignmentSummary {
   neutralLabels: string[];
 }
 
-export type EngineGateState = 'armed' | 'blocked' | 'paused' | 'active' | 'done' | 'skipped';
+export type EngineGateState =
+  | 'armed'
+  | 'blocked'
+  | 'paused'
+  | 'active'
+  | 'done'
+  | 'skipped'
+  | 'pending';
 
 export interface EngineGateRow {
   engineId: string;

@@ -4,13 +4,39 @@
 import type { AsianDirectionLogEntry } from '@/lib/fetchAsianDirectionLog';
 import type { AmdState } from '@/lib/types';
 import type { AsianSessionVerdict } from '@/lib/directionDecisionTypes';
-import { resolveAsianSessionPhase, todayUtcDate } from '@/lib/directionDecisionPhases';
+import {
+  isForexWeekendClosed,
+  resolveAsianSessionPhase,
+  todayUtcDate,
+} from '@/lib/directionDecisionPhases';
 
 const DIRECTION_SET_ACTIONS = new Set(['SET_LONG', 'SET_SHORT', 'NO_CHANGE']);
 const SKIP_ACTIONS = new Set(['SKIPPED_NOT_SHIFTED', 'SKIPPED_NO_D1', 'SKIPPED_NO_AMD']);
 
 export function findTodayAsianRows(rows: AsianDirectionLogEntry[]): AsianDirectionLogEntry[] {
-  const today = todayUtcDate();
+  const now = new Date();
+  const utcHour = now.getUTCHours();
+  const today = now.toISOString().slice(0, 10);
+
+  if (utcHour < 8) {
+    const yesterday = new Date(now);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    const yesterdayRows = rows.filter(
+      (row) =>
+        row.trade_date === yesterdayStr &&
+        (row.action === 'SET_LONG' ||
+          row.action === 'SET_SHORT' ||
+          row.action === 'NO_CHANGE' ||
+          row.action === 'SKIPPED_NOT_SHIFTED' ||
+          row.action === 'SKIPPED_NO_D1' ||
+          row.action === 'SKIPPED_NO_AMD'),
+    );
+
+    if (yesterdayRows.length > 0) return yesterdayRows;
+  }
+
   return rows.filter((row) => row.trade_date === today);
 }
 
@@ -44,6 +70,14 @@ export function buildAsianVerdict(
   asianRows: AsianDirectionLogEntry[],
   _amdState: AmdState | null,
 ): AsianSessionVerdict {
+  if (isForexWeekendClosed()) {
+    return {
+      headline: 'WEEKEND',
+      subline: 'Markets closed',
+      tone: 'pending',
+    };
+  }
+
   const phase = resolveAsianSessionPhase();
   const todayRows = findTodayAsianRows(asianRows);
 

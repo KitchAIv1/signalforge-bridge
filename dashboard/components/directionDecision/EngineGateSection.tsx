@@ -49,6 +49,9 @@ function gateIcon(state: EngineGateState) {
   if (state === 'blocked') {
     return <IconX size={14} className="shrink-0 text-red-600 dark:text-red-400" />;
   }
+  if (state === 'pending') {
+    return <IconClock size={14} className="shrink-0 text-slate-400" />;
+  }
   if (state === 'paused' || state === 'done') {
     return <IconMinus size={14} className="shrink-0 text-slate-400" />;
   }
@@ -61,6 +64,7 @@ function gateStateLabel(state: EngineGateState): string {
   if (state === 'blocked') return 'BLOCKED';
   if (state === 'paused') return 'PAUSED';
   if (state === 'done') return 'DONE';
+  if (state === 'pending') return 'PENDING';
   return 'SKIPPED';
 }
 

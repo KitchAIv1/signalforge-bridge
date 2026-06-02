@@ -225,6 +225,16 @@ export function computeAlignment(checklist: ChecklistRow[]): AlignmentSummary {
     else if (row.impliedDirection === 'neutral') neutralLabels.push(row.label);
   }
 
+  const directionalCount = longLabels.length + shortLabels.length;
+  if (directionalCount < 3) {
+    return {
+      kind: 'insufficient',
+      longLabels,
+      shortLabels,
+      neutralLabels,
+    };
+  }
+
   if (longLabels.length > 0 && shortLabels.length > 0) {
     return { kind: 'split', longLabels, shortLabels, neutralLabels };
   }

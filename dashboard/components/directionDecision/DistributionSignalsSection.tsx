@@ -88,7 +88,16 @@ export function DistributionSignalsSection({
 
       <div className="flex-1 space-y-3">
         <DirectionChecklist rows={checklist} />
-        <SignalAlignmentBadge alignment={alignment} />
+        {alignment.kind === 'insufficient' ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+            <div className="text-xs font-semibold tracking-wide">ALIGNMENT: INSUFFICIENT</div>
+            <p className="mt-1 text-xs">
+              {alignment.longLabels.length + alignment.shortLabels.length} of 5 signals available
+            </p>
+          </div>
+        ) : (
+          <SignalAlignmentBadge alignment={alignment} />
+        )}
       </div>
 
       <button
