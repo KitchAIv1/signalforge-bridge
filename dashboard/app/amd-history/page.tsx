@@ -79,7 +79,7 @@ export default function AmdHistoryPage() {
           />
         </section>
 
-        <aside className="w-full lg:sticky lg:top-6 lg:w-1/2 lg:self-start xl:w-3/5">
+        <aside className="w-full lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:w-1/2 lg:self-start lg:overflow-y-auto xl:w-3/5">
           {selectedRow != null ? (
             <AmdHistoryDetailPanel
               selectedRow={selectedRow}
