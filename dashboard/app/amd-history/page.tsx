@@ -10,7 +10,7 @@ import { AmdReferenceModal } from '@/components/amdReference/AmdReferenceModal';
 
 function TodayMissingBanner({ todayUtc }: { todayUtc: string }) {
   return (
-    <div className="mb-4 rounded-lg border border-blue-700/40 bg-blue-950/30 px-4 py-3">
+    <div className="rounded-lg border border-blue-700/40 bg-blue-950/30 px-4 py-3">
       <p className="text-sm text-blue-300">
         📡 Today&apos;s AMD detection ({todayUtc}) has not run yet — scheduled for 10:31 UTC
       </p>
@@ -53,10 +53,11 @@ export default function AmdHistoryPage() {
   }
 
   const todayUtc = new Date().toISOString().slice(0, 10);
+  const showTodayBanner = shouldShowTodayBanner(rows);
 
   return (
-    <div className="min-h-screen bg-white p-4 dark:bg-slate-950 sm:p-6">
-      <header className="mb-6">
+    <div className="flex flex-col bg-white p-4 dark:bg-slate-950 sm:p-6 lg:box-border lg:h-[calc(100svh-3rem)] lg:min-h-0 lg:overflow-hidden">
+      <header className="mb-6 shrink-0 lg:mb-4">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">AMD Intelligence History</h1>
           <AmdReferenceModal />
@@ -66,32 +67,40 @@ export default function AmdHistoryPage() {
         </p>
       </header>
 
-      {shouldShowTodayBanner(rows) ? <TodayMissingBanner todayUtc={todayUtc} /> : null}
+      <div className="flex flex-1 flex-col gap-6 lg:min-h-0 lg:gap-0 lg:flex-row lg:overflow-hidden">
+        <section className="flex w-full flex-col lg:min-h-0 lg:w-1/2 lg:overflow-hidden xl:w-2/5">
+          {showTodayBanner ? (
+            <div className="mb-4 shrink-0 lg:pr-3">
+              <TodayMissingBanner todayUtc={todayUtc} />
+            </div>
+          ) : null}
 
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <section className="w-full lg:w-1/2 xl:w-2/5">
-          <AmdHistoryTable
-            rows={rows}
-            selectedId={selectedRow?.id ?? null}
-            onSelect={setSelectedRow}
-            filterTag={filterTag}
-            onFilterChange={setFilterTag}
-          />
+          <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-3">
+            <AmdHistoryTable
+              rows={rows}
+              selectedId={selectedRow?.id ?? null}
+              onSelect={setSelectedRow}
+              filterTag={filterTag}
+              onFilterChange={setFilterTag}
+            />
+          </div>
         </section>
 
-        <aside className="w-full lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:w-1/2 lg:self-start lg:overflow-y-auto xl:w-3/5">
-          {selectedRow != null ? (
-            <AmdHistoryDetailPanel
-              selectedRow={selectedRow}
-              onClose={() => setSelectedRow(null)}
-              tradeEntry={tradeEntry}
-              forceOutcomePending={forceOutcomePending || undefined}
-            />
-          ) : (
-            <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
-              <p className="text-sm text-slate-400">Select a date to view the AMD chart</p>
-            </div>
-          )}
+        <aside className="flex w-full flex-col lg:min-h-0 lg:w-1/2 lg:overflow-hidden xl:w-3/5">
+          <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pl-3">
+            {selectedRow != null ? (
+              <AmdHistoryDetailPanel
+                selectedRow={selectedRow}
+                onClose={() => setSelectedRow(null)}
+                tradeEntry={tradeEntry}
+                forceOutcomePending={forceOutcomePending || undefined}
+              />
+            ) : (
+              <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-700">
+                <p className="text-sm text-slate-400">Select a date to view the AMD chart</p>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
     </div>
