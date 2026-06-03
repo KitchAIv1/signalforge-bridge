@@ -10,7 +10,7 @@
 
 import { getAccountSummary, getPricing, placeMarketOrder } from '../../connectors/oanda.js';
 import { getSupabaseClient } from '../../connectors/supabase.js';
-import { insertTrade, loadTodayDayState, recentTradeOpened } from './scalperDayState.js';
+import { insertTrade, loadOpenTrades, loadTodayDayState, recentTradeOpened } from './scalperDayState.js';
 import { scalperError, scalperLog, scalperWarn } from './scalperLogger.js';
 import type { ScalperConfig } from './scalperTypes.js';
 import { pipsToPrice, todayUtcString } from './scalperTypes.js';
@@ -102,6 +102,15 @@ export async function runEntryMonitor(config: ScalperConfig): Promise<void> {
   const tpPrice = triggerLevel + (dayState.direction === 'long' ? 1 : -1) * pipsToPrice(config.tpPips);
   const slPrice = triggerLevel - (dayState.direction === 'long' ? 1 : -1) * pipsToPrice(config.slPips);
   const signedUnits = dayState.direction === 'long' ? units : -units;
+
+  const openScalperTrades = await loadOpenTrades(tradeDate, config.pair);
+  if (openScalperTrades.length > 0) {
+    scalperLog('Entry skipped — existing open trade', {
+      openCount: openScalperTrades.length,
+      tradeDate,
+    });
+    return;
+  }
 
   let orderResult: Awaited<ReturnType<typeof placeMarketOrder>>;
   try {
