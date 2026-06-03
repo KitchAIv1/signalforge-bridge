@@ -9,10 +9,14 @@ import {
 } from '@/lib/asianCloseBiasHelpers';
 import { AmdHistoryChart } from '@/components/AmdHistoryChart';
 import { AmdShiftedStructureSection } from '@/components/AmdShiftedStructureSection';
+import { AmdHistoryIntelligenceDetail } from '@/components/AmdHistoryIntelligenceDetail';
+import type { AmdTradeEntry } from '@/lib/fetchAmdTradeEntry';
 
 interface AmdHistoryDetailPanelProps {
   selectedRow: AmdState;
   onClose: () => void;
+  tradeEntry?: AmdTradeEntry | null;
+  forceOutcomePending?: boolean;
 }
 
 // Static tag parameter reference — hardcoded from production constants
@@ -126,7 +130,12 @@ function SectionHeading({ children }: { children: ReactNode }) {
   );
 }
 
-export function AmdHistoryDetailPanel({ selectedRow, onClose }: AmdHistoryDetailPanelProps) {
+export function AmdHistoryDetailPanel({
+  selectedRow,
+  onClose,
+  tradeEntry,
+  forceOutcomePending,
+}: AmdHistoryDetailPanelProps) {
   const tagParams = TAG_PARAMS[selectedRow.amd_tag] ?? TAG_PARAMS['INSUFFICIENT_DATA'];
   const isShifted = selectedRow.amd_tag === 'AMD_SHIFTED';
 
@@ -269,8 +278,17 @@ export function AmdHistoryDetailPanel({ selectedRow, onClose }: AmdHistoryDetail
       {/* Divider */}
       <div className="border-t border-slate-100 dark:border-slate-800" />
 
-      {/* Existing AMD Chart — unchanged */}
-      <AmdHistoryChart amdState={selectedRow} />
+      <AmdHistoryIntelligenceDetail selectedRow={selectedRow} />
+
+      {/* Divider */}
+      <div className="border-t border-slate-100 dark:border-slate-800" />
+
+      {/* AMD Chart */}
+      <AmdHistoryChart
+        amdState={selectedRow}
+        tradeEntry={tradeEntry}
+        forceOutcomePending={forceOutcomePending}
+      />
 
     </div>
   );

@@ -184,3 +184,63 @@ export function outcomeTagColor(
     return 'text-red-600 dark:text-red-400';
   return 'text-slate-500 dark:text-slate-400';
 }
+
+export function windowConfirmedLabel(
+  confirmed: boolean | null | undefined,
+): string {
+  if (confirmed === true) return 'Confirmed ✓';
+  if (confirmed === false) return 'Not confirmed';
+  return '—';
+}
+
+export function windowConfirmedColor(
+  confirmed: boolean | null | undefined,
+): string {
+  if (confirmed === true) return 'text-green-400';
+  if (confirmed === false) return 'text-red-400';
+  return 'text-gray-500';
+}
+
+export function dailyBiasAlignmentLabel(
+  alignment: string | null | undefined,
+): string {
+  if (alignment === 'ALIGNED') return 'Aligned';
+  if (alignment === 'CONFLICTED') return 'Conflicted';
+  if (alignment === 'RANGING') return 'Ranging';
+  return '—';
+}
+
+export function dailyBiasAlignmentColor(
+  alignment: string | null | undefined,
+): string {
+  if (alignment === 'ALIGNED') return 'text-green-400';
+  if (alignment === 'CONFLICTED') return 'text-red-400';
+  if (alignment === 'RANGING') return 'text-gray-400';
+  return 'text-gray-500';
+}
+
+export function d1VoteDisplay(
+  bullish: number | null | undefined,
+  bearish: number | null | undefined,
+  window: 5 | 7,
+): string {
+  if (bullish == null && bearish == null) return '—';
+  const bullCount = bullish ?? 0;
+  const bearCount = bearish ?? 0;
+  if (bullCount > bearCount) return `${bullCount}/${window} bullish`;
+  if (bearCount > bullCount) return `${bearCount}/${window} bearish`;
+  return `neutral (${window}-candle)`;
+}
+
+export function autoDirectionConfidenceShort(
+  confidence: string | null | undefined,
+): string {
+  if (!confidence) return '';
+  const shortLabels: Record<string, string> = {
+    high: '(high)',
+    medium: '(med)',
+    low: '(low)',
+    very_low: '(v.low)',
+  };
+  return shortLabels[confidence] ?? `(${confidence})`;
+}

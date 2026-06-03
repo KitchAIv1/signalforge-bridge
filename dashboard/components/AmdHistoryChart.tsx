@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CandlestickData, UTCTimestamp } from 'lightweight-charts';
 import type { AmdState } from '@/lib/types';
+import type { AmdTradeEntry } from '@/lib/fetchAmdTradeEntry';
 import { captureAmdChartPngBlob } from '@/lib/captureAmdChartPngBlob';
 import { parseAmdChartOhlc } from '@/lib/parseAmdChartOhlc';
 import type { RawAmdOhlcBar } from '@/lib/parseAmdChartOhlc';
@@ -10,11 +11,21 @@ import { uploadAmdChartToStorage } from '@/lib/uploadAmdChartToStorage';
 import { updateAmdChartUrl } from '@/lib/updateAmdChartUrl';
 import { utcSessionBandsForTradeDate } from '@/lib/amdHistorySessionUtcBands';
 import { createUtcSessionBandsPrimitive } from '@/lib/amdHistoryUtcBandsPrimitive';
-import { judasMarkersForBars } from '@/lib/amdHistoryJudasMarkers';
+import { buildAmdHistoryChartMarkers } from '@/lib/amdHistoryChartMarkers';
+import { getVisibleHours } from '@/lib/amdHistoryVisibleRange';
+import {
+  AmdHistoryChartGrayCard,
+  AmdHistoryChartPendingBanner,
+  resolveChartEmptyState,
+  shouldShowOutcomePendingBanner,
+} from '@/components/AmdHistoryChartEmptyStates';
 import { amdTagColor, amdTagLabel, judasDirectionLabel } from '@/lib/amdPanelFormatters';
 
 interface AmdHistoryChartProps {
   amdState: AmdState;
+  tradeEntry?: AmdTradeEntry | null;
+  /** Dev-only: force State C pending banner when NODE_ENV === 'development' */
+  forceOutcomePending?: boolean;
 }
 
 type ChartSaveRibbonStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -32,6 +43,7 @@ function rawBarsToCandlestickData(rows: RawAmdOhlcBar[]): CandlestickData[] {
 interface AmdHistoryChartSaveRibbonProps {
   savedUrlFlag: boolean;
   saveStatus: ChartSaveRibbonStatus;
+  saveError: string | null;
   disableSaveChart: boolean;
   onPersistChartSnapshot: () => void;
 }
@@ -39,6 +51,7 @@ interface AmdHistoryChartSaveRibbonProps {
 function AmdHistoryChartSaveRibbon({
   savedUrlFlag,
   saveStatus,
+  saveError,
   disableSaveChart,
   onPersistChartSnapshot,
 }: AmdHistoryChartSaveRibbonProps) {
@@ -51,24 +64,37 @@ function AmdHistoryChartSaveRibbon({
     );
   }
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 dark:border-slate-600">
-      <span className="text-xs text-slate-400">AUDUSD H1 — AMD annotated chart</span>
-      <div className="flex items-center gap-2">
-        {saveStatus === 'idle' || saveStatus === 'saved' || saveStatus === 'error' ? (
-          <button
-            type="button"
-            disabled={disableSaveChart}
-            onClick={() => onPersistChartSnapshot()}
-            className="rounded bg-blue-600 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Save chart
-          </button>
-        ) : null}
-        {saveStatus === 'saving' ? <span className="text-[11px] text-slate-400">Saving…</span> : null}
-        {saveStatus === 'error' ? (
-          <span className="text-[11px] text-red-400">Could not save — try again</span>
-        ) : null}
+    <div className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 dark:border-slate-600">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-slate-400">AUDUSD H1 — AMD annotated chart</span>
+        <div className="flex items-center gap-2">
+          {saveStatus === 'idle' || saveStatus === 'saved' || saveStatus === 'error' ? (
+            <button
+              type="button"
+              disabled={disableSaveChart}
+              onClick={() => onPersistChartSnapshot()}
+              className="rounded bg-blue-600 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Save chart
+            </button>
+          ) : null}
+          {saveStatus === 'saving' ? (
+            <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+              Saving…
+            </span>
+          ) : null}
+          {saveStatus === 'saved' ? (
+            <span className="text-[11px] text-green-400">Saved ✓</span>
+          ) : null}
+          {saveStatus === 'error' ? (
+            <span className="text-[11px] text-red-400">Save failed</span>
+          ) : null}
+        </div>
       </div>
+      {saveStatus === 'error' && saveError ? (
+        <p className="mt-1 text-[10px] text-red-400/80">{saveError}</p>
+      ) : null}
     </div>
   );
 }
@@ -148,7 +174,7 @@ async function runPersistChartSnapshot(opts: {
   amdRowId: string;
   onRemountCharts: () => void;
   setSaving: () => void;
-  setError: () => void;
+  setError: (message: string) => void;
   setSavedSuccess: (url: string) => void;
 }): Promise<void> {
   const {
@@ -165,43 +191,61 @@ async function runPersistChartSnapshot(opts: {
     setSaving();
     const pngBlob = await captureAmdChartPngBlob(hostEl, rawBars);
     if (!pngBlob) {
-      setError();
+      setError('Chart capture returned no image');
       return;
     }
     const publicChartUrl = await uploadAmdChartToStorage(tradeDate, pngBlob);
     if (!publicChartUrl) {
-      setError();
+      setError('Upload to storage failed');
       return;
     }
     await updateAmdChartUrl(amdRowId, publicChartUrl);
     setSavedSuccess(publicChartUrl);
   } catch (err: unknown) {
     console.warn('[AmdHistoryChart] Save failed:', err);
-    setError();
+    setError(err instanceof Error ? err.message : 'Unknown error');
   } finally {
     onRemountCharts();
   }
 }
 
-export function AmdHistoryChart({ amdState }: AmdHistoryChartProps) {
+export function AmdHistoryChart({
+  amdState,
+  tradeEntry,
+  forceOutcomePending,
+}: AmdHistoryChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [saveStatus, setSaveStatus] = useState<ChartSaveRibbonStatus>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [savedChartUrlLocal, setSavedChartUrlLocal] = useState<string | null>(amdState.chart_url ?? null);
   const [chartRemountNonce, setChartRemountNonce] = useState(0);
 
   useEffect(() => {
     setSavedChartUrlLocal(amdState.chart_url ?? null);
     setSaveStatus('idle');
+    setSaveError(null);
   }, [amdState.id, amdState.chart_url]);
+
+  useEffect(() => {
+    if (saveStatus !== 'saved') return undefined;
+    const timer = window.setTimeout(() => setSaveStatus('idle'), 3000);
+    return () => window.clearTimeout(timer);
+  }, [saveStatus]);
 
   const rawBars = useMemo(
     () => parseAmdChartOhlc(amdState.chart_data),
-    [amdState.chart_data, amdState.id]
+    [amdState.chart_data, amdState.id],
+  );
+
+  const emptyState = resolveChartEmptyState(amdState);
+  const showPendingBanner = shouldShowOutcomePendingBanner(
+    amdState.outcome_evaluated_at,
+    forceOutcomePending,
   );
 
   useEffect(() => {
     const elRef = containerRef.current;
-    if (!elRef || rawBars.length === 0) return undefined;
+    if (!elRef || rawBars.length === 0 || emptyState != null) return undefined;
 
     const elHost = elRef;
     let chartInstance = null as null | ReturnType<
@@ -232,6 +276,17 @@ export function AmdHistoryChart({ amdState }: AmdHistoryChartProps) {
           borderColor: '#334155',
         },
         rightPriceScale: { borderColor: '#334155' },
+        handleScroll: {
+          mouseWheel: false,
+          pressedMouseMove: true,
+          horzTouchDrag: false,
+          vertTouchDrag: false,
+        },
+        handleScale: {
+          mouseWheel: false,
+          pinch: false,
+          axisPressedMouseMove: true,
+        },
       });
 
       chartInstance = chartCanvas;
@@ -250,21 +305,26 @@ export function AmdHistoryChart({ amdState }: AmdHistoryChartProps) {
       const chartBars = rawBarsToCandlestickData(rawBars);
       series.setData(chartBars);
 
-      series.setMarkers(
-        judasMarkersForBars(
-          rawBars,
-          amdState.trade_date,
-          amdState.judas_direction,
-          amdState.judas_extreme_price
-        ),
-      );
+      series.setMarkers(buildAmdHistoryChartMarkers(rawBars, amdState, tradeEntry));
 
-      // Show full AMD day: 00:00–17:00 UTC (distribution zone even when candles end early).
+      if (tradeEntry) {
+        const isLong = tradeEntry.direction === 'long';
+        series.createPriceLine({
+          price: tradeEntry.fillPrice,
+          color: isLong ? '#22c55e' : '#ef4444',
+          lineWidth: 1,
+          lineStyle: lw.LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `AMD ${tradeEntry.direction.toUpperCase()} entry`,
+        });
+      }
+
       const dayStartSecForVisibleRange =
         Math.floor(Date.parse(`${amdState.trade_date}T00:00:00.000Z`) / 1000);
+      const visibleHours = getVisibleHours(amdState.amd_tag);
       chartCanvas.timeScale().setVisibleRange({
         from: dayStartSecForVisibleRange as UTCTimestamp,
-        to: (dayStartSecForVisibleRange + 17 * 3600) as UTCTimestamp,
+        to: (dayStartSecForVisibleRange + visibleHours * 3600) as UTCTimestamp,
       });
 
       const resize = (): void =>
@@ -292,15 +352,23 @@ export function AmdHistoryChart({ amdState }: AmdHistoryChartProps) {
       chartInstance = null;
       elHost.innerHTML = '';
     };
-  }, [amdState.id, amdState.trade_date, amdState.judas_direction, rawBars, chartRemountNonce]);
+  }, [
+    amdState,
+    rawBars,
+    chartRemountNonce,
+    emptyState,
+    tradeEntry,
+  ]);
 
   function startPersistFromClick(): void {
     if (saveStatus === 'saving' || savedChartUrlLocal != null) return;
     const hostEl = containerRef.current;
     if (!hostEl) {
+      setSaveError('Chart container not ready');
       setSaveStatus('error');
       return;
     }
+    setSaveError(null);
     void runPersistChartSnapshot({
       hostEl,
       rawBars,
@@ -308,12 +376,27 @@ export function AmdHistoryChart({ amdState }: AmdHistoryChartProps) {
       amdRowId: amdState.id,
       onRemountCharts: () => setChartRemountNonce((n) => n + 1),
       setSaving: () => setSaveStatus('saving'),
-      setError: () => setSaveStatus('error'),
+      setError: (message) => {
+        setSaveError(message);
+        setSaveStatus('error');
+      },
       setSavedSuccess: (url) => {
         setSavedChartUrlLocal(url);
         setSaveStatus('saved');
       },
     });
+  }
+
+  if (emptyState === 'insufficient') {
+    return (
+      <AmdHistoryChartGrayCard message="Holiday or market closure — no H1 candles available for this date." />
+    );
+  }
+
+  if (emptyState === 'pre_may_no_data') {
+    return (
+      <AmdHistoryChartGrayCard message="No OANDA candle data — practice account history starts May 2025." />
+    );
   }
 
   if (rawBars.length === 0) {
@@ -332,9 +415,12 @@ export function AmdHistoryChart({ amdState }: AmdHistoryChartProps) {
 
   return (
     <div className="space-y-2">
+      {showPendingBanner ? <AmdHistoryChartPendingBanner /> : null}
+
       <AmdHistoryChartSaveRibbon
         savedUrlFlag={hasPersistedUrl}
         saveStatus={saveStatus}
+        saveError={saveError}
         disableSaveChart={saveStatus === 'saving'}
         onPersistChartSnapshot={startPersistFromClick}
       />

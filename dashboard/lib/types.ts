@@ -259,6 +259,14 @@ export interface AmdState {
   amd_size_multiplier?: number | null;
   asian_close_position_pct?: number | null;
   asian_close_bias_signal?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  // Window outcome (written at 16:30 UTC)
+  window_tag_used?: string | null;
+  window_from_utc?: string | null;
+  window_to_utc?: string | null;
+  window_pip_move?: number | null;
+  window_direction_confirmed?: boolean | null;
+  window_candles?: Record<string, unknown> | null;
+  window_evaluated_at?: string | null;
 }
 
 export type ScalperDirection = 'long' | 'short';

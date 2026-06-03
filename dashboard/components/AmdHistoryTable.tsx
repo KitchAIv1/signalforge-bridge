@@ -1,8 +1,33 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import type { AmdState } from '@/lib/types';
-import { amdTagColor, amdTagLabel, m5SignalLabel, m5SignalColor, outcomeTagLabel, outcomeTagColor } from '@/lib/amdPanelFormatters';
+import {
+  amdTagColor,
+  amdTagLabel,
+  autoDirectionLabel,
+  autoDirectionConfidenceShort,
+  dailyBiasAlignmentLabel,
+  dailyBiasAlignmentColor,
+  m5SignalLabel,
+  m5SignalColor,
+  outcomeTagLabel,
+  outcomeTagColor,
+} from '@/lib/amdPanelFormatters';
 import { asianCloseBiasColor } from '@/lib/asianCloseBiasHelpers';
+import {
+  sortAmdHistoryRows,
+  toggleSortState,
+  sortIndicator,
+  type AmdHistorySortState,
+  type AmdHistorySortColumn,
+} from '@/lib/amdHistoryTableSort';
+import {
+  AmdHistoryTableFilters,
+  type OutcomeFilterValue,
+  type AlignmentFilterValue,
+  type JudasFilterValue,
+} from '@/components/AmdHistoryTableFilters';
 
 interface AmdHistoryTableProps {
   rows: AmdState[];
@@ -22,6 +47,47 @@ const ALL_TAGS = [
   'INSUFFICIENT_DATA',
 ] as const;
 
+function applyOutcomeFilter(row: AmdState, outcomeFilter: OutcomeFilterValue): boolean {
+  if (outcomeFilter === 'ALL') return true;
+  if (outcomeFilter === 'PENDING') return row.amd_outcome_tag == null;
+  return row.amd_outcome_tag === outcomeFilter;
+}
+
+function applyAlignmentFilter(row: AmdState, alignmentFilter: AlignmentFilterValue): boolean {
+  if (alignmentFilter === 'ALL') return true;
+  return row.daily_bias_alignment === alignmentFilter;
+}
+
+function applyJudasFilter(row: AmdState, judasFilter: JudasFilterValue): boolean {
+  if (judasFilter === 'ALL') return true;
+  return row.judas_direction === judasFilter;
+}
+
+function SortableHeader({
+  label,
+  column,
+  sortState,
+  onSort,
+}: {
+  label: string;
+  column: AmdHistorySortColumn;
+  sortState: AmdHistorySortState | null;
+  onSort: (column: AmdHistorySortColumn) => void;
+}) {
+  return (
+    <th className="px-3 py-2 text-left">
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+      >
+        {label}
+        {sortIndicator(sortState, column)}
+      </button>
+    </th>
+  );
+}
+
 export function AmdHistoryTable({
   rows,
   selectedId,
@@ -29,7 +95,36 @@ export function AmdHistoryTable({
   filterTag,
   onFilterChange,
 }: AmdHistoryTableProps) {
-  const filtered = filterTag === 'ALL' ? rows : rows.filter((historyRow) => historyRow.amd_tag === filterTag);
+  const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilterValue>('ALL');
+  const [alignmentFilter, setAlignmentFilter] = useState<AlignmentFilterValue>('ALL');
+  const [judasFilter, setJudasFilter] = useState<JudasFilterValue>('ALL');
+  const [sortState, setSortState] = useState<AmdHistorySortState | null>(null);
+
+  const filtered = useMemo(() => {
+    const tagFiltered = filterTag === 'ALL' ? rows : rows.filter((row) => row.amd_tag === filterTag);
+    return tagFiltered.filter(
+      (row) =>
+        applyOutcomeFilter(row, outcomeFilter) &&
+        applyAlignmentFilter(row, alignmentFilter) &&
+        applyJudasFilter(row, judasFilter),
+    );
+  }, [rows, filterTag, outcomeFilter, alignmentFilter, judasFilter]);
+
+  const displayedRows = useMemo(
+    () => sortAmdHistoryRows(filtered, sortState),
+    [filtered, sortState],
+  );
+
+  function handleSort(column: AmdHistorySortColumn): void {
+    setSortState((current) => toggleSortState(current, column));
+  }
+
+  function handleClearFilters(): void {
+    onFilterChange('ALL');
+    setOutcomeFilter('ALL');
+    setAlignmentFilter('ALL');
+    setJudasFilter('ALL');
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -46,29 +141,48 @@ export function AmdHistoryTable({
             }`}
           >
             {tag === 'ALL' ? 'All' : amdTagLabel(tag)}{' '}
-            {tag === 'ALL' ? `(${rows.length})` : `(${rows.filter((historyRow) => historyRow.amd_tag === tag).length})`}
+            {tag === 'ALL' ? `(${rows.length})` : `(${rows.filter((row) => row.amd_tag === tag).length})`}
           </button>
         ))}
       </div>
+
+      <AmdHistoryTableFilters
+        outcomeFilter={outcomeFilter}
+        onOutcomeFilterChange={setOutcomeFilter}
+        alignmentFilter={alignmentFilter}
+        onAlignmentFilterChange={setAlignmentFilter}
+        judasFilter={judasFilter}
+        onJudasFilterChange={setJudasFilter}
+        onClearFilters={handleClearFilters}
+        hasActiveFilters={
+          filterTag !== 'ALL' ||
+          outcomeFilter !== 'ALL' ||
+          alignmentFilter !== 'ALL' ||
+          judasFilter !== 'ALL'
+        }
+      />
 
       <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800">
             <tr>
-              <th className="px-3 py-2 text-left">Date</th>
+              <SortableHeader label="Date" column="trade_date" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Tag</th>
+              <th className="px-3 py-2 text-left">Alignment</th>
+              <th className="px-3 py-2 text-left">Auto Dir</th>
               <th className="px-3 py-2 text-left">Judas</th>
-              <th className="px-3 py-2 text-left">Pips</th>
+              <SortableHeader label="Pips" column="judas_pips" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Asian</th>
               <th className="px-3 py-2 text-left">Asian Bias</th>
               <th className="px-3 py-2 text-left">Reversal</th>
               <th className="px-3 py-2 text-left">M5</th>
               <th className="px-3 py-2 text-left">Outcome</th>
+              <SortableHeader label="Win pips" column="window_pip_move" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Chart</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {filtered.map((historyRow) => (
+            {displayedRows.map((historyRow) => (
               <tr
                 key={historyRow.id}
                 onClick={() => onSelect(historyRow)}
@@ -83,6 +197,21 @@ export function AmdHistoryTable({
                 </td>
                 <td className={`px-3 py-2 font-medium ${amdTagColor(historyRow.amd_tag)}`}>
                   {amdTagLabel(historyRow.amd_tag)}
+                </td>
+                <td className={`px-3 py-2 text-xs ${dailyBiasAlignmentColor(historyRow.daily_bias_alignment)}`}>
+                  {dailyBiasAlignmentLabel(historyRow.daily_bias_alignment)}
+                </td>
+                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
+                  {historyRow.auto_direction ? (
+                    <>
+                      {autoDirectionLabel(historyRow.auto_direction)}
+                      <span className="ml-1 text-slate-400">
+                        {autoDirectionConfidenceShort(historyRow.auto_direction_confidence)}
+                      </span>
+                    </>
+                  ) : (
+                    '—'
+                  )}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                   {historyRow.judas_direction ?? '—'}
@@ -119,6 +248,9 @@ export function AmdHistoryTable({
                 <td className={`px-3 py-2 text-xs font-medium ${outcomeTagColor(historyRow.amd_outcome_tag)}`}>
                   {outcomeTagLabel(historyRow.amd_outcome_tag)}
                 </td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+                  {historyRow.window_pip_move != null ? historyRow.window_pip_move : '—'}
+                </td>
                 <td className="px-3 py-2">
                   {historyRow.chart_data != null ? (
                     <span className="text-xs text-blue-400">Click to view</span>
@@ -133,7 +265,7 @@ export function AmdHistoryTable({
       </div>
 
       <p className="text-xs text-slate-400">
-        Showing {filtered.length} of {rows.length} days
+        Showing {displayedRows.length} of {rows.length} days
       </p>
     </div>
   );
