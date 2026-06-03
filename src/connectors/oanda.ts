@@ -549,3 +549,16 @@ export async function fetchCandleRange(
     return [];
   }
 }
+
+/** Distribution-open reference: pinned 10:00 UTC M5 bar close for scalper init. */
+export async function fetchTenAmM5Candle(
+  pair: string,
+  tradeDate: string,
+): Promise<LatestM5Candle | null> {
+  const fromISO = `${tradeDate}T10:00:00.000000000Z`;
+  const toISO = `${tradeDate}T10:06:00.000000000Z`;
+  const candles = await fetchCandleRange(pair, fromISO, toISO, 'M5');
+  const bar = candles.find((c) => c.time.startsWith(`${tradeDate}T10:00`));
+  if (!bar) return null;
+  return parseMidCandleStick(bar);
+}

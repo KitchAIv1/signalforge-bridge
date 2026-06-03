@@ -16,7 +16,7 @@
  *   16:00 UTC → hardClose()
  */
 
-import { closeTrade, fetchLatestM5Candle } from '../../connectors/oanda.js';
+import { closeTrade, fetchTenAmM5Candle } from '../../connectors/oanda.js';
 import { getSupabaseClient } from '../../connectors/supabase.js';
 import { syncScalperTradeToBridgeLog } from './scalperBridgeSync.js';
 import {
@@ -121,8 +121,8 @@ export async function initializeDayState(): Promise<void> {
     return;
   }
 
-  // Fetch 10:00 UTC M5 candle for reference price
-  const candle = await fetchLatestM5Candle(config.pair);
+  // Fetch 10:00 UTC M5 candle for reference price (pinned to distribution open)
+  const candle = await fetchTenAmM5Candle(config.pair, tradeDate);
   if (!candle) {
     scalperWarn('Could not fetch 10:00 M5 candle — aborting initialization', { tradeDate });
     return;
