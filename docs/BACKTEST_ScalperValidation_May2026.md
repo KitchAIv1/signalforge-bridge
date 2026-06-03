@@ -8,6 +8,8 @@
 
 | Date | Change |
 |------|--------|
+| 2026-06-03 | Reference Price Correction section — `fetchTenAmM5Candle` fix + reference comparison backtest |
+| 2026-06-01 | Clean Data Re-evaluation section — `decision_auto_direction` cohort (`disagree_clean_grid.csv`) |
 | 2026-05-31 | Added agree_status split + net-after-spread from output CSVs |
 | 2026-05-31 | Initial validation doc |
 
@@ -195,6 +197,8 @@ Net column source: `scalper_net_after_spread_summary.csv` (`agree_split_*`, spre
 
 **Live operating population (AGREE + NEUTRAL):** 168 days, combined gross +1353.9 net pips (+1054.6 + +299.3 from table above).
 
+**⚠️ Contamination warning (2026-06-01):** This split uses `auto_direction` from `amd_state`, which is suspect on 285/287 historical days. See §14 for clean-cohort re-evaluation using `decision_auto_direction`.
+
 ---
 
 ## 9. Asian Session Scalper Backtest
@@ -259,16 +263,150 @@ Full table (14 configs) in CSV.
 5. **NEUTRAL strong bucket:** +2.95/trade net over 44 days — live engine arms NEUTRAL post-2026-05-31.
 6. **Asian session:** Cohort B +0.61/trade net over 255 days; Cohort A sample too small (2 days).
 
+7. **Clean re-evaluation (2026-06-01):** AGREE+NEUTRAL combined **+2.32/trade net** on `decision_auto_direction` cohort — ~20% lower than contaminated §8 estimate. DISAGREE net **-0.24/trade** — keep blocked.
+
+8. **Reference price (2026-06-03):** Live init must use 10:00 UTC bar (`fetchTenAmM5Candle`). Pre-fix live behavior matched Config B (−0.27/trade net vs backtest). See §15.
+
 ---
 
-## 14. Limitations
+## 14. Clean Data Re-evaluation (June 2026)
+
+**Date:** 2026-06-01  
+**Script:** `scripts/disagreeCleanBacktest.ts`  
+**CSV:** `scripts/output/disagree_clean_grid.csv`  
+**Cohort loader:** `scripts/disagreeCleanBacktest/loadCleanCohort.ts` — reads `decision_auto_direction` only (never `auto_direction`).
+
+### 14.1 Why re-run was required
+
+| Finding | Source |
+|---------|--------|
+| 287 `amd_state` rows since 2025-05-01 | Backfill + contamination audit |
+| 285 rows (`99.3%`) have `evaluated_at` outside 10:31–10:35 UTC (`rerun_later`) | Ad-hoc query on `evaluated_at` hour/minute [VERIFY re-run query in repo] |
+| 2 rows (`clean_1031`) — only 2026-05-30 and 2026-05-31 | Same audit |
+| 101/287 days: reconstructed `decision_auto_direction` ≠ stored `auto_direction` | `scripts/output/decision_direction_backfill_v2.csv` (`changed=true` count) |
+
+Root cause: `auto_direction` is overwritten after 10:31 when the 16:30 outcome cron unlocks `detection_locked` and a later bridge restart reruns full detection. See [DISCOVERY_AutoDirection_Contamination_June2026.md](./DISCOVERY_AutoDirection_Contamination_June2026.md).
+
+**Fix deployed:** Migration 030 — immutable `decision_auto_direction` / `decision_evaluated_at` (commit `4877c56`). Historical values backfilled via `scripts/decisionDirectionBackfill.ts` with H1 hour-10 filter + D1 last-bar drop (`filterD1At1031.ts`, commit `901f19e`).
+
+### 14.2 Simulation config (all clean runs)
+
+| Parameter | Value |
+|-----------|-------|
+| pullback / tp / sl | 5 / 10 / 10 |
+| max_ratchets | 3 |
+| window | 10:05–16:00 (`triggerScanCutoff='1600'`) |
+| spread adjustment | `expectancy_net = expectancy_gross - 1.04` (same formula as §11) |
+
+### 14.3 Gate counts (278 directional days with `decision_auto_direction`)
+
+From `disagreeCleanBacktest.ts` console output / `loadCleanCohort.ts`:
+
+| Gate | Days |
+|------|------|
+| AGREE | 117 |
+| NEUTRAL | 51 |
+| DISAGREE | 110 |
+| BLOCKED | 0 |
+
+AGREE + NEUTRAL = **168 qualifying days** (live scalper operating population on clean data).
+
+### 14.4 Clean AGREE / NEUTRAL results
+
+Source: `disagree_clean_grid.csv` Runs A and B:
+
+| Gate | n_days | total_trades | win_pct | net_pips | expectancy/trade (gross) | expectancy/trade (net) |
+|------|--------|--------------|---------|----------|--------------------------|------------------------|
+| AGREE (Run A) | 117 | 266 | 72.1 | 987.1 | 3.71 | **2.67** |
+| NEUTRAL (Run B) | 51 | 96 | 64.3 | 230.4 | 2.40 | **1.36** |
+| **Combined** | **168** | **362** | — | **1217.5** | **3.36** | **2.32** |
+
+Combined net/trade: `(987.1 + 230.4) / (266 + 96) - 1.04 = 2.32`.
+
+### 14.5 Clean DISAGREE results
+
+Source: `disagree_clean_grid.csv` Run C (`direction_source=decision_auto_direction`):
+
+| Metric | Value |
+|--------|-------|
+| n_days | 110 |
+| total_trades | 201 |
+| win_pct | 57.2 |
+| net_pips | 160.5 |
+| expectancy/trade (gross) | **0.80** |
+| expectancy/trade (net) | **-0.24** |
+
+**Verdict:** DISAGREE remains blocked in live — net edge is negative after 1.04 pip spread. Contaminated split (§8) showed +0.08/trade net on 86 days using `auto_direction`; that figure is not reliable.
+
+Contaminated DISAGREE strategy backtest (`disagree_strategy_grid.csv`, cohort2 Strategy B): +84.5 net pips, +1.36/trade on `auto_direction` — **invalid for decision-time inference**.
+
+### 14.6 Expectancy vs contaminated estimate
+
+| Cohort | Contaminated gross/trade (§8) | Clean gross/trade (§14.4) | Contaminated net/trade | Clean net/trade |
+|--------|------------------------------|---------------------------|------------------------|-----------------|
+| AGREE + NEUTRAL | 3.94 | 3.36 | 2.90 | 2.32 |
+
+Net expectancy reduction: **~20%** lower on clean data `(2.90 → 2.32)`.
+
+Production config selection (Run B extended window) remains directionally valid but pre-June figures in §3–§8 should be treated as upper-bound estimates until re-run on `decision_auto_direction`.
+
+---
+
+## 15. Reference Price Correction (June 2026)
+
+**Date:** 2026-06-03  
+**Script:** `scripts/scalperReferenceComparisonBacktest.ts`  
+**CSV:** `scripts/output/reference_comparison_grid.csv`, `scripts/output/reference_comparison_daily.csv`  
+**Cohort:** AGREE + NEUTRAL, 168 days, `decision_auto_direction` (§14.3)
+
+### Bug discovered
+
+Live scalper init called `fetchLatestM5Candle()`, which returns the last complete M5 bar at call time (~10:32 UTC) — the **10:25 bar close**, not the **10:00 UTC distribution-open bar** used by all backtests (`simulatePriceRatchetDay.ts` reads `candles[0].c`).
+
+### Gap quantification (282 distribution-candle days)
+
+| Metric | Value |
+|--------|-------|
+| Average gap (10:00 vs 10:25 close) | 3.3 pips |
+| Days with gap > 3 pips | 41% |
+| Days with gap > 5 pips | 21% |
+| Max gap observed | 17.4 pips |
+
+### Reference comparison backtest (168 AGREE+NEUTRAL days)
+
+Same simulation config as §14.2; only reference price input differs:
+
+| Config | Reference | gross/trade | net/trade | net_pips (168 days) |
+|--------|-----------|-------------|-----------|---------------------|
+| A | 10:00 bar close (backtest) | +3.36 | **+2.32** | +1217.5 |
+| B | 10:25 bar close (live pre-fix) | +3.09 | **+2.05** | +1120.5 |
+| **Delta** | — | **-0.27** | **-0.27** | **-97** |
+
+Net/trade: gross − 1.04 pip spread (same formula as §11).
+
+Daily outcome match rate: 78/168 days (46.4%) — reference gap changes whether triggers fire, not just fill price.
+
+### Fix deployed
+
+`fetchTenAmM5Candle()` pins reference to the 10:00 UTC M5 bar — commit `28425c9`.
+
+### Revised validated figures (post-fix)
+
+- **Updated validated expectancy:** +2.32 net/trade (not +2.88)
+- **Annual net pips revised:** ~839 (not ~995)
+
+---
+
+## 16. Limitations
 
 - Backtests use bar OHLC, not live mid-price entry.
 - AGREE-only backtests exclude NEUTRAL; live engine includes NEUTRAL (post-2026-05-31).
 - Asian Cohort A not viable for inference (2 days).
 - `scalper_backtest_grid.csv` uses n=22 — different from production AGREE cohort.
 - Spread assumed flat 1.04 pips/trade — not per-config slippage modeled.
+- **`auto_direction` backtests (§3–§8) are contaminated** — use `decision_auto_direction` for historical direction (§14).
+- Clean backfill ground-truth verified on **one day only** (2026-06-01 = `long`); broader accuracy [VERIFY] as live days accumulate.
 
 ---
 
-*BACKTEST Scalper Validation | SignalForge / Veredix | May 2026*
+*BACKTEST Scalper Validation | SignalForge / Veredix | Updated 2026-06-03*
