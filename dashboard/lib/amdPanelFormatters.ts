@@ -244,3 +244,18 @@ export function autoDirectionConfidenceShort(
   };
   return shortLabels[confidence] ?? `(${confidence})`;
 }
+
+export function m5MomentumTypeLabel(type: string | null | undefined): string {
+  if (!type) return '—';
+  if (type === 'SUSTAINED') return 'Sustained';
+  if (type === 'REVERSED') return 'Reversed';
+  if (type === 'STALLED') return 'Stalled';
+  return type;
+}
+
+export function m5MomentumTypeColor(type: string | null | undefined): string {
+  if (type === 'SUSTAINED') return 'text-green-600';
+  if (type === 'REVERSED') return 'text-red-500';
+  if (type === 'STALLED') return 'text-yellow-600';
+  return 'text-muted-foreground';
+}
