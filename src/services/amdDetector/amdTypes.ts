@@ -45,6 +45,7 @@ export type AmdDateFeatures = DateFeatures & {
   judas_extreme_price: number | null;
   asian_close_position_pct?: number | null;
   asian_close_bias_signal?: AsianCloseBiasSignal;
+  accumulation_quality_score?: number | null;
 };
 
 export type AmdStateRow = {

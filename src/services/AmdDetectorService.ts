@@ -103,6 +103,7 @@ function buildAmdStateUpsertRow(insertOpts: PersistAmdRowOpts) {
     asian_range_pips: features.asian_range_pips,
     asian_net_pips: features.asian_net_pips,
     asian_is_flat: features.asian_is_flat,
+    accumulation_quality_score: features.accumulation_quality_score ?? null,
     judas_direction: features.judas_direction,
     judas_pips: features.judas_pips,
     judas_extreme_price: features.judas_extreme_price,

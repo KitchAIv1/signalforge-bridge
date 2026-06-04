@@ -117,9 +117,14 @@ function asianRangeFromCandles(
 function asianNetAndFlatFromCandles(
   asianCandles: OhlcCandle[],
   asian_range_pips: number | null
-): { asian_net_pips: number | null; asian_is_flat: boolean } {
+): {
+  asian_net_pips: number | null;
+  asian_is_flat: boolean;
+  accumulation_quality_score: number | null;
+} {
   let asian_net_pips: number | null = null;
   let asian_is_flat = false;
+  let accumulation_quality_score: number | null = null;
   if (
     asianCandles.length >= 4 &&
     asian_range_pips !== null &&
@@ -133,6 +138,10 @@ function asianNetAndFlatFromCandles(
     if (asianOpen !== null && asianClose !== null) {
       asian_net_pips = Math.round((asianClose - asianOpen) * 10000);
       const netToRangeRatio = Math.abs(asian_net_pips) / asian_range_pips;
+      accumulation_quality_score =
+        asian_range_pips > 0
+          ? Math.round((1 - netToRangeRatio) * 100) / 100
+          : null;
       const ratioFlat = netToRangeRatio <= 0.5;
       const overallUp = asian_net_pips > 0;
       let oppositeCount = 0;
@@ -149,7 +158,7 @@ function asianNetAndFlatFromCandles(
       asian_is_flat = ratioFlat || oscillating;
     }
   }
-  return { asian_net_pips, asian_is_flat };
+  return { asian_net_pips, asian_is_flat, accumulation_quality_score };
 }
 
 function asianCloseBiasFromCandles(
@@ -372,7 +381,8 @@ export function computeDateFeatures(
   const { byHour, asianCandles, londonCandles, distCandles } =
     sliceSessionsByUtcHour(candles);
   const asian_range_pips = asianRangeFromCandles(asianCandles, onBadCandle);
-  const { asian_net_pips, asian_is_flat } = asianNetAndFlatFromCandles(
+  const { asian_net_pips, asian_is_flat, accumulation_quality_score } =
+    asianNetAndFlatFromCandles(
     asianCandles,
     asian_range_pips
   );
@@ -420,6 +430,7 @@ export function computeDateFeatures(
   });
   features.asian_close_position_pct = closeBias.asian_close_position_pct;
   features.asian_close_bias_signal = closeBias.asian_close_bias_signal;
+  features.accumulation_quality_score = accumulation_quality_score;
   return features;
 }
 
