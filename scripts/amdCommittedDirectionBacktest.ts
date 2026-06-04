@@ -30,6 +30,7 @@ type CommittedResult = {
 type StateRow = {
   trade_date: string;
   amd_outcome_tag: string;
+  amd_tag: string | null;
   judas_direction: string | null;
   judas_pips: number | null;
   decision_auto_direction: string | null;
@@ -51,6 +52,7 @@ type FeaturePredictions = Record<FeatureKey, Dir | null>;
 type DayRow = {
   trade_date: string;
   amd_outcome_tag: string;
+  amd_tag: string | null;
   judas_direction: string | null;
   committed: CommittedResult;
   features: FeaturePredictions;
@@ -302,7 +304,7 @@ function computeComboStats(rows: DayRow[], minAgree: number): {
 }
 
 function bestFeatureForTag(rows: DayRow[], tag: string): { key: FeatureKey; acc: number; n: number } {
-  const tagRows = rows.filter((row) => row.amd_outcome_tag === tag);
+  const tagRows = rows.filter((row) => row.amd_tag === tag);
   let best: { key: FeatureKey; acc: number; n: number } = { key: 'f1', acc: 0, n: 0 };
   for (const key of FEATURE_KEYS) {
     const stats = computeFeatureStats(tagRows, key, tagRows.length);
@@ -361,7 +363,7 @@ async function main(): Promise<void> {
   const { data: stateRows, error: stateErr } = await supabase
     .from('amd_state')
     .select(`
-      trade_date, amd_outcome_tag,
+      trade_date, amd_outcome_tag, amd_tag,
       judas_direction, judas_pips,
       decision_auto_direction, auto_direction_confidence,
       m5_vs_judas_direction, m5_momentum_type, m5_w2_net_pips,
@@ -405,6 +407,7 @@ async function main(): Promise<void> {
     dayRows.push({
       trade_date: rawState.trade_date,
       amd_outcome_tag: rawState.amd_outcome_tag,
+      amd_tag: rawState.amd_tag,
       judas_direction: rawState.judas_direction,
       committed,
       features,
@@ -479,10 +482,10 @@ async function main(): Promise<void> {
     `AccB=${combo5.acc_B}% | AccAgree=${combo5.acc_agree}%`,
   );
 
-  console.log('\n── BY AMD TAG ──');
+  console.log('\n── BY AMD TAG (live amd_tag at 10:31) ──');
   console.log('Best feature per tag for Option A accuracy:');
-  for (const tag of ['AMD_TEXTBOOK', 'AMD_COMPRESSION_BREAKOUT', 'AMD_FAILED', 'AMD_SHIFTED']) {
-    const shortTag = tag.replace('AMD_', '').replace('_BREAKOUT', '');
+  for (const tag of ['AMD_FAILED', 'AMD_SHIFTED', 'AMD_NONE']) {
+    const shortTag = tag.replace('AMD_', '');
     const best = bestFeatureForTag(dayRows, tag);
     console.log(
       `  ${shortTag.padEnd(11)}: F${best.key.replace('f', '')} ${FEATURE_LABELS[best.key]} at ${best.acc}% (n=${best.n})`,
