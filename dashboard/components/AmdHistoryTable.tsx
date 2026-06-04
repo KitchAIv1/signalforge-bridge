@@ -173,6 +173,7 @@ export function AmdHistoryTable({
               <th className="px-3 py-2 text-left">Judas</th>
               <SortableHeader label="Pips" column="judas_pips" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Asian</th>
+              <th className="px-3 py-2 text-left">Qual</th>
               <th className="px-3 py-2 text-left">Asian Bias</th>
               <th className="px-3 py-2 text-left">Reversal</th>
               <th className="px-3 py-2 text-left">M5</th>
@@ -219,6 +220,18 @@ export function AmdHistoryTable({
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{historyRow.judas_pips ?? '—'}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                   {historyRow.asian_range_pips ?? '—'}p {historyRow.asian_is_flat ? '✓' : ''}
+                </td>
+                <td className="px-3 py-2">
+                  {(() => {
+                    const score = historyRow.accumulation_quality_score;
+                    const display = score != null ? `${Math.round(score * 100)}%` : '—';
+                    const color =
+                      score == null      ? 'text-muted-foreground' :
+                      score >= 0.65      ? 'text-green-600' :
+                      score >= 0.45      ? 'text-yellow-600' :
+                                           'text-muted-foreground';
+                    return <span className={color}>{display}</span>;
+                  })()}
                 </td>
                 <td className="px-3 py-2">
                   {historyRow.asian_close_bias_signal ? (

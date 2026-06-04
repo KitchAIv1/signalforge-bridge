@@ -214,6 +214,7 @@ export interface AmdState {
   asian_range_pips:        number | null;
   asian_net_pips:          number | null;
   asian_is_flat:           boolean | null;
+  accumulation_quality_score: number | null;
   judas_direction:         'UP' | 'DOWN' | 'FLAT' | null;
   judas_pips:              number | null;
   judas_extreme_price:     number | null;
