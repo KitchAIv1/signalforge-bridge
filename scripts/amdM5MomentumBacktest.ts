@@ -67,8 +67,8 @@ function windowNet(open: number, close: number): number {
 }
 
 function classifyWindowDir(netPips: number): WindowDir {
-  if (netPips > 0.5) return 'UP';
-  if (netPips < -0.5) return 'DOWN';
+  if (netPips > 1) return 'UP';
+  if (netPips < -1) return 'DOWN';
   return 'FLAT';
 }
 
@@ -149,14 +149,14 @@ function computeDetailRow(
 ): DetailRow | null {
   if (candles.length < 6) return null;
 
-  const w1Open = parsePrice(candles[0].o);
-  const w1Close = parsePrice(candles[2].c);
-  const w1Net = windowNet(w1Open, w1Close);
+  const w1Net = candles.slice(0, 3).reduce(
+    (sum, c) => sum + (parseFloat(c.c) - parseFloat(c.o)), 0,
+  ) * 10000;
   const w1Dir = classifyWindowDir(w1Net);
 
-  const w2Open = parsePrice(candles[3].o);
-  const w2Close = parsePrice(candles[5].c);
-  const w2Net = windowNet(w2Open, w2Close);
+  const w2Net = candles.slice(3, 6).reduce(
+    (sum, c) => sum + (parseFloat(c.c) - parseFloat(c.o)), 0,
+  ) * 10000;
   const w2Dir = classifyWindowDir(w2Net);
 
   const storedW1 = row.m5_first_3_net_pips != null
