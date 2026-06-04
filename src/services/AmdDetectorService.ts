@@ -129,6 +129,8 @@ function buildAmdStateUpsertRow(insertOpts: PersistAmdRowOpts) {
     m5_vs_judas_direction: insertOpts.m5Signal.m5_vs_judas_direction,
     m5_first_candle_direction:
       insertOpts.m5Signal.m5_first_candle_direction,
+    m5_w2_net_pips: insertOpts.m5Signal?.m5_w2_net_pips ?? null,
+    m5_momentum_type: insertOpts.m5Signal?.m5_momentum_type ?? null,
     m5_evaluated_at: insertOpts.m5Signal.m5_evaluated_at,
     judas_to_range_ratio: insertOpts.autoDir.judas_to_range_ratio ?? null,
     asian_drift_ratio: insertOpts.autoDir.asian_drift_ratio ?? null,
@@ -354,6 +356,8 @@ async function fetchAmdM5Signal(
     m5_first_3_net_pips: null,
     m5_vs_judas_direction: null,
     m5_first_candle_direction: null,
+    m5_w2_net_pips: null,
+    m5_momentum_type: null,
     m5_evaluated_at: null,
   };
 
@@ -413,10 +417,34 @@ async function fetchAmdM5Signal(
       m5VsJudas = netDir === 'bullish' ? 'AGAINST_JUDAS' : 'WITH_JUDAS';
     }
 
+    let m5_w2_net_pips: number | null = null;
+    let m5_momentum_type: 'SUSTAINED' | 'REVERSED' | 'STALLED' | null = null;
+
+    if (candles.length >= 6) {
+      const secondThree = candles.slice(3, 6);
+      const w2NetPips =
+        secondThree.reduce((sum, candle) => sum + (candle.c - candle.o), 0) *
+        10000;
+      m5_w2_net_pips = parseFloat(w2NetPips.toFixed(4));
+
+      const w1Dir = netPips > 1 ? 'UP' : netPips < -1 ? 'DOWN' : 'FLAT';
+      const w2Dir = w2NetPips > 1 ? 'UP' : w2NetPips < -1 ? 'DOWN' : 'FLAT';
+
+      if (w1Dir === 'FLAT' || w2Dir === 'FLAT') {
+        m5_momentum_type = 'STALLED';
+      } else if (w1Dir === w2Dir) {
+        m5_momentum_type = 'SUSTAINED';
+      } else {
+        m5_momentum_type = 'REVERSED';
+      }
+    }
+
     return {
       m5_first_3_net_pips: parseFloat(netPips.toFixed(4)),
       m5_vs_judas_direction: m5VsJudas,
       m5_first_candle_direction: firstDir,
+      m5_w2_net_pips,
+      m5_momentum_type,
       m5_evaluated_at: new Date().toISOString(),
     };
   } catch {
@@ -444,6 +472,8 @@ async function recordAmdInsightForEmptyH1(
     m5_first_3_net_pips: null,
     m5_vs_judas_direction: null,
     m5_first_candle_direction: null,
+    m5_w2_net_pips: null,
+    m5_momentum_type: null,
     m5_evaluated_at: null,
   };
   let autoDir = computeAutoDirectionSnapshot(

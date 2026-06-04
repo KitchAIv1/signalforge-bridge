@@ -120,12 +120,16 @@ export type AmdAutoDirectionSnapshot = {
   asian_net_direction?: string | null;
 };
 
+export type M5MomentumType = 'SUSTAINED' | 'REVERSED' | 'STALLED';
+
 export type AmdM5Signal = {
   m5_first_3_net_pips: number | null;
   m5_vs_judas_direction:
     'WITH_JUDAS' | 'AGAINST_JUDAS' | 'NEUTRAL' | null;
   m5_first_candle_direction:
     'bullish' | 'bearish' | 'doji' | null;
+  m5_w2_net_pips: number | null;
+  m5_momentum_type: M5MomentumType | null;
   m5_evaluated_at: string | null;
 };
 
