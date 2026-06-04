@@ -177,6 +177,7 @@ export function AmdHistoryTable({
               <th className="px-3 py-2 text-left">Asian Bias</th>
               <th className="px-3 py-2 text-left">Reversal</th>
               <th className="px-3 py-2 text-left">M5</th>
+              <th className="px-3 py-2 text-left">Momentum</th>
               <th className="px-3 py-2 text-left">Outcome</th>
               <SortableHeader label="Win pips" column="window_pip_move" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Chart</th>
@@ -257,6 +258,18 @@ export function AmdHistoryTable({
                 </td>
                 <td className={`px-3 py-2 text-xs font-medium ${m5SignalColor(historyRow.m5_vs_judas_direction)}`}>
                   {m5SignalLabel(historyRow.m5_vs_judas_direction)}
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {(() => {
+                    const momentum = historyRow.m5_momentum_type;
+                    const display = momentum ?? '—';
+                    const color =
+                      momentum === 'SUSTAINED' ? 'text-green-600' :
+                      momentum === 'REVERSED'  ? 'text-red-500' :
+                      momentum === 'STALLED'   ? 'text-yellow-600' :
+                      'text-muted-foreground';
+                    return <span className={color}>{display}</span>;
+                  })()}
                 </td>
                 <td className={`px-3 py-2 text-xs font-medium ${outcomeTagColor(historyRow.amd_outcome_tag)}`}>
                   {outcomeTagLabel(historyRow.amd_outcome_tag)}

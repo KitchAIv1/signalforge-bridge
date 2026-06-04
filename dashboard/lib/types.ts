@@ -228,6 +228,8 @@ export interface AmdState {
   m5_first_3_net_pips?: number | null;
   m5_vs_judas_direction?: string | null;
   m5_first_candle_direction?: string | null;
+  m5_w2_net_pips?: number | null;
+  m5_momentum_type?: string | null;
   m5_evaluated_at?: string | null;
   // Outcome (written at 16:30 UTC)
   amd_outcome_tag?: string | null;
