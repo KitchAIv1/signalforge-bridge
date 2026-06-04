@@ -33,6 +33,7 @@ type SlotMetrics = {
 type DetailRow = {
   trade_date: string;
   amd_outcome_tag: string;
+  judas_direction: string | null;
   slot_type: '30m' | '1H';
   slot_label: string;
   up_pips: number;
@@ -73,7 +74,7 @@ const SLOTS_30M: SlotDef[] = [
 ];
 
 const SLOTS_1H: SlotDef[] = [
-  { label: '10:00-11:00', startMinute: 0, endMinute: 60 },
+  { label: '10:30-11:30', startMinute: 30, endMinute: 90 },
   { label: '11:00-12:00', startMinute: 60, endMinute: 120 },
   { label: '12:00-13:00', startMinute: 120, endMinute: 180 },
   { label: '13:00-14:00', startMinute: 180, endMinute: 240 },
@@ -212,7 +213,7 @@ function printSlotTable(
   slotType: '30m' | '1H',
   slots: SlotDef[],
   detailRows: DetailRow[],
-  groupMatch: (tag: string) => boolean,
+  rowMatch: (row: DetailRow) => boolean,
 ): void {
   console.log(`\n── ${title} ──`);
   console.log(
@@ -223,7 +224,7 @@ function printSlotTable(
       (row) =>
         row.slot_type === slotType &&
         row.slot_label === slot.label &&
-        groupMatch(row.amd_outcome_tag),
+        rowMatch(row),
     );
     const stats = computeGroupStats(slotRows);
     console.log(
@@ -336,6 +337,7 @@ function writeDetailCsv(detailRows: DetailRow[], outputPath: string): void {
 function buildDetailRows(
   tradeDate: string,
   outcomeTag: string,
+  judasDirection: string | null,
   candles: M5RawCandle[],
 ): DetailRow[] {
   const rows: DetailRow[] = [];
@@ -346,6 +348,7 @@ function buildDetailRows(
     rows.push({
       trade_date: tradeDate,
       amd_outcome_tag: outcomeTag,
+      judas_direction: judasDirection,
       slot_type: '30m',
       slot_label: slot.label,
       up_pips: metrics.up_pips,
@@ -363,6 +366,7 @@ function buildDetailRows(
     rows.push({
       trade_date: tradeDate,
       amd_outcome_tag: outcomeTag,
+      judas_direction: judasDirection,
       slot_type: '1H',
       slot_label: slot.label,
       up_pips: metrics.up_pips,
@@ -392,7 +396,7 @@ async function main(): Promise<void> {
 
   const { data: stateRows, error: stateErr } = await supabase
     .from('amd_state')
-    .select('trade_date, amd_outcome_tag')
+    .select('trade_date, amd_outcome_tag, judas_direction')
     .eq('pair', PAIR)
     .not('amd_outcome_tag', 'is', null);
 
@@ -400,8 +404,14 @@ async function main(): Promise<void> {
     throw new Error(`amd_state fetch failed: ${stateErr?.message ?? 'no data'}`);
   }
 
-  const outcomeByDate = new Map(
-    stateRows.map((row) => [row.trade_date as string, row.amd_outcome_tag as string]),
+  const stateByDate = new Map(
+    stateRows.map((row) => [
+      row.trade_date as string,
+      {
+        outcomeTag: row.amd_outcome_tag as string,
+        judasDirection: (row.judas_direction as string | null) ?? null,
+      },
+    ]),
   );
 
   const detailRows: DetailRow[] = [];
@@ -411,14 +421,21 @@ async function main(): Promise<void> {
     const tradeDate = m5Row.trade_date as string;
     const candleCount = m5Row.candle_count as number;
     const candles = m5Row.candles as M5RawCandle[];
-    const outcomeTag = outcomeByDate.get(tradeDate);
+    const stateRow = stateByDate.get(tradeDate);
 
-    if (!outcomeTag || candleCount < 60 || !candles || candles.length < 72) {
+    if (!stateRow || candleCount < 60 || !candles || candles.length < 72) {
       skipped += 1;
       continue;
     }
 
-    detailRows.push(...buildDetailRows(tradeDate, outcomeTag, candles));
+    detailRows.push(
+      ...buildDetailRows(
+        tradeDate,
+        stateRow.outcomeTag,
+        stateRow.judasDirection,
+        candles,
+      ),
+    );
   }
 
   const dayCount = new Set(detailRows.map((row) => row.trade_date)).size;
@@ -452,17 +469,17 @@ async function main(): Promise<void> {
     '30m',
     SLOTS_30M,
     detailRows,
-    (tag) =>
-      tag === 'AMD_TEXTBOOK' ||
-      tag === 'AMD_COMPRESSION_BREAKOUT' ||
-      tag === 'AMD_FAILED',
+    (row) =>
+      row.amd_outcome_tag === 'AMD_TEXTBOOK' ||
+      row.amd_outcome_tag === 'AMD_COMPRESSION_BREAKOUT' ||
+      row.amd_outcome_tag === 'AMD_FAILED',
   );
   printSlotTable(
     `30-MINUTE SLOTS — NON-AMD DAYS (${nonAmdDayCount})`,
     '30m',
     SLOTS_30M,
     detailRows,
-    (tag) => tag === 'AMD_SHIFTED' || tag === 'AMD_NONE',
+    (row) => row.amd_outcome_tag === 'AMD_SHIFTED' || row.amd_outcome_tag === 'AMD_NONE',
   );
 
   printSlotTable(
@@ -482,8 +499,36 @@ async function main(): Promise<void> {
       '1H',
       SLOTS_1H,
       detailRows,
-      group.match,
+      (row) => group.match(row.amd_outcome_tag),
     );
+
+    if (group.key === 'AMD_TEXTBOOK') {
+      const textbookUpDays = new Set(
+        detailRows.filter(
+          (row) => row.amd_outcome_tag === 'AMD_TEXTBOOK' && row.judas_direction === 'UP',
+        ).map((row) => row.trade_date),
+      ).size;
+      const textbookDownDays = new Set(
+        detailRows.filter(
+          (row) => row.amd_outcome_tag === 'AMD_TEXTBOOK' && row.judas_direction === 'DOWN',
+        ).map((row) => row.trade_date),
+      ).size;
+
+      printSlotTable(
+        `1-HOUR SLOTS — TEXTBOOK + UP JUDAS (predict SHORT) (${textbookUpDays})`,
+        '1H',
+        SLOTS_1H,
+        detailRows,
+        (row) => row.amd_outcome_tag === 'AMD_TEXTBOOK' && row.judas_direction === 'UP',
+      );
+      printSlotTable(
+        `1-HOUR SLOTS — TEXTBOOK + DOWN JUDAS (predict LONG) (${textbookDownDays})`,
+        '1H',
+        SLOTS_1H,
+        detailRows,
+        (row) => row.amd_outcome_tag === 'AMD_TEXTBOOK' && row.judas_direction === 'DOWN',
+      );
+    }
   }
 
   printKeyFindings(detailRows);
