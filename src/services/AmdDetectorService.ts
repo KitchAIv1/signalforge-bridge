@@ -528,7 +528,16 @@ async function recordAmdInsightForEmptyH1(
     );
   }
   try {
-    await sendAmdTelegramAlert(tradeDate, emptyFeatures);
+    const { hour: judas_extreme_utc_hour, timing: judas_timing } = deriveJudasTiming(
+      buildAmdChartDataPayload(tradeDate, [], emptyFeatures),
+      emptyFeatures.judas_direction,
+      emptyFeatures.judas_extreme_price,
+    );
+    await sendAmdTelegramAlert(tradeDate, {
+      ...emptyFeatures,
+      judas_timing,
+      judas_extreme_utc_hour,
+    });
   } catch (tgErr: unknown) {
     console.warn('[AmdDetector] Telegram alert failed:', tgErr);
   }
@@ -602,7 +611,16 @@ async function recordAmdInsightForH1Window(
   }
 
   try {
-    await sendAmdTelegramAlert(tradeDate, features);
+    const { hour: judas_extreme_utc_hour, timing: judas_timing } = deriveJudasTiming(
+      buildAmdChartDataPayload(tradeDate, h1Pull, features),
+      features.judas_direction,
+      features.judas_extreme_price,
+    );
+    await sendAmdTelegramAlert(tradeDate, {
+      ...features,
+      judas_timing,
+      judas_extreme_utc_hour,
+    });
   } catch (tgErr: unknown) {
     console.warn('[AmdDetector] Telegram alert failed:', tgErr);
   }
