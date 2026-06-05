@@ -43,6 +43,9 @@ type StateRow = {
   asian_close_bias_signal: string | null;
 };
 
+type FirstMoveDir = 'UP' | 'DOWN' | 'TIED';
+type ReversalType = 'CONTINUATION' | 'STALLED' | 'REVERSAL' | 'MIXED';
+
 type SlotMetrics = {
   open_1200: number;
   close_1300: number;
@@ -50,8 +53,10 @@ type SlotMetrics = {
   candle_direction: Dir;
   peak_up_pips: number;
   peak_up_time: string;
+  peak_up_candle_idx: number;
   peak_down_pips: number;
   peak_down_time: string;
+  peak_down_candle_idx: number;
   dominant_direction: Dir;
   total_range: number;
   real_move_pips: number;
@@ -60,6 +65,15 @@ type SlotMetrics = {
   close_confirms_dominant: boolean;
   judas_inverted: Dir | null;
   dominant_agrees_judas_inversion: boolean | null;
+  first_move_direction: FirstMoveDir;
+  first_move_pips: number;
+  first_move_time: string;
+  second_move_pips: number;
+  second_move_time: string;
+  had_reversal: boolean;
+  reversal_pips_from_peak: number;
+  reversal_depth_pips: number;
+  reversal_type: ReversalType;
 };
 
 type DayRow = StateRow & SlotMetrics;
@@ -97,6 +111,91 @@ function classifyMoveSize(realMovePips: number): MoveSize {
   return 'MICRO';
 }
 
+function computeReversalFields(
+  open1200: number,
+  close1300: number,
+  netPips: number,
+  candleDirection: Dir,
+  peakUpPips: number,
+  peakUpTime: string,
+  peakUpCandleIdx: number,
+  peakDownPips: number,
+  peakDownTime: string,
+  peakDownCandleIdx: number,
+): Pick<
+  SlotMetrics,
+  | 'first_move_direction' | 'first_move_pips' | 'first_move_time'
+  | 'second_move_pips' | 'second_move_time'
+  | 'had_reversal' | 'reversal_pips_from_peak' | 'reversal_depth_pips' | 'reversal_type'
+> {
+  const firstMoveDirection: FirstMoveDir =
+    peakUpCandleIdx < peakDownCandleIdx ? 'UP'
+      : peakDownCandleIdx < peakUpCandleIdx ? 'DOWN' : 'TIED';
+
+  const firstMovePips =
+    firstMoveDirection === 'UP' ? peakUpPips
+      : firstMoveDirection === 'DOWN' ? peakDownPips : 0;
+  const firstMoveTime =
+    firstMoveDirection === 'UP' ? peakUpTime
+      : firstMoveDirection === 'DOWN' ? peakDownTime : '12:00';
+  const secondMovePips =
+    firstMoveDirection === 'UP' ? peakDownPips
+      : firstMoveDirection === 'DOWN' ? peakUpPips : 0;
+  const secondMoveTime =
+    firstMoveDirection === 'UP' ? peakDownTime
+      : firstMoveDirection === 'DOWN' ? peakUpTime : '12:00';
+
+  const firstMoveThreshold = 3;
+  const hadReversal =
+    firstMovePips >= firstMoveThreshold
+    && secondMovePips >= firstMoveThreshold
+    && (
+      (firstMoveDirection === 'UP' && netPips < -1)
+      || (firstMoveDirection === 'DOWN' && netPips > 1)
+    );
+
+  const reversalPipsFromPeak =
+    firstMoveDirection === 'UP'
+      ? Math.round((open1200 + peakUpPips / 10000 - close1300) * 10000 * 10) / 10
+      : firstMoveDirection === 'DOWN'
+        ? Math.round((close1300 - (open1200 - peakDownPips / 10000)) * 10000 * 10) / 10
+        : 0;
+
+  const reversalDepthPips =
+    firstMoveDirection === 'UP'
+      ? Math.round((firstMovePips + Math.abs(Math.min(netPips, 0))) * 10) / 10
+      : firstMoveDirection === 'DOWN'
+        ? Math.round((firstMovePips + Math.abs(Math.max(netPips, 0))) * 10) / 10
+        : 0;
+
+  const reversalType: ReversalType =
+    !hadReversal && firstMoveDirection === candleDirection ? 'CONTINUATION'
+      : !hadReversal && candleDirection === 'FLAT' ? 'STALLED'
+        : hadReversal ? 'REVERSAL'
+          : 'MIXED';
+
+  return {
+    first_move_direction: firstMoveDirection,
+    first_move_pips: firstMovePips,
+    first_move_time: firstMoveTime,
+    second_move_pips: secondMovePips,
+    second_move_time: secondMoveTime,
+    had_reversal: hadReversal,
+    reversal_pips_from_peak: reversalPipsFromPeak,
+    reversal_depth_pips: reversalDepthPips,
+    reversal_type: reversalType,
+  };
+}
+
+function firstMoveBucket(firstMoveTime: string): string {
+  const [hh, mm] = firstMoveTime.split(':').map(Number);
+  const minutes = hh * 60 + mm;
+  if (minutes <= 735) return '12:00-12:15';
+  if (minutes <= 750) return '12:15-12:30';
+  if (minutes <= 765) return '12:30-12:45';
+  return '12:45-12:55';
+}
+
 function extractSlotMetrics(
   candles: M5RawCandle[],
   judasDir: string | null,
@@ -111,8 +210,10 @@ function extractSlotMetrics(
 
   let peakUpPips = 0;
   let peakUpTime = '12:00';
+  let peakUpCandleIdx = 0;
   let peakDownPips = 0;
   let peakDownTime = '12:00';
+  let peakDownCandleIdx = 0;
 
   for (let index = 0; index < slot.length; index += 1) {
     const high = parseFloat(slot[index].h);
@@ -122,10 +223,12 @@ function extractSlotMetrics(
 
     if (up > peakUpPips) {
       peakUpPips = up;
+      peakUpCandleIdx = index;
       peakUpTime = peakTimeFromIndex(index);
     }
     if (down > peakDownPips) {
       peakDownPips = down;
+      peakDownCandleIdx = index;
       peakDownTime = peakTimeFromIndex(index);
     }
   }
@@ -145,6 +248,19 @@ function extractSlotMetrics(
     ? dominantDirection === judasInverted
     : null;
 
+  const reversalFields = computeReversalFields(
+    open1200,
+    close1300,
+    netPips,
+    candleDirection,
+    peakUpPips,
+    peakUpTime,
+    peakUpCandleIdx,
+    peakDownPips,
+    peakDownTime,
+    peakDownCandleIdx,
+  );
+
   return {
     open_1200: open1200,
     close_1300: close1300,
@@ -152,8 +268,10 @@ function extractSlotMetrics(
     candle_direction: candleDirection,
     peak_up_pips: peakUpPips,
     peak_up_time: peakUpTime,
+    peak_up_candle_idx: peakUpCandleIdx,
     peak_down_pips: peakDownPips,
     peak_down_time: peakDownTime,
+    peak_down_candle_idx: peakDownCandleIdx,
     dominant_direction: dominantDirection,
     total_range: totalRange,
     real_move_pips: realMovePips,
@@ -162,6 +280,7 @@ function extractSlotMetrics(
     close_confirms_dominant: closeConfirmsDominant,
     judas_inverted: judasInverted,
     dominant_agrees_judas_inversion: dominantAgreesJudas,
+    ...reversalFields,
   };
 }
 
@@ -191,6 +310,59 @@ function printTagSummary(tag: string, rows: DayRow[]): void {
   console.log(`  Close confirms dominant: ${pct(confirms, tagged.length)}%`);
 }
 
+function printReversalAnalysis(rows: DayRow[]): void {
+  const total = rows.length;
+  const upThenDown = rows.filter((row) => row.had_reversal && row.first_move_direction === 'UP').length;
+  const downThenUp = rows.filter((row) => row.had_reversal && row.first_move_direction === 'DOWN').length;
+  const continuation = rows.filter((row) => row.reversal_type === 'CONTINUATION').length;
+  const stalled = rows.filter((row) => row.reversal_type === 'STALLED').length;
+  const hadReversal = rows.filter((row) => row.had_reversal).length;
+
+  console.log('\n── REVERSAL ANALYSIS ──');
+  console.log(`First move UP then reversed DOWN:  ${upThenDown} days (${pct(upThenDown, total)}%)`);
+  console.log(`First move DOWN then reversed UP:  ${downThenUp} days (${pct(downThenUp, total)}%)`);
+  console.log(`No reversal (continuation):        ${continuation} days (${pct(continuation, total)}%)`);
+  console.log(`Stalled (flat close):              ${stalled} days (${pct(stalled, total)}%)`);
+  console.log(`\nHad reversal (first move ≥3p, close opposite side): ${hadReversal}/${total} (${pct(hadReversal, total)}%)`);
+
+  console.log('\nReversal by AMD outcome tag:');
+  for (const tag of [
+    'AMD_TEXTBOOK',
+    'AMD_COMPRESSION_BREAKOUT',
+    'AMD_FAILED',
+    'AMD_SHIFTED',
+    'AMD_NONE',
+  ]) {
+    const tagged = rows.filter((row) => row.amd_outcome_tag === tag);
+    if (tagged.length === 0) continue;
+    const shortTag = tag.replace('AMD_', '').replace('_BREAKOUT', '').padEnd(11);
+    const tagReversals = tagged.filter((row) => row.had_reversal).length;
+    console.log(
+      `  ${shortTag}: ${pct(tagReversals, tagged.length)}% had reversal | ` +
+      `avg first move: ${avg(tagged.map((row) => row.first_move_pips))}p | ` +
+      `avg reversal depth: ${avg(tagged.filter((row) => row.had_reversal).map((row) => row.reversal_depth_pips))}p`,
+    );
+  }
+
+  console.log('\nPeak timing — first move peak:');
+  for (const bucket of ['12:00-12:15', '12:15-12:30', '12:30-12:45', '12:45-12:55']) {
+    const count = rows.filter((row) => firstMoveBucket(row.first_move_time) === bucket).length;
+    const suffix = bucket === '12:00-12:15' ? '  ← immediate move'
+      : bucket === '12:45-12:55' ? '  ← late move' : '';
+    console.log(`  ${bucket}: ${count} days (${pct(count, total)}%)${suffix}`);
+  }
+
+  const reversalRows = rows.filter((row) => row.had_reversal);
+  const continuationRows = rows.filter((row) => row.reversal_type === 'CONTINUATION');
+  console.log(
+    `\nOn REVERSAL days: avg first_move_pips = ${avg(reversalRows.map((row) => row.first_move_pips))}p | ` +
+    `avg reversal_depth_pips = ${avg(reversalRows.map((row) => row.reversal_depth_pips))}p`,
+  );
+  console.log(
+    `On CONTINUATION days: avg first_move_pips = ${avg(continuationRows.map((row) => row.first_move_pips))}p`,
+  );
+}
+
 function writeDetailCsv(rows: DayRow[], outputPath: string): void {
   const header = [
     'trade_date',
@@ -207,6 +379,9 @@ function writeDetailCsv(rows: DayRow[], outputPath: string): void {
     'dominant_direction', 'total_range', 'real_move_pips', 'real_move_time',
     'move_size', 'close_confirms_dominant',
     'judas_inverted', 'dominant_agrees_judas_inversion',
+    'first_move_direction', 'first_move_pips', 'first_move_time',
+    'second_move_pips', 'second_move_time',
+    'had_reversal', 'reversal_depth_pips', 'reversal_type',
   ].join(',');
 
   const lines = rows.map((row) => [
@@ -224,6 +399,9 @@ function writeDetailCsv(rows: DayRow[], outputPath: string): void {
     row.dominant_direction, row.total_range, row.real_move_pips, row.real_move_time,
     row.move_size, row.close_confirms_dominant,
     row.judas_inverted ?? '', row.dominant_agrees_judas_inversion ?? '',
+    row.first_move_direction, row.first_move_pips, row.first_move_time,
+    row.second_move_pips, row.second_move_time,
+    row.had_reversal, row.reversal_depth_pips, row.reversal_type,
   ].join(','));
 
   fs.writeFileSync(outputPath, [header, ...lines].join('\n') + '\n');
@@ -354,6 +532,8 @@ async function main(): Promise<void> {
   ]) {
     printTagSummary(tag, dayRows);
   }
+
+  printReversalAnalysis(dayRows);
 
   const largeRows = dayRows.filter((row) => row.move_size === 'LARGE');
   const largeUp = largeRows.filter((row) => row.dominant_direction === 'UP').length;
