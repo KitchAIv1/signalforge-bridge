@@ -7,6 +7,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { fetchCompletedCandles } from '../connectors/oanda.js';
 import { computeDateFeatures, type OhlcCandle } from './amdDetector/amdFeatures.js';
 import { buildAmdChartDataPayload } from './amdDetector/amdChartPayload.js';
+import { deriveJudasTiming } from './amdDetector/judasTimingDeriver.js';
 import type {
   AmdAutoDirectionSnapshot,
   AmdDailyBiasSnapshot,
@@ -96,6 +97,11 @@ function buildAmdStateUpsertRow(insertOpts: PersistAmdRowOpts) {
     candlesForChart,
     features,
   );
+  const { hour: judas_extreme_utc_hour, timing: judas_timing } = deriveJudasTiming(
+    chartPayload,
+    features.judas_direction,
+    features.judas_extreme_price,
+  );
   return {
     trade_date: tradeDate,
     evaluated_at: evaluatedAtISO,
@@ -107,6 +113,8 @@ function buildAmdStateUpsertRow(insertOpts: PersistAmdRowOpts) {
     judas_direction: features.judas_direction,
     judas_pips: features.judas_pips,
     judas_extreme_price: features.judas_extreme_price,
+    judas_extreme_utc_hour,
+    judas_timing,
     reversal_confirmed: features.reversal_confirmed,
     compression_breakout: features.compression_breakout,
     delayed_distribution: features.delayed_distribution,

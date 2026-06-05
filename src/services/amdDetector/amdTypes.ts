@@ -40,9 +40,13 @@ export type DateFeatures = {
 
 export type AsianCloseBiasSignal = 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
 
+export type JudasTimingBucket = 'EARLY' | 'LATE' | null;
+
 /** Production return of computeDateFeatures — includes DB column judas_extreme_price. */
 export type AmdDateFeatures = DateFeatures & {
   judas_extreme_price: number | null;
+  judas_extreme_utc_hour?: number | null;
+  judas_timing?: JudasTimingBucket;
   asian_close_position_pct?: number | null;
   asian_close_bias_signal?: AsianCloseBiasSignal;
   accumulation_quality_score?: number | null;
@@ -58,6 +62,8 @@ export type AmdStateRow = {
   judas_direction: JudasDirection | null;
   judas_pips: number | null;
   judas_extreme_price: number | null;
+  judas_extreme_utc_hour?: number | null;
+  judas_timing?: JudasTimingBucket;
   reversal_confirmed: boolean | null;
   compression_breakout: boolean;
   delayed_distribution: boolean;
