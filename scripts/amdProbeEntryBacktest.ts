@@ -269,6 +269,7 @@ async function main(): Promise<void> {
     if (probeDir !== 'UP' && probeDir !== 'DOWN') continue;
 
     const firstMovePips = parseFloat(col(csvRow, 'first_move_pips')) || 0;
+    const firstMoveTime = col(csvRow, 'first_move_time');
     const open1200 = parseFloat(candles[24].o);
     const probePeakPrice = probeDir === 'UP'
       ? open1200 + firstMovePips / 10000
@@ -278,19 +279,36 @@ async function main(): Promise<void> {
     const price1230 = parseFloat(candles[30].o);
     const fadeDir: Dir = probeDir === 'UP' ? 'DOWN' : 'UP';
 
-    const fadingAt1225 = probeDir === 'UP'
-      ? price1225 < probePeakPrice
-      : price1225 > probePeakPrice;
-    const fadingAt1230 = probeDir === 'UP'
-      ? price1230 < probePeakPrice
-      : price1230 > probePeakPrice;
+    const firstMoveTimeParts = firstMoveTime.split(':').map(Number);
+    const firstMoveMinutes = firstMoveTimeParts[0] * 60 + firstMoveTimeParts[1];
+    const entryAMinutes = 745;
+    const entryBMinutes = 750;
 
-    const fadeDepth1225 = probeDir === 'UP'
-      ? Math.round((probePeakPrice - price1225) * 10000 * 10) / 10
-      : Math.round((price1225 - probePeakPrice) * 10000 * 10) / 10;
-    const fadeDepth1230 = probeDir === 'UP'
-      ? Math.round((probePeakPrice - price1230) * 10000 * 10) / 10
-      : Math.round((price1230 - probePeakPrice) * 10000 * 10) / 10;
+    const probeAlreadyPeaked1225 = firstMoveMinutes < entryAMinutes;
+    const fadingAt1225 = probeAlreadyPeaked1225 && (
+      probeDir === 'UP'
+        ? price1225 < probePeakPrice
+        : price1225 > probePeakPrice
+    );
+
+    const probeAlreadyPeaked1230 = firstMoveMinutes < entryBMinutes;
+    const fadingAt1230 = probeAlreadyPeaked1230 && (
+      probeDir === 'UP'
+        ? price1230 < probePeakPrice
+        : price1230 > probePeakPrice
+    );
+
+    const fadeDepth1225 = fadingAt1225
+      ? probeDir === 'UP'
+        ? Math.round((probePeakPrice - price1225) * 10000 * 10) / 10
+        : Math.round((price1225 - probePeakPrice) * 10000 * 10) / 10
+      : 0;
+
+    const fadeDepth1230 = fadingAt1230
+      ? probeDir === 'UP'
+        ? Math.round((probePeakPrice - price1230) * 10000 * 10) / 10
+        : Math.round((price1230 - probePeakPrice) * 10000 * 10) / 10
+      : 0;
 
     const entryA = parseFloat(candles[29].o);
     const entryB = parseFloat(candles[30].o);
