@@ -37,12 +37,23 @@ type EntryExits = {
   mae_to_1300: number;
 };
 
+type LiveProbeResult = {
+  live_probe_dir: Dir | 'FLAT';
+  live_probe_up_pips: number;
+  live_probe_down_pips: number;
+  live_probe_net_pips: number;
+  live_probe_peak_price: number;
+  live_probe_peak_minutes: number;
+};
+
 type DayRow = {
   trade_date: string;
   amd_outcome_tag: string;
-  first_move_dir: Dir;
-  first_move_pips: number;
-  probe_peak_price: number;
+  live_probe_dir: Dir;
+  live_probe_up_pips: number;
+  live_probe_down_pips: number;
+  live_probe_net_pips: number;
+  live_probe_peak_price: number;
   fade_dir: Dir;
   fading_at_1225: boolean;
   fade_depth_1225: number;
@@ -83,6 +94,65 @@ function pct(numerator: number, denominator: number): number {
 function avg(values: number[]): number {
   if (values.length === 0) return 0;
   return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+}
+
+function probePeakMinutes(probeIdx: number): number {
+  return 720 + probeIdx * 5;
+}
+
+function computeLiveProbe(candles: M5RawCandle[]): LiveProbeResult | null {
+  const probe = candles.slice(24, 28);
+  if (probe.length < 4) return null;
+
+  const open1200 = parseFloat(probe[0].o);
+  const close1220 = parseFloat(probe[3].c);
+  const netPips = Math.round((close1220 - open1200) * 10000 * 10) / 10;
+
+  let peakUpPips = 0;
+  let peakDownPips = 0;
+  let peakUpIdx = 0;
+  let peakDownIdx = 0;
+
+  for (let probeIdx = 0; probeIdx < probe.length; probeIdx += 1) {
+    const high = parseFloat(probe[probeIdx].h);
+    const low = parseFloat(probe[probeIdx].l);
+    const up = Math.round((high - open1200) * 10000 * 10) / 10;
+    const down = Math.round((open1200 - low) * 10000 * 10) / 10;
+
+    if (up > peakUpPips) {
+      peakUpPips = up;
+      peakUpIdx = probeIdx;
+    }
+    if (down > peakDownPips) {
+      peakDownPips = down;
+      peakDownIdx = probeIdx;
+    }
+  }
+
+  const liveProbeDir: Dir | 'FLAT' =
+    peakUpIdx < peakDownIdx ? 'UP'
+      : peakDownIdx < peakUpIdx ? 'DOWN'
+        : peakUpPips > peakDownPips ? 'UP'
+          : peakDownPips > peakUpPips ? 'DOWN'
+            : 'FLAT';
+
+  const dominantPips = liveProbeDir === 'UP' ? peakUpPips
+    : liveProbeDir === 'DOWN' ? peakDownPips : 0;
+  const peakIdx = liveProbeDir === 'UP' ? peakUpIdx : peakDownIdx;
+  const peakPrice = liveProbeDir === 'UP'
+    ? open1200 + peakUpPips / 10000
+    : liveProbeDir === 'DOWN'
+      ? open1200 - peakDownPips / 10000
+      : open1200;
+
+  return {
+    live_probe_dir: liveProbeDir,
+    live_probe_up_pips: peakUpPips,
+    live_probe_down_pips: peakDownPips,
+    live_probe_net_pips: netPips,
+    live_probe_peak_price: peakPrice,
+    live_probe_peak_minutes: probePeakMinutes(peakIdx),
+  };
 }
 
 function loadGroundTruthCsv(): {
@@ -216,8 +286,9 @@ function spreadBreakevenExit(stats: EntryStats, threshold: number): string {
 
 function writeDetailCsv(rows: DayRow[], outputPath: string): void {
   const header = [
-    'trade_date', 'amd_outcome_tag', 'first_move_dir', 'first_move_pips',
-    'probe_peak_price', 'fade_dir',
+    'trade_date', 'amd_outcome_tag',
+    'live_probe_dir', 'live_probe_up_pips', 'live_probe_down_pips',
+    'live_probe_net_pips', 'live_probe_peak_price', 'fade_dir',
     'fading_at_1225', 'fade_depth_1225', 'fading_at_1230', 'fade_depth_1230',
     'had_reversal', 'reversal_depth_pips',
     'entryA_price', 'A_p1235', 'A_p1240', 'A_p1245', 'A_p1250', 'A_p1255', 'A_p1300',
@@ -227,8 +298,9 @@ function writeDetailCsv(rows: DayRow[], outputPath: string): void {
   ].join(',');
 
   const lines = rows.map((row) => [
-    row.trade_date, row.amd_outcome_tag, row.first_move_dir, row.first_move_pips,
-    row.probe_peak_price, row.fade_dir,
+    row.trade_date, row.amd_outcome_tag,
+    row.live_probe_dir, row.live_probe_up_pips, row.live_probe_down_pips,
+    row.live_probe_net_pips, row.live_probe_peak_price, row.fade_dir,
     row.fading_at_1225, row.fade_depth_1225, row.fading_at_1230, row.fade_depth_1230,
     row.had_reversal, row.reversal_depth_pips,
     row.entryA_price, row.entryA.p1235, row.entryA.p1240, row.entryA.p1245,
@@ -258,6 +330,11 @@ async function main(): Promise<void> {
   }
 
   const dayRows: DayRow[] = [];
+  let skippedFlat = 0;
+  let liveProbeUp = 0;
+  let liveProbeDown = 0;
+  let agreesCount = 0;
+  let agreesTotal = 0;
 
   for (const candleRow of candleRows) {
     const tradeDate = candleRow.trade_date as string;
@@ -265,22 +342,35 @@ async function main(): Promise<void> {
     const csvRow = csvByDate.get(tradeDate);
     if (!csvRow || !candles || candles.length < 36) continue;
 
-    const probeDir = col(csvRow, 'first_move_direction');
-    if (probeDir !== 'UP' && probeDir !== 'DOWN') continue;
+    const liveProbe = computeLiveProbe(candles);
+    if (!liveProbe) continue;
 
-    const firstMovePips = parseFloat(col(csvRow, 'first_move_pips')) || 0;
-    const firstMoveTime = col(csvRow, 'first_move_time');
-    const open1200 = parseFloat(candles[24].o);
-    const probePeakPrice = probeDir === 'UP'
-      ? open1200 + firstMovePips / 10000
-      : open1200 - firstMovePips / 10000;
+    if (liveProbe.live_probe_dir === 'FLAT' || Math.max(
+      liveProbe.live_probe_up_pips,
+      liveProbe.live_probe_down_pips,
+    ) < 1) {
+      skippedFlat += 1;
+      continue;
+    }
+
+    const probeDir = liveProbe.live_probe_dir;
+    const probePeakPrice = liveProbe.live_probe_peak_price;
+
+    // Agreement check only — not used for entry
+    const csvFirstMoveDir = col(csvRow, 'first_move_direction');
+    if (csvFirstMoveDir === 'UP' || csvFirstMoveDir === 'DOWN') {
+      agreesTotal += 1;
+      if (csvFirstMoveDir === liveProbe.live_probe_dir) agreesCount += 1;
+    }
+
+    if (probeDir === 'UP') liveProbeUp += 1;
+    else liveProbeDown += 1;
 
     const price1225 = parseFloat(candles[29].o);
     const price1230 = parseFloat(candles[30].o);
     const fadeDir: Dir = probeDir === 'UP' ? 'DOWN' : 'UP';
 
-    const firstMoveTimeParts = firstMoveTime.split(':').map(Number);
-    const firstMoveMinutes = firstMoveTimeParts[0] * 60 + firstMoveTimeParts[1];
+    const firstMoveMinutes = liveProbe.live_probe_peak_minutes;
     const entryAMinutes = 745;
     const entryBMinutes = 750;
 
@@ -316,9 +406,11 @@ async function main(): Promise<void> {
     dayRows.push({
       trade_date: tradeDate,
       amd_outcome_tag: col(csvRow, 'amd_outcome_tag'),
-      first_move_dir: probeDir,
-      first_move_pips: firstMovePips,
-      probe_peak_price: probePeakPrice,
+      live_probe_dir: probeDir,
+      live_probe_up_pips: liveProbe.live_probe_up_pips,
+      live_probe_down_pips: liveProbe.live_probe_down_pips,
+      live_probe_net_pips: liveProbe.live_probe_net_pips,
+      live_probe_peak_price: probePeakPrice,
       fade_dir: fadeDir,
       fading_at_1225: fadingAt1225,
       fade_depth_1225: fadeDepth1225,
@@ -344,7 +436,9 @@ async function main(): Promise<void> {
   console.log(`${total} days | Entry: fade direction after probe peak | No prediction — pure observation`);
 
   console.log('\n── POPULATION ──');
-  console.log(`All days with first move: ${total}`);
+  console.log(`All days with live probe: ${total}`);
+  console.log(`Skipped (flat probe at 12:20): ${skippedFlat}`);
+  console.log(`Live probe UP: ${liveProbeUp} | Live probe DOWN: ${liveProbeDown}`);
   console.log(`Fading at 12:25 (price below/above probe peak): ${fading1225.length} (${pct(fading1225.length, total)}%)`);
   console.log(`Fading at 12:30: ${fading1230.length} (${pct(fading1230.length, total)}%)`);
   console.log(`Reversal days (had_reversal=true): ${reversalRows.length} (${pct(reversalRows.length, total)}%)`);
@@ -426,6 +520,11 @@ async function main(): Promise<void> {
   console.log(
     `Spread breakeven (1.5p): Entry A reaches at ${spreadBreakevenExit(allA, 1.5)} | ` +
     `Entry B reaches at ${spreadBreakevenExit(allB, 1.5)}`,
+  );
+
+  console.log('\n── LIVE PROBE vs CSV FIRST MOVE AGREEMENT ──');
+  console.log(
+    `Live probe direction matches CSV first_move_direction: ${agreesCount}/${agreesTotal} (${pct(agreesCount, agreesTotal)}%)`,
   );
 
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
