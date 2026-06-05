@@ -10,6 +10,9 @@ import {
   m5SignalColor,
   m5MomentumTypeLabel,
   m5MomentumTypeColor,
+  judasTimingLabel,
+  judasTimingColor,
+  judasTimingConfirmRate,
 } from '@/lib/amdPanelFormatters';
 import {
   describeAsianRangePips,
@@ -33,6 +36,12 @@ interface AmdPanelMetricsProps {
 }
 
 export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) {
+  const ShadowPill = () => (
+    <span className="ml-1 rounded px-1.5 py-0.5 text-xs font-semibold bg-yellow-900/20 text-yellow-500 dark:bg-yellow-900/30 dark:text-yellow-400">
+      SHADOW
+    </span>
+  );
+
   const manualBadge =
     amdState != null && (amdState.amd_tag_manual_override ?? '').trim() !== '' ? (
       <span className="ml-2 text-xs font-medium text-amber-800 dark:text-amber-300">(manual override)</span>
@@ -48,9 +57,23 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
 
       <AmdIntelPrimaryTag displayTag={displayTag} manualOverrideSnippet={manualBadge} />
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         <AmdIntelStatTile caption="Asian range" value={asianMetric} />
         <AmdIntelStatTile caption="Judas swing" value={judasMetric} />
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+          <p className="mb-1 text-xs text-muted-foreground">
+            Judas Timing
+            <ShadowPill />
+          </p>
+          <p className={`text-sm font-semibold ${judasTimingColor(amdState?.judas_timing)}`}>
+            {judasTimingLabel(amdState?.judas_timing)}
+          </p>
+          {amdState?.judas_timing && (
+            <p className="text-xs text-muted-foreground">
+              {judasTimingConfirmRate(amdState.judas_timing)}
+            </p>
+          )}
+        </div>
         <AmdIntelStatTile
           caption="Reversal"
           value={reversalMetric}
@@ -103,7 +126,10 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
             )}
             {amdState.accumulation_quality_score != null && (
               <div className="mt-1 flex justify-between text-sm">
-                <span className="text-muted-foreground">Accum. Quality</span>
+                <span className="text-muted-foreground">
+                  Accum. Quality
+                  <ShadowPill />
+                </span>
                 <span className={
                   amdState.accumulation_quality_score >= 0.65 ? 'text-green-600' :
                   amdState.accumulation_quality_score >= 0.45 ? 'text-yellow-600' :
@@ -146,7 +172,10 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
           </div>
           {amdState.m5_momentum_type && (
             <div className="mt-1 flex justify-between text-sm">
-              <span className="text-muted-foreground">Momentum</span>
+              <span className="text-muted-foreground">
+                Momentum
+                <ShadowPill />
+              </span>
               <span className={m5MomentumTypeColor(amdState.m5_momentum_type)}>
                 {m5MomentumTypeLabel(amdState.m5_momentum_type)}
                 {amdState.m5_w2_net_pips != null && (

@@ -171,13 +171,14 @@ export function AmdHistoryTable({
               <th className="px-3 py-2 text-left">Alignment</th>
               <th className="px-3 py-2 text-left">Auto Dir</th>
               <th className="px-3 py-2 text-left">Judas</th>
+              <th className="px-3 py-2 text-left">⚡ Timing</th>
               <SortableHeader label="Pips" column="judas_pips" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Asian</th>
-              <th className="px-3 py-2 text-left">Qual</th>
+              <th className="px-3 py-2 text-left">⚡ Qual</th>
               <th className="px-3 py-2 text-left">Asian Bias</th>
               <th className="px-3 py-2 text-left">Reversal</th>
               <th className="px-3 py-2 text-left">M5</th>
-              <th className="px-3 py-2 text-left">Momentum</th>
+              <th className="px-3 py-2 text-left">⚡ Momentum</th>
               <th className="px-3 py-2 text-left">Outcome</th>
               <SortableHeader label="Win pips" column="window_pip_move" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Chart</th>
@@ -217,6 +218,26 @@ export function AmdHistoryTable({
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                   {historyRow.judas_direction ?? '—'}
+                </td>
+                <td className="px-3 py-2">
+                  {(() => {
+                    const timing = historyRow.judas_timing;
+                    if (timing === 'LATE') {
+                      return (
+                        <span className="rounded px-1.5 py-0.5 text-xs font-semibold text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20">
+                          Late H9
+                        </span>
+                      );
+                    }
+                    if (timing === 'EARLY') {
+                      return (
+                        <span className="rounded px-1.5 py-0.5 text-xs font-semibold text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20">
+                          Early H8
+                        </span>
+                      );
+                    }
+                    return <span className="text-xs text-muted-foreground">—</span>;
+                  })()}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{historyRow.judas_pips ?? '—'}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">

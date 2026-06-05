@@ -218,6 +218,8 @@ export interface AmdState {
   judas_direction:         'UP' | 'DOWN' | 'FLAT' | null;
   judas_pips:              number | null;
   judas_extreme_price:     number | null;
+  judas_extreme_utc_hour?: number | null;
+  judas_timing?:           'EARLY' | 'LATE' | null;
   reversal_confirmed:      boolean | null;
   compression_breakout:    boolean;
   delayed_distribution:    boolean;

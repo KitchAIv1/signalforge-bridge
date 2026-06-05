@@ -259,3 +259,21 @@ export function m5MomentumTypeColor(type: string | null | undefined): string {
   if (type === 'STALLED') return 'text-yellow-600';
   return 'text-muted-foreground';
 }
+
+export function judasTimingLabel(timing: string | null | undefined): string {
+  if (timing === 'LATE') return 'Late (H9)';
+  if (timing === 'EARLY') return 'Early (H8)';
+  return '—';
+}
+
+export function judasTimingColor(timing: string | null | undefined): string {
+  if (timing === 'LATE') return 'text-emerald-600 dark:text-emerald-400';
+  if (timing === 'EARLY') return 'text-amber-500 dark:text-amber-400';
+  return 'text-muted-foreground';
+}
+
+export function judasTimingConfirmRate(timing: string | null | undefined): string {
+  if (timing === 'LATE') return '75% hist';
+  if (timing === 'EARLY') return '52% hist';
+  return '';
+}

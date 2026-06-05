@@ -18,6 +18,12 @@ export function buildAmdTelegramMessage(tradeDate: string, features: AmdDateFeat
     ? `Judas: ${features.judas_direction} ${features.judas_pips ?? '?'}pips`
     : 'Judas: —';
 
+  const timingDisplay = features.judas_timing === 'LATE'
+    ? 'Late (H9) · 75% hist confirm'
+    : features.judas_timing === 'EARLY'
+      ? 'Early (H8) · 52% hist confirm'
+      : '—';
+
   const reversalLine =
     features.reversal_confirmed === true
       ? 'Reversal: Confirmed ✓'
@@ -31,6 +37,7 @@ export function buildAmdTelegramMessage(tradeDate: string, features: AmdDateFeat
     `Tag: ${label}`,
     asianLine,
     judasLine,
+    `Timing: ${timingDisplay}`,
     reversalLine,
     `Size: ${multiplierLine}`,
     '━━━━━━━━━━━━━━━━━━━━━━━',
