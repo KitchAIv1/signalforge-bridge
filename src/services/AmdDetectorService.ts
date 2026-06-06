@@ -36,6 +36,7 @@ import {
   sendAmdTelegramAlert,
 } from './amdDetector/sendAmdTelegramAlert.js';
 import { applyAsianCloseAdvisory } from './amdDetector/asianCloseAdvisory.js';
+import { fetchWindowOutcomeForDate } from './amdDetector/fetchWindowOutcomeForDate.js';
 import { logInfo } from '../utils/logger.js';
 
 const AUD_AMD_PAIR = 'AUD_USD';
@@ -680,6 +681,71 @@ export async function runAmdDetection(): Promise<void> {
   }
 }
 
+const WINDOW_OUTCOME_ELIGIBLE_TAGS = [
+  'AMD_TEXTBOOK',
+  'AMD_COMPRESSION_BREAKOUT',
+  'AMD_FAILED',
+  'AMD_SHIFTED',
+] as const;
+
+async function persistWindowOutcomeForTag(
+  supabaseDb: SupabaseClient,
+  tradeDate: string,
+  outcomeTag: string,
+  autoDirection: string | null,
+): Promise<void> {
+  if (!WINDOW_OUTCOME_ELIGIBLE_TAGS.includes(outcomeTag as typeof WINDOW_OUTCOME_ELIGIBLE_TAGS[number])) {
+    return;
+  }
+
+  try {
+    console.log(
+      `[AmdOutcome] Computing window outcome for ${tradeDate} tag=${outcomeTag}`,
+    );
+    const windowOutcome = await fetchWindowOutcomeForDate(
+      tradeDate,
+      outcomeTag,
+      autoDirection,
+    );
+    if (!windowOutcome) {
+      console.log(
+        `[AmdOutcome] Window outcome returned null for ${tradeDate} — skipping write`,
+      );
+      return;
+    }
+
+    const { error: windowErr } = await supabaseDb
+      .from('amd_state')
+      .update({
+        window_tag_used: windowOutcome.window_tag_used,
+        window_from_utc: windowOutcome.window_from_utc,
+        window_to_utc: windowOutcome.window_to_utc,
+        window_pip_move: windowOutcome.window_pip_move,
+        window_direction_confirmed: windowOutcome.window_direction_confirmed,
+        window_candles: windowOutcome.window_candles,
+        window_evaluated_at: windowOutcome.window_evaluated_at,
+      })
+      .eq('pair', AUD_AMD_PAIR)
+      .eq('trade_date', tradeDate);
+
+    if (windowErr) {
+      console.error('[AmdOutcome] Window outcome DB write failed:', windowErr.message);
+      return;
+    }
+
+    console.log(
+      `[AmdOutcome] Window outcome written: ` +
+        `confirmed=${windowOutcome.window_direction_confirmed ?? 'null'} ` +
+        `pip_move=${windowOutcome.window_pip_move ?? 'null'}`,
+    );
+  } catch (windowErr: unknown) {
+    console.error(
+      '[AmdOutcome] Window outcome failed — outcome tag already written, continuing:',
+      windowErr instanceof Error ? windowErr.message : windowErr,
+    );
+  }
+}
+
 export async function runAmdOutcomeDetection(): Promise<void> {
   if (amdOutcomeInProgress) {
     console.log('[AmdOutcome] Outcome detection already in progress — skipping');
@@ -699,7 +765,7 @@ export async function runAmdOutcomeDetection(): Promise<void> {
 
     const { data: existing, error: fetchErr } = await supabaseDb
       .from('amd_state')
-      .select('id, amd_tag, judas_direction')
+      .select('id, amd_tag, judas_direction, auto_direction')
       .eq('pair', AUD_AMD_PAIR)
       .eq('trade_date', tradeDate)
       .maybeSingle();
@@ -770,6 +836,13 @@ export async function runAmdOutcomeDetection(): Promise<void> {
           `outcome=${outcomeFeatures.amd_tag} | ` +
           `reversal=${outcomeFeatures.reversal_confirmed ?? 'null'} | ` +
           `compression=${outcomeFeatures.compression_breakout}`,
+      );
+
+      await persistWindowOutcomeForTag(
+        supabaseDb,
+        tradeDate,
+        outcomeFeatures.amd_tag,
+        (existing.auto_direction as string | null) ?? null,
       );
     } catch (err: unknown) {
       console.error(
