@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { logInfo } from '../../utils/logger.js';
 import { parseChartOhlc } from './parseChartOhlc.js';
 import { PDL_SWEEP_PAIR } from './pdlSweepConstants.js';
 import type { StoredM5Candle } from './pdlSweepTypes.js';
@@ -38,6 +39,11 @@ export async function fetchPriorDayLow(
   const sortedDates = stateRows.map((row) => String(row.trade_date));
   const priorDate = findPriorTradingDate(tradeDate, sortedDates);
   if (!priorDate) return null;
+
+  const priorDayOfWeek = new Date(priorDate + 'T00:00:00Z').getUTCDay();
+  if (priorDayOfWeek === 5) {
+    logInfo('[PdlSweepDetector] Prior day is Friday — PDL three-source merge covers 00:00–16:00 UTC only. 16:00–21:00 NY session excluded. Monday PDL may be understated.');
+  }
 
   const [asianRes, distRes, stateRes] = await Promise.all([
     supabase
