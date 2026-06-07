@@ -160,6 +160,7 @@ async function main(): Promise<void> {
       console.error('[PdlSweep] Detection cron error:', pdlSweepErr);
     }
   }, { timezone: 'UTC' });
+  logInfo('[cron] registered 55 11 * * 1-5 PDL sweep detection');
 
   // 13:05 UTC Mon-Fri — PDL sweep outcome evaluation
   cron.schedule('5 13 * * 1-5', async () => {
@@ -169,6 +170,7 @@ async function main(): Promise<void> {
       console.error('[PdlSweep] Outcome cron error:', pdlOutcomeErr);
     }
   }, { timezone: 'UTC' });
+  logInfo('[cron] registered 5 13 * * 1-5 PDL sweep outcome');
 
   cron.schedule('*/5 * * * *', async () => {
     try {
