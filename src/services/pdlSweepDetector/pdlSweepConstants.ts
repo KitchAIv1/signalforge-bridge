@@ -1,0 +1,11 @@
+export const PDL_SWEEP_PAIR = 'AUD_USD';
+export const PDL_SWEEP_TABLE = 'pdl_sweep_signals';
+
+export const LONDON_DIR_THRESHOLD_PIPS = 2;
+export const HOUR_DIR_THRESHOLD_PIPS = 1;
+
+export const DETECTOR_M5_FROM_SUFFIX = '10:00:00.000000000Z';
+export const DETECTOR_M5_TO_SUFFIX = '12:00:00.000000000Z';
+
+export const OUTCOME_M5_FROM_SUFFIX = '12:00:00.000000000Z';
+export const OUTCOME_M5_TO_SUFFIX = '13:00:00.000000000Z';

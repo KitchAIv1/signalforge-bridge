@@ -29,6 +29,8 @@ import {
   initializeDayState as scalperInitDay,
   runMonitors as scalperRunMonitors,
 } from './services/scalper/ScalperEngine.js';
+import { runPdlSweepDetection } from './services/pdlSweepDetector/pdlSweepDetectorService.js';
+import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeService.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -147,6 +149,24 @@ async function main(): Promise<void> {
       await fetchTodayDistributionCandles();
     } catch (distributionM5Err) {
       console.error('[DistributionM5] Daily fetch error:', distributionM5Err);
+    }
+  }, { timezone: 'UTC' });
+
+  // 11:55 UTC Mon-Fri — PDL sweep shadow detection
+  cron.schedule('55 11 * * 1-5', async () => {
+    try {
+      await runPdlSweepDetection();
+    } catch (pdlSweepErr) {
+      console.error('[PdlSweep] Detection cron error:', pdlSweepErr);
+    }
+  }, { timezone: 'UTC' });
+
+  // 13:05 UTC Mon-Fri — PDL sweep outcome evaluation
+  cron.schedule('5 13 * * 1-5', async () => {
+    try {
+      await runPdlSweepOutcome();
+    } catch (pdlOutcomeErr) {
+      console.error('[PdlSweep] Outcome cron error:', pdlOutcomeErr);
     }
   }, { timezone: 'UTC' });
 
