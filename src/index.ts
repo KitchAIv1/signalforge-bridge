@@ -154,6 +154,7 @@ async function main(): Promise<void> {
 
   // 11:55 UTC Mon-Fri — PDL sweep shadow detection
   cron.schedule('55 11 * * 1-5', async () => {
+    await new Promise(resolve => setTimeout(resolve, 30_000));
     try {
       await runPdlSweepDetection();
     } catch (pdlSweepErr) {
