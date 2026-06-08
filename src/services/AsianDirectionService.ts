@@ -1,27 +1,18 @@
 /**
- * Asian Direction automation — sets omega_direction on AMD_SHIFTED days at 21:00 UTC,
+ * Asian Direction automation — sets prior-day AMD flags at 21:10 UTC,
  * closes Omega positions at 08:00 UTC Asian session end.
  */
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '../connectors/supabase.js';
 import { closeAllOpenOmegaPositions } from './omegaClosePositions.js';
-import { fetchPriorD1Candle } from './asianDirection/fetchPriorD1.js';
-import { sendAsianOpenAlert, sendAsianCloseAlert } from './telegram/alertAsianSession.js';
+import { sendAsianCloseAlert } from './telegram/alertAsianSession.js';
 import { logAsianDirectionRow } from './asianDirection/logAsianDirection.js';
 import type {
   AsianDirectionAction,
   AsianDirectionLogRow,
   AsianDirectionTriggerType,
 } from './asianDirection/types.js';
-
-function buildAsianDirectionSupabaseClient(): SupabaseClient {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('[AsianDirection] Missing SUPABASE_URL or service key env var');
-  }
-  return createClient(supabaseUrl, supabaseKey);
-}
+import { writeBridgeConfigKey } from './asianDetection/bridgeConfigHelpers.js';
 
 function utcTodayDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -30,16 +21,13 @@ function utcTodayDate(): string {
 /**
  * Resolves the correct date to use for amd_state lookups.
  * amd_state only has rows for trading days (Mon–Fri).
- * On Sunday at 21:00 UTC (Asian open), use Friday's date instead.
- * On Saturday (should not fire but defensive): use Friday's date.
- * All other days: use today's date.
+ * On Sunday at 21:10 UTC (Asian open), use Friday's date instead.
  */
-function resolveAmdLookupDate(todayUtc: string): { lookupDate: string; isWeekendFallback: boolean } {
+export function resolveAmdLookupDate(todayUtc: string): { lookupDate: string; isWeekendFallback: boolean } {
   const d = new Date(`${todayUtc}T21:00:00.000Z`);
-  const dayOfWeek = d.getUTCDay(); // 0=Sunday, 1=Monday ... 6=Saturday
+  const dayOfWeek = d.getUTCDay();
 
   if (dayOfWeek === 0) {
-    // Sunday — use Friday (subtract 2 days)
     const friday = new Date(d);
     friday.setUTCDate(friday.getUTCDate() - 2);
     return {
@@ -49,8 +37,6 @@ function resolveAmdLookupDate(todayUtc: string): { lookupDate: string; isWeekend
   }
 
   if (dayOfWeek === 6) {
-    // Saturday — use Friday (subtract 1 day)
-    // Defensive: cron should never fire on Saturday but handle it safely
     const friday = new Date(d);
     friday.setUTCDate(friday.getUTCDate() - 1);
     return {
@@ -59,7 +45,6 @@ function resolveAmdLookupDate(todayUtc: string): { lookupDate: string; isWeekend
     };
   }
 
-  // Monday–Friday: use today
   return { lookupDate: todayUtc, isWeekendFallback: false };
 }
 
@@ -85,15 +70,15 @@ function emptyLogFields(
   };
 }
 
-async function fetchTodayAmdTag(
+async function fetchAmdTagForDate(
   supabase: SupabaseClient,
-  todayUtc: string,
+  lookupDate: string,
 ): Promise<{ amdTag: string | null; error: boolean }> {
   try {
     const { data, error } = await supabase
       .from('amd_state')
       .select('amd_tag')
-      .eq('trade_date', todayUtc)
+      .eq('trade_date', lookupDate)
       .limit(1)
       .maybeSingle();
 
@@ -109,9 +94,7 @@ async function fetchTodayAmdTag(
   }
 }
 
-async function readOmegaDirection(
-  supabase: SupabaseClient,
-): Promise<string | null> {
+async function readOmegaDirection(supabase: SupabaseClient): Promise<string | null> {
   try {
     const { data, error } = await supabase
       .from('bridge_config')
@@ -132,177 +115,48 @@ async function readOmegaDirection(
   }
 }
 
-/**
- * Returns ISO string for the next 08:00:00 UTC occurrence.
- * Asian session window: 21:00 UTC → next 08:00 UTC.
- */
-function nextAsianSessionExpiry(): string {
-  const now = new Date();
-  const candidate = new Date(now);
-  candidate.setUTCHours(8, 0, 0, 0);
-  if (candidate.getTime() <= now.getTime()) {
-    candidate.setUTCDate(candidate.getUTCDate() + 1);
-  }
-  return candidate.toISOString();
-}
-
-/**
- * Writes omega_direction_valid_until to bridge_config.
- * Non-fatal — never throws.
- */
-async function writeOmegaDirectionValidUntil(
-  supabase: SupabaseClient,
-  expiryIso: string,
-): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('bridge_config')
-      .update({
-        config_value: expiryIso,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('config_key', 'omega_direction_valid_until');
-    if (error) {
-      console.error('[AsianDirection] Failed to write valid_until:', error.message);
-    }
-  } catch (err: unknown) {
-    console.error('[AsianDirection] valid_until write error:', String(err));
-  }
-}
-
-async function writeOmegaDirection(
-  supabase: SupabaseClient,
-  directionToSet: string,
-): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('bridge_config')
-      .update({
-        config_value: directionToSet,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('config_key', 'omega_direction');
-
-    if (error) {
-      console.error('[AsianDirection] Failed to write omega_direction:', error.message);
-      return false;
-    }
-
-    return true;
-  } catch (writeErr: unknown) {
-    console.error('[AsianDirection] omega_direction write error:', String(writeErr));
-    return false;
-  }
-}
-
 export async function runAsianDirectionSet(): Promise<void> {
   try {
-    const supabase = buildAsianDirectionSupabaseClient();
+    const supabase = getSupabaseClient();
     const todayUtc = utcTodayDate();
-
-    // Weekend fallback: amd_state has no rows for Saturday/Sunday.
-    // On Sunday 21:00 UTC (Asian open), use Friday's AMD tag instead.
     const { lookupDate, isWeekendFallback } = resolveAmdLookupDate(todayUtc);
-    const amdLookup = await fetchTodayAmdTag(supabase, lookupDate);
+    const amdLookup = await fetchAmdTagForDate(supabase, lookupDate);
 
     if (amdLookup.error || amdLookup.amdTag == null) {
-      await writeOmegaDirectionValidUntil(supabase, new Date().toISOString());
       await logAsianDirectionRow(supabase, {
         ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
         action: 'SKIPPED_NO_AMD',
         reason: isWeekendFallback
           ? `Weekend fallback: no amd_state row found for Friday ${lookupDate} (today=${todayUtc})`
-          : `No amd_state row found for ${todayUtc}`,
+          : `No amd_state row found for ${lookupDate}`,
       });
       return;
     }
 
     const amdTag = amdLookup.amdTag;
-    if (amdTag !== 'AMD_SHIFTED') {
-      await writeOmegaDirectionValidUntil(supabase, new Date().toISOString());
-      await logAsianDirectionRow(supabase, {
-        ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
-        action: 'SKIPPED_NOT_SHIFTED',
-        reason: `AMD tag is ${amdTag} — only AMD_SHIFTED triggers auto-direction`,
-        amd_tag: amdTag,
-      });
-      return;
-    }
+    const isShifted = amdTag === 'AMD_SHIFTED';
+    const shiftedOk = await writeBridgeConfigKey(
+      supabase,
+      'asian_prior_amd_shifted',
+      isShifted ? 'true' : 'false',
+    );
+    const tagOk = await writeBridgeConfigKey(supabase, 'asian_prior_amd_tag', amdTag);
 
-    const oandaToken = process.env.OANDA_API_TOKEN ?? '';
-    const oandaEnv = process.env.OANDA_ENVIRONMENT ?? 'practice';
-    const priorD1 = await fetchPriorD1Candle(todayUtc, oandaToken, oandaEnv);
-
-    if (priorD1 == null) {
-      await writeOmegaDirectionValidUntil(supabase, new Date().toISOString());
-      await logAsianDirectionRow(supabase, {
-        ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
-        action: 'SKIPPED_NO_D1',
-        reason: `Could not fetch prior D1 candle for ${todayUtc}`,
-        amd_tag: amdTag,
-      });
-      return;
-    }
-
-    const priorD1Direction = priorD1.close > priorD1.open ? 'BULLISH' : 'BEARISH';
-    const priorD1BodyPips =
-      Math.round(Math.abs(priorD1.close - priorD1.open) * 10000 * 100) / 100;
-    const directionToSet = priorD1Direction === 'BULLISH' ? 'long' : 'short';
-    const previousDirection = await readOmegaDirection(supabase);
-
-    if (previousDirection === directionToSet) {
-      // Direction unchanged but window is still valid — extend to next 08:00 UTC
-      await writeOmegaDirectionValidUntil(supabase, nextAsianSessionExpiry());
-      await logAsianDirectionRow(supabase, {
-        ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
-        action: 'NO_CHANGE',
-        reason: `omega_direction already set to ${directionToSet}`,
-        amd_tag: amdTag,
-        prior_d1_direction: priorD1Direction,
-        prior_d1_body_pips: priorD1BodyPips,
-        prior_d1_close: priorD1.close,
-        direction_set: directionToSet,
-        previous_direction: previousDirection,
-        direction_changed: false,
-      });
-      return;
-    }
-
-    const writeOk = await writeOmegaDirection(supabase, directionToSet);
-    const setAction: AsianDirectionAction =
-      directionToSet === 'long' ? 'SET_LONG' : 'SET_SHORT';
-    const reasonSuffix = writeOk ? '' : ' (bridge_config update failed)';
+    const flagAction: AsianDirectionAction = isShifted
+      ? 'AMD_SHIFTED_FLAG_SET'
+      : 'AMD_NOT_SHIFTED_FLAG_SET';
+    const writeSuffix = shiftedOk && tagOk ? '' : ' (bridge_config update failed)';
 
     await logAsianDirectionRow(supabase, {
       ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
       amd_tag: amdTag,
-      prior_d1_direction: priorD1Direction,
-      prior_d1_body_pips: priorD1BodyPips,
-      prior_d1_close: priorD1.close,
-      direction_set: directionToSet,
-      previous_direction: previousDirection,
-      direction_changed: writeOk,
-      action: setAction,
-      reason:
-        `AMD_SHIFTED + D1 ${priorD1Direction} → set omega_direction=${directionToSet}` +
-        reasonSuffix,
+      action: flagAction,
+      reason: `Prior day amd_tag=${amdTag} lookupDate=${lookupDate}${writeSuffix}`,
     });
 
-    if (writeOk) {
-      await writeOmegaDirectionValidUntil(supabase, nextAsianSessionExpiry());
-      console.log(
-        `[AsianDirection] omega_direction set to ${directionToSet} for ${todayUtc}. ` +
-          `AMD_SHIFTED + D1 ${priorD1Direction}. Previous: ${previousDirection}`,
-      );
-      void sendAsianOpenAlert({
-        directionSet: directionToSet,
-        previousDirection,
-        amdTag,
-        priorD1Direction,
-        priorD1BodyPips,
-        directionChanged: true,
-      }).catch(() => {});
-    }
+    console.log(
+      `[AsianDirection] AMD flag set for ${todayUtc}: shifted=${isShifted}, tag=${amdTag}`,
+    );
   } catch (runErr: unknown) {
     console.error('[AsianDirection] runAsianDirectionSet failed:', String(runErr));
   }
@@ -310,7 +164,7 @@ export async function runAsianDirectionSet(): Promise<void> {
 
 export async function runAsianSessionClose(): Promise<void> {
   try {
-    const supabase = buildAsianDirectionSupabaseClient();
+    const supabase = getSupabaseClient();
     const todayUtc = utcTodayDate();
     const currentDirection = (await readOmegaDirection(supabase)) ?? 'long';
 

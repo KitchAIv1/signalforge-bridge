@@ -20,6 +20,12 @@ import {
   runAmdOutcomeDetection,
 } from './services/AmdDetectorService.js';
 import { runAsianDirectionSet, runAsianSessionClose } from './services/AsianDirectionService.js';
+import {
+  runConditionACheck,
+  runConditionBCheck,
+  runConditionBSlowCheck,
+  runConditionCCheck,
+} from './services/AsianSessionDetectionService.js';
 import { fetchTodayAsianCandles } from './services/asianM5/asianM5CandleFetch.js';
 import { fetchTodayDistributionCandles } from './services/distributionM5/distributionM5CandleFetch.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
@@ -133,6 +139,46 @@ async function main(): Promise<void> {
       console.error('[AsianDirection] Scheduled session close error:', asianCloseErr);
     }
   }, { timezone: 'UTC' });
+
+  cron.schedule('0 1 * * *', async () => {
+    try {
+      console.log('[AsianDetection] 01:00 UTC — Condition C check');
+      await runConditionCCheck();
+    } catch (err) {
+      console.error('[AsianDetection] Condition C error:', err);
+    }
+  }, { timezone: 'UTC' });
+
+  cron.schedule('5 3 * * *', async () => {
+    try {
+      console.log('[AsianDetection] 03:05 UTC — Condition B check');
+      await runConditionBCheck();
+    } catch (err) {
+      console.error('[AsianDetection] Condition B error:', err);
+    }
+  }, { timezone: 'UTC' });
+
+  cron.schedule('5 4 * * *', async () => {
+    try {
+      console.log('[AsianDetection] 04:05 UTC — Condition B_SLOW check');
+      await runConditionBSlowCheck();
+    } catch (err) {
+      console.error('[AsianDetection] Condition B_SLOW error:', err);
+    }
+  }, { timezone: 'UTC' });
+
+  cron.schedule('10 4 * * *', async () => {
+    try {
+      console.log('[AsianDetection] 04:10 UTC — Condition A check');
+      await runConditionACheck();
+    } catch (err) {
+      console.error('[AsianDetection] Condition A error:', err);
+    }
+  }, { timezone: 'UTC' });
+
+  logInfo(
+    '[AsianDetection] Cron schedule: C@01:00 (12 bars), B@03:05 (37 bars), B_SLOW@04:05 (49 bars), A@04:10 (50 bars)',
+  );
 
   // 08:05 UTC — Asian session closed, fetch today's M5 candles
   cron.schedule('5 8 * * 1-5', async () => {

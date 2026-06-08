@@ -12,7 +12,9 @@ export type AsianDirectionAction =
   | 'SKIPPED_NO_D1'
   | 'SKIPPED_NO_AMD'
   | 'NO_CHANGE'
-  | 'ASIAN_CLOSE';
+  | 'ASIAN_CLOSE'
+  | 'AMD_SHIFTED_FLAG_SET'
+  | 'AMD_NOT_SHIFTED_FLAG_SET';
 
 export type AsianDirectionTriggerType = 'DIRECTION_SET' | 'ASIAN_CLOSE';
 
