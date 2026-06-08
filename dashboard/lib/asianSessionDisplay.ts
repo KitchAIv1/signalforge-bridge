@@ -1,12 +1,17 @@
 // amd_outcome_tag NOT referenced
-// Asian session display is scoped to today's asian_direction_log rows only.
+// Legacy asian_direction_log helpers — kept for AsianDirectionPanel and API route.
 
 import type { AsianDirectionLogEntry } from '@/lib/fetchAsianDirectionLog';
 import type { AmdState } from '@/lib/types';
-import type { AsianSessionVerdict } from '@/lib/directionDecisionTypes';
+import type { AsianSessionDetection, AsianSessionVerdict } from '@/lib/directionDecisionTypes';
+import {
+  allCronsFiredToday,
+  findTodayActiveDetection,
+  findTodayChecks,
+  nextPendingCron,
+} from '@/lib/asianDetectionDisplayHelpers';
 import {
   isForexWeekendClosed,
-  resolveAsianSessionPhase,
   todayUtcDate,
 } from '@/lib/directionDecisionPhases';
 
@@ -67,7 +72,7 @@ function directionFromRow(row: AsianDirectionLogEntry): 'long' | 'short' | null 
 }
 
 export function buildAsianVerdict(
-  asianRows: AsianDirectionLogEntry[],
+  detectionRows: AsianSessionDetection[],
   _amdState: AmdState | null,
 ): AsianSessionVerdict {
   if (isForexWeekendClosed()) {
@@ -78,61 +83,60 @@ export function buildAsianVerdict(
     };
   }
 
-  const phase = resolveAsianSessionPhase();
-  const todayRows = findTodayAsianRows(asianRows);
+  const todayRows = findTodayChecks(detectionRows);
+  const active = findTodayActiveDetection(detectionRows);
 
-  if (!todayRows.length) {
-    if (phase === 'pending') {
-      return {
-        headline: 'Pending',
-        subline: 'Asian session in progress — no log rows yet',
-        tone: 'pending',
-      };
-    }
+  if (active) {
+    const condLabel = active.condition_fired ?? '?';
+    const dirLabel = active.direction_set === 'long' ? 'LONG' : 'SHORT';
+    const timeLabel = active.condition_check_time;
+    const shiftedLabel = active.prior_amd_shifted ? 'AMD_SHIFTED prior' : 'Non-SHIFTED prior';
+    const sizeLabel = active.size_multiplier === 1.0 ? '1.0×' : '0.75×';
     return {
-      headline: 'No data',
-      subline: 'No asian_direction_log rows for today',
-      tone: 'pending',
+      headline: `${dirLabel} — Condition ${condLabel} @ ${timeLabel}`,
+      subline: `${shiftedLabel} · Size ${sizeLabel}`,
+      tone: 'complete',
     };
   }
 
-  const directionRow = findTodayDirectionSetRow(todayRows);
-  const direction = directionRow ? directionFromRow(directionRow) : null;
-  if (direction) {
+  if (todayRows.some((row) => row.action === 'SKIPPED_MANUAL_MODE')) {
     return {
-      headline: `Direction: ${direction.toUpperCase()}`,
-      subline: directionRow!.reason ?? 'Prior D1 + AMD_SHIFTED overnight set',
-      tone: phase === 'active' ? 'active' : 'complete',
-    };
-  }
-
-  const skipRow = findTodaySkipRow(todayRows);
-  if (skipRow?.action === 'SKIPPED_NOT_SHIFTED') {
-    return {
-      headline: 'SKIPPED — not AMD_SHIFTED',
-      subline: skipRow.reason ?? 'Asian direction set runs only on AMD_SHIFTED days at 21:00 UTC',
-      tone: 'skipped',
-    };
-  }
-  if (skipRow) {
-    return {
-      headline: `SKIPPED — ${skipRow.action.replace('SKIPPED_', '')}`,
-      subline: skipRow.reason ?? 'Direction set skipped overnight',
+      headline: 'Manual mode — detection skipped',
+      subline: 'Direction set manually via dashboard',
       tone: 'skipped',
     };
   }
 
-  if (hasTodayAsianCloseOnly(todayRows)) {
+  if (allCronsFiredToday(todayRows)) {
     return {
-      headline: 'No direction set',
-      subline: 'Asian close logged at 08:00 UTC — awaiting 21:00 UTC direction set',
-      tone: phase === 'completed' ? 'skipped' : 'pending',
+      headline: 'No pattern detected today',
+      subline: 'All 4 conditions checked — no sustained direction found',
+      tone: 'skipped',
+    };
+  }
+
+  if (todayRows.length > 0) {
+    const firedTimes = todayRows.map((row) => row.condition_check_time);
+    const nextCron = nextPendingCron(firedTimes);
+    return {
+      headline: 'Monitoring in progress',
+      subline: nextCron ? `Next check: ${nextCron}` : 'Awaiting final checks',
+      tone: 'active',
+    };
+  }
+
+  const nowHour = new Date().getUTCHours();
+  if (nowHour >= 8) {
+    return {
+      headline: 'No pattern detected today',
+      subline: 'Asian session closed without a sustained directional signal',
+      tone: 'skipped',
     };
   }
 
   return {
-    headline: 'Pending',
-    subline: 'Awaiting overnight direction set evaluation',
+    headline: 'Asian session open',
+    subline: 'First check at 01:00 UTC — Condition C',
     tone: 'pending',
   };
 }

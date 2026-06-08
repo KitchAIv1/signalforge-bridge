@@ -7,6 +7,7 @@ import type {
   ChecklistRow,
   SessionPhase,
 } from '@/lib/directionDecisionLogic';
+import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
 import { DirectionChecklist } from '@/components/directionDecision/DirectionChecklist';
 import { IconChevronDown } from '@/lib/directionDecisionTablerIcons';
 import {
@@ -19,6 +20,7 @@ interface AsianSessionSectionProps {
   verdict: AsianSessionVerdict;
   checklist: ChecklistRow[];
   amdState: AmdState | null;
+  activeDetection?: AsianSessionDetection | null;
 }
 
 function phaseLabel(phase: SessionPhase): string {
@@ -34,29 +36,65 @@ function verdictToneClass(tone: AsianSessionVerdict['tone']): string {
   return 'text-amber-700 dark:text-amber-300';
 }
 
-function AsianDetailsPanel({ amdState }: { amdState: AmdState | null }) {
-  if (!amdState) {
-    return <p className="text-xs text-slate-500">No AMD state for investigation details.</p>;
-  }
+function formatDetectionNetPips(netPips: number | null): string {
+  if (netPips == null) return '—';
+  const prefix = netPips > 0 ? '+' : '';
+  return `${prefix}${netPips.toFixed(1)}p`;
+}
+
+function AsianDetailsPanel({
+  amdState,
+  activeDetection,
+}: {
+  amdState: AmdState | null;
+  activeDetection?: AsianSessionDetection | null;
+}) {
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
-      <div>
-        <dt className="text-slate-400">Asian range</dt>
-        <dd>{amdState.asian_range_pips ?? '—'} pips</dd>
-      </div>
-      <div>
-        <dt className="text-slate-400">Asian net</dt>
-        <dd>{amdState.asian_net_pips ?? '—'} pips</dd>
-      </div>
-      <div>
-        <dt className="text-slate-400">Judas pips</dt>
-        <dd>{amdState.judas_pips ?? '—'}</dd>
-      </div>
-      <div>
-        <dt className="text-slate-400">Evaluated</dt>
-        <dd>{amdState.evaluated_at?.slice(11, 16) ?? '—'} UTC</dd>
-      </div>
-    </dl>
+    <div className="space-y-2">
+      {activeDetection && (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
+          <div>
+            <dt className="text-slate-400">Condition</dt>
+            <dd>{activeDetection.condition_fired ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Fired at</dt>
+            <dd>{activeDetection.condition_check_time} UTC</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Net at detection</dt>
+            <dd>{formatDetectionNetPips(activeDetection.detection_net_pips)}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Candles checked</dt>
+            <dd>{activeDetection.candle_count ?? '—'}</dd>
+          </div>
+        </dl>
+      )}
+      {amdState && (
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-slate-100 pt-2 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+          <div>
+            <dt className="text-slate-400">Asian range</dt>
+            <dd>{amdState.asian_range_pips ?? '—'} pips</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Asian net</dt>
+            <dd>{amdState.asian_net_pips ?? '—'} pips</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">Judas pips</dt>
+            <dd>{amdState.judas_pips ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-slate-400">AMD evaluated</dt>
+            <dd>{amdState.evaluated_at?.slice(11, 16) ?? '—'} UTC</dd>
+          </div>
+        </dl>
+      )}
+      {!activeDetection && !amdState && (
+        <p className="text-xs text-slate-500">No detection data available.</p>
+      )}
+    </div>
   );
 }
 
@@ -65,6 +103,7 @@ export function AsianSessionSection({
   verdict,
   checklist,
   amdState,
+  activeDetection,
 }: AsianSessionSectionProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -105,7 +144,7 @@ export function AsianSessionSection({
       </button>
       {detailsOpen && (
         <div className="mt-2 rounded border border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-          <AsianDetailsPanel amdState={amdState} />
+          <AsianDetailsPanel amdState={amdState} activeDetection={activeDetection} />
         </div>
       )}
     </section>

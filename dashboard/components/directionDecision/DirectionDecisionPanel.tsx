@@ -37,7 +37,7 @@ function DirectionDecisionError({ message }: { message: string }) {
 }
 
 export function DirectionDecisionPanel() {
-  const { snapshot, amdState, regimeState, scalperDayState, verificationStatus, loading, error } =
+  const { snapshot, amdState, regimeState, scalperDayState, asianActiveDetection, verificationStatus, loading, error } =
     useDirectionDecisionData();
   const [lastUpdatedUtc, setLastUpdatedUtc] = useState('');
 
@@ -77,6 +77,7 @@ export function DirectionDecisionPanel() {
           verdict={snapshot.asianVerdict}
           checklist={snapshot.asianChecklist}
           amdState={amdState}
+          activeDetection={asianActiveDetection}
         />
 
         <DistributionSignalsSection

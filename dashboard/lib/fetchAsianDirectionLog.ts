@@ -13,6 +13,7 @@ export interface AsianDirectionLogEntry {
 }
 
 import { getSupabase } from '@/lib/supabase';
+import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
 
 const LOG_SELECT =
   'trade_date, triggered_at, amd_tag, prior_d1_direction, direction_set, ' +
@@ -35,4 +36,24 @@ export async function fetchAsianDirectionLog(): Promise<AsianDirectionLogEntry[]
 
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as AsianDirectionLogEntry[];
+}
+
+const DETECTION_LOG_SELECT =
+  'id, trade_date, condition_fired, condition_check_time, ' +
+  'detection_bar, detection_direction, detection_net_pips, ' +
+  'prior_amd_shifted, prior_amd_tag, size_multiplier, ' +
+  'action, direction_set, valid_until, candle_count, ' +
+  'error_message, created_at';
+
+export async function fetchAsianSessionDetectionLog(): Promise<AsianSessionDetection[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('asian_session_detection_log')
+    .select(DETECTION_LOG_SELECT)
+    .gte('trade_date', lookbackTradeDate(7))
+    .order('created_at', { ascending: false })
+    .limit(56);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as AsianSessionDetection[];
 }

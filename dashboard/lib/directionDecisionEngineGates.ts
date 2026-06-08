@@ -1,5 +1,6 @@
 import type { AmdState, RegimeState, ScalperDayState, ScalperTrade } from '@/lib/types';
 import type { AsianDirectionLogEntry } from '@/lib/fetchAsianDirectionLog';
+import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
 import type { OmegaWindowStatus } from '@/lib/fetchOmegaWindowStatus';
 import { resolveEffectiveAutoDirection } from '@/lib/effectiveAutoDirection';
 import { REBUILD_BLOCKED_HOURS_UTC } from '@/lib/rebuildHourBlockedHoursUtc';
@@ -241,6 +242,7 @@ export function buildDirectionDecisionSnapshot(input: {
   amdState: AmdState | null;
   regimeState: RegimeState | null;
   asianRows: AsianDirectionLogEntry[];
+  asianDetectionRows: AsianSessionDetection[];
   scalperDayState: ScalperDayState | null;
   scalperTrades: ScalperTrade[];
   omegaWindow: OmegaWindowStatus | null;
@@ -250,7 +252,7 @@ export function buildDirectionDecisionSnapshot(input: {
   engineActiveMap: Record<string, boolean>;
 }): DirectionDecisionSnapshot {
   const distributionChecklist = buildDistributionChecklist(input.amdState, input.regimeState);
-  const asianChecklist = buildAsianChecklist(input.asianRows, input.amdState);
+  const asianChecklist = buildAsianChecklist(input.asianDetectionRows, input.amdState);
   const alignment = computeAlignment(distributionChecklist);
   const asianCloseGate = resolveAsianCloseGate(input.amdState);
 
@@ -261,7 +263,7 @@ export function buildDirectionDecisionSnapshot(input: {
     asianChecklist,
     distributionChecklist,
     alignment,
-    asianVerdict: buildAsianVerdict(input.asianRows, input.amdState),
+    asianVerdict: buildAsianVerdict(input.asianDetectionRows, input.amdState),
     distributionVerdict: buildDistributionVerdict(asianCloseGate, input.amdState, alignment),
     asianCloseGate,
     gateExplanation: buildGateExplanation(asianCloseGate, input.amdState),

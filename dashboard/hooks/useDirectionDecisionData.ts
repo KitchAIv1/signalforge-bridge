@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { fetchAudUsdTodayAmdState } from '@/lib/fetchAudUsdTodayAmdState';
-import { fetchAsianDirectionLog } from '@/lib/fetchAsianDirectionLog';
+import { fetchAsianDirectionLog, fetchAsianSessionDetectionLog } from '@/lib/fetchAsianDirectionLog';
+import { findTodayActiveDetection } from '@/lib/asianDetectionDisplayHelpers';
 import { fetchOmegaWindowStatus } from '@/lib/fetchOmegaWindowStatus';
 import { fetchEngineControlRows } from '@/lib/engineControlConfig';
 import { fetchRebuildHourGateEnabled } from '@/lib/rebuildHourGateConfig';
@@ -11,6 +12,7 @@ import {
   buildDirectionDecisionSnapshot,
   type DirectionDecisionSnapshot,
 } from '@/lib/directionDecisionLogic';
+import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
 import type { AmdState, RegimeState, ScalperDayState, ScalperTrade } from '@/lib/types';
 
 const REFRESH_MS = 60 * 1000;
@@ -20,6 +22,7 @@ export interface UseDirectionDecisionDataResult {
   amdState: AmdState | null;
   regimeState: RegimeState | null;
   scalperDayState: ScalperDayState | null;
+  asianActiveDetection: AsianSessionDetection | null;
   verificationStatus: {
     liveDirection: string | null;
     reconstructedDirection: string | null;
@@ -89,6 +92,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
   const [amdState, setAmdState] = useState<AmdState | null>(null);
   const [regimeState, setRegimeState] = useState<RegimeState | null>(null);
   const [scalperDayState, setScalperDayState] = useState<ScalperDayState | null>(null);
+  const [detectionRows, setDetectionRows] = useState<AsianSessionDetection[]>([]);
   const [snapshot, setSnapshot] = useState<DirectionDecisionSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +106,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
         amdRow,
         regimeRow,
         asianRows,
+        detectionRowsResult,
         omegaWindow,
         controls,
         rebuildHourGateEnabled,
@@ -111,6 +116,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
         fetchAudUsdTodayAmdState(),
         fetchRegimeState(),
         fetchAsianDirectionLog(),
+        fetchAsianSessionDetectionLog(),
         fetchOmegaWindowStatus(),
         fetchEngineControlRows(supabase),
         fetchRebuildHourGateEnabled(supabase),
@@ -121,11 +127,13 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
       setAmdState(amdRow);
       setRegimeState(regimeRow);
       setScalperDayState(scalperBundle.dayState);
+      setDetectionRows(detectionRowsResult);
       setSnapshot(
         buildDirectionDecisionSnapshot({
           amdState: amdRow,
           regimeState: regimeRow,
           asianRows,
+          asianDetectionRows: detectionRowsResult,
           scalperDayState: scalperBundle.dayState,
           scalperTrades: scalperBundle.trades,
           omegaWindow,
@@ -171,10 +179,11 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
       amdState,
       regimeState,
       scalperDayState,
+      asianActiveDetection: findTodayActiveDetection(detectionRows),
       verificationStatus,
       loading,
       error,
       refetch,
     };
-  }, [snapshot, amdState, regimeState, scalperDayState, loading, error, refetch]);
+  }, [snapshot, amdState, regimeState, scalperDayState, detectionRows, loading, error, refetch]);
 }

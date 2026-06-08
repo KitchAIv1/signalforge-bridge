@@ -1,22 +1,23 @@
 import type { AmdState, RegimeState } from '@/lib/types';
-import type { AsianDirectionLogEntry } from '@/lib/fetchAsianDirectionLog';
 import { resolveEffectiveAutoDirection } from '@/lib/effectiveAutoDirection';
 import { layer4Label } from '@/lib/regimePanelFormatters';
 import type {
   AlignmentSummary,
   AsianCloseGate,
+  AsianSessionDetection,
   ChecklistRow,
   ChecklistStatus,
   DirectionSide,
 } from '@/lib/directionDecisionTypes';
 import { asianCloseFilterStatus } from '@/lib/asianCloseBiasHelpers';
 import {
-  findTodayAsianRows,
-  findTodayDirectionSetRow,
-  findTodaySkipRow,
-  resolveTodayAmdTag,
-  resolveTodayAsianContextRow,
-} from '@/lib/asianSessionDisplay';
+  allCronsFiredToday,
+  directionFromDetection,
+  findTodayActiveDetection,
+  findTodayChecks,
+  latestTodayCheck,
+  nextPendingCron,
+} from '@/lib/asianDetectionDisplayHelpers';
 
 function judasImpliedDirection(judas: string | null | undefined): DirectionSide | null {
   if (judas === 'UP') return 'short';
@@ -160,56 +161,108 @@ export function buildDistributionChecklist(
   ];
 }
 
-export function buildAsianChecklist(
-  asianRows: AsianDirectionLogEntry[],
-  amdState: AmdState | null,
-): ChecklistRow[] {
-  const todayRows = findTodayAsianRows(asianRows);
-  const contextRow = resolveTodayAsianContextRow(todayRows, amdState);
-  const directionRow = findTodayDirectionSetRow(todayRows);
-  const skipRow = findTodaySkipRow(todayRows);
-  const amdTag = resolveTodayAmdTag(todayRows, amdState);
-  const isShifted = amdTag === 'AMD_SHIFTED';
-  const priorD1 = contextRow?.prior_d1_direction ?? '—';
-  const priorDir: DirectionSide | null =
-    priorD1 === 'BULLISH' ? 'long' : priorD1 === 'BEARISH' ? 'short' : null;
+function formatSizeMultiplierLabel(multiplier: number | null | undefined): string {
+  if (multiplier == null) return '—';
+  if (multiplier === 1.0) return '1.0×';
+  if (multiplier === 0.75) return '0.75×';
+  return `${multiplier}×`;
+}
 
-  const omegaValue = directionRow
-    ? `Direction set (${directionRow.action})`
-    : skipRow
-      ? skipRow.action.replace('SKIPPED_', 'Skipped — ')
-      : todayRows.some((row) => row.action === 'ASIAN_CLOSE')
-        ? 'Asian close logged — pending 21:00 UTC'
-        : 'Session window';
+function buildDetectionStatusRow(
+  todayRows: AsianSessionDetection[],
+  active: AsianSessionDetection | null,
+): ChecklistRow {
+  const impliedDirection = directionFromDetection(active);
 
-  return [
-    {
-      id: 'prior_d1',
-      label: 'Prior D1',
-      value: priorD1 === '—' ? '—' : `${priorD1} → ${priorDir === 'long' ? 'LONG' : 'SHORT'}`,
-      impliedDirection: priorDir,
-      status: priorDir ? 'pass' : 'pending',
-    },
-    {
-      id: 'amd_tag',
-      label: 'AMD Tag',
-      value: amdTag ?? '—',
-      impliedDirection: isShifted ? priorDir : null,
-      status: isShifted ? 'pass' : 'fail',
-    },
-    {
-      id: 'asian_scalper',
-      label: 'Asian Scalper',
-      value: 'NOT DEPLOYED',
+  if (active) {
+    const condLabel = active.condition_fired ?? '?';
+    return {
+      id: 'asian-detection',
+      label: 'Pattern Detection',
+      value: `${condLabel} @ ${active.condition_check_time}`,
+      impliedDirection,
+      status: 'pass',
+    };
+  }
+
+  if (todayRows.some((row) => row.action === 'SKIPPED_MANUAL_MODE')) {
+    return {
+      id: 'asian-detection',
+      label: 'Pattern Detection',
+      value: 'Manual mode — skipped',
       impliedDirection: null,
       status: 'neutral',
+    };
+  }
+
+  if (allCronsFiredToday(todayRows)) {
+    return {
+      id: 'asian-detection',
+      label: 'Pattern Detection',
+      value: 'No pattern detected',
+      impliedDirection: null,
+      status: 'fail',
+    };
+  }
+
+  if (todayRows.length > 0) {
+    const firedTimes = todayRows.map((row) => row.condition_check_time);
+    const nextCron = nextPendingCron(firedTimes);
+    return {
+      id: 'asian-detection',
+      label: 'Pattern Detection',
+      value: nextCron ? `Pending (next: ${nextCron})` : 'Awaiting final checks',
+      impliedDirection: null,
+      status: 'neutral',
+    };
+  }
+
+  return {
+    id: 'asian-detection',
+    label: 'Pattern Detection',
+    value: 'Awaiting first check (01:00 UTC)',
+    impliedDirection: null,
+    status: 'neutral',
+  };
+}
+
+export function buildAsianChecklist(
+  detectionRows: AsianSessionDetection[],
+  _amdState: AmdState | null,
+): ChecklistRow[] {
+  const todayRows = findTodayChecks(detectionRows);
+  const active = findTodayActiveDetection(detectionRows);
+  const contextRow = active ?? latestTodayCheck(todayRows);
+  const impliedDirection = directionFromDetection(active);
+  const priorShifted = contextRow?.prior_amd_shifted ?? false;
+  const sizeMultiplier = contextRow?.size_multiplier ?? null;
+
+  return [
+    buildDetectionStatusRow(todayRows, active),
+    {
+      id: 'asian-direction',
+      label: 'Direction Set',
+      value: impliedDirection ? impliedDirection.toUpperCase() : '—',
+      impliedDirection,
+      status: impliedDirection ? 'pass' : 'neutral',
     },
     {
-      id: 'omega_asian',
-      label: 'Omega',
-      value: omegaValue,
+      id: 'asian-prior-shifted',
+      label: 'Prior AMD_SHIFTED',
+      value: contextRow
+        ? priorShifted
+          ? 'Yes (1.0× size)'
+          : 'No (0.75× size)'
+        : '—',
       impliedDirection: null,
-      status: skipRow ? 'fail' : directionRow ? 'pass' : 'pending',
+      status: priorShifted ? 'pass' : 'neutral',
+    },
+    {
+      id: 'asian-size',
+      label: 'Size Multiplier',
+      value: formatSizeMultiplierLabel(sizeMultiplier),
+      impliedDirection: null,
+      status: sizeMultiplier === 1.0 ? 'pass' : 'neutral',
     },
   ];
 }
