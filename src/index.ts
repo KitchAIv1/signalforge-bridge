@@ -98,10 +98,30 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
-  // Run once on startup so regime_state is populated immediately
-  runRegimeDetection().catch(startupError => {
-    console.error('[RegimeDetector] Startup run error:', startupError);
-  });
+  // Run once on startup so regime_state is populated immediately (skip if ran within 30 min)
+  (async () => {
+    try {
+      const { data: lastRegime } = await supabase
+        .from('regime_state')
+        .select('evaluated_at')
+        .eq('pair', 'AUD_USD')
+        .order('evaluated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const lastRanMs = lastRegime?.evaluated_at
+        ? Date.now() - new Date(lastRegime.evaluated_at).getTime()
+        : Infinity;
+
+      if (lastRanMs > 30 * 60 * 1000) {
+        await runRegimeDetection();
+      } else {
+        logInfo('[RegimeDetector] Startup skipped — ran within last 30 min');
+      }
+    } catch (err) {
+      console.error('[RegimeDetector] Startup guard error:', err);
+    }
+  })();
 
   cron.schedule('31 10 * * 1-5', async () => {
     try {
@@ -198,16 +218,15 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
-  // 11:55 UTC Mon-Fri — PDL sweep shadow detection
-  cron.schedule('55 11 * * 1-5', async () => {
-    await new Promise(resolve => setTimeout(resolve, 30_000));
+  // 12:10 UTC Mon-Fri — PDL sweep shadow detection
+  cron.schedule('10 12 * * 1-5', async () => {
     try {
       await runPdlSweepDetection();
     } catch (pdlSweepErr) {
       console.error('[PdlSweep] Detection cron error:', pdlSweepErr);
     }
   }, { timezone: 'UTC' });
-  logInfo('[cron] registered 55 11 * * 1-5 PDL sweep detection');
+  logInfo('[cron] registered 10 12 * * 1-5 PDL sweep detection');
 
   // 13:05 UTC Mon-Fri — PDL sweep outcome evaluation
   cron.schedule('5 13 * * 1-5', async () => {
@@ -305,12 +324,25 @@ async function main(): Promise<void> {
     _amdUtcHour > 16 ||
     (_amdUtcHour === 16 && _amdUtcMin >= 30);
   if (_outcomeWindowOpen) {
-    runAmdOutcomeDetection().catch((outcomeStartErr) => {
-      console.error(
-        '[AmdOutcome] Startup run error:',
-        outcomeStartErr,
-      );
-    });
+    (async () => {
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const { data: existingOutcome } = await supabase
+          .from('amd_state')
+          .select('outcome_evaluated_at')
+          .eq('trade_date', todayStr)
+          .eq('pair', 'AUD_USD')
+          .maybeSingle();
+
+        if (existingOutcome?.outcome_evaluated_at) {
+          logInfo('[AmdOutcome] Startup skipped — outcome already written today');
+        } else {
+          await runAmdOutcomeDetection();
+        }
+      } catch (err) {
+        console.error('[AmdOutcome] Startup guard error:', err);
+      }
+    })();
   }
 
   // Asian direction set removed from startup — the 21:10 UTC cron is the sole trigger.
