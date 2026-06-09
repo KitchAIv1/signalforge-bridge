@@ -27,3 +27,11 @@ export function notDetectedResult(): DetectionResult {
 export function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+export type AsianSessionDetectionAction =
+  | 'SET_LONG'
+  | 'SET_SHORT'
+  | 'NO_DETECTION'
+  | 'FETCH_INSUFFICIENT_CANDLES'
+  | 'SKIPPED_MANUAL_MODE'
+  | 'ALREADY_SET';

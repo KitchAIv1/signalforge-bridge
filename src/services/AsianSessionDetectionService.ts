@@ -18,6 +18,8 @@ import type { DetectionResult, M5Candle } from './asianDetection/types.js';
 
 type ConditionLabel = 'C' | 'B_SLOW' | 'B' | 'A';
 
+const OANDA_BAR_SETTLE_MS = 45_000;
+
 function utcTodayDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -57,6 +59,8 @@ async function runConditionCheck(
   const priorAmdTag = await getBridgeConfigValue(supabase, 'asian_prior_amd_tag');
   const sizeMultiplier = priorAmdShifted ? 1.0 : 0.75;
 
+  await new Promise<void>((resolve) => setTimeout(resolve, OANDA_BAR_SETTLE_MS));
+
   let candles: M5Candle[];
   try {
     candles = await fetchTodayAsianCandlesLive(barsNeeded);
@@ -75,7 +79,7 @@ async function runConditionCheck(
     await logAsianSessionDetection(supabase, {
       trade_date: tradeDate,
       condition_check_time: checkTime,
-      action: 'NO_DETECTION',
+      action: 'FETCH_INSUFFICIENT_CANDLES',
       error_message: `Insufficient candles: ${candles.length}/${barsNeeded}`,
       candle_count: candles.length,
     });
