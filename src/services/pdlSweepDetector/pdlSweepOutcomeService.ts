@@ -23,7 +23,7 @@ export async function runPdlSweepOutcome(): Promise<void> {
     .eq('trade_date', tradeDate)
     .maybeSingle();
 
-  if (error || !row?.signal_fired) return;
+  if (error || !row) return;
 
   try {
     const outcomeCandles = await fetchOutcomeM5Candles(tradeDate);
@@ -52,9 +52,12 @@ export async function runPdlSweepOutcome(): Promise<void> {
       return;
     }
 
-    const correct = row.signal_direction === 'long' && h12Direction === 'UP';
-    await sendPdlSweepOutcomeAlert(tradeDate, h12Direction, h12Net, correct);
-    console.log(`[PdlSweep] outcome ${tradeDate} h12=${h12Direction} ${h12Net}p correct=${correct}`);
+    console.log(`[PdlSweep] outcome ${tradeDate} h12=${h12Direction} ${h12Net}p`);
+    if (row.signal_fired) {
+      const correct = row.signal_direction === 'long' && h12Direction === 'UP';
+      await sendPdlSweepOutcomeAlert(tradeDate, h12Direction, h12Net, correct);
+      console.log(`[PdlSweep] outcome alert sent correct=${correct}`);
+    }
   } catch (err) {
     console.error('[PdlSweep] outcome error:', err);
   }

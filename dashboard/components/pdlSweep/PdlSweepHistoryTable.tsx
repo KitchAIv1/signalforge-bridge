@@ -104,8 +104,34 @@ function NonSignalRow({ row }: { row: PdlSweepSignalRow }) {
           <span className="text-slate-500">—</span>
         )}
       </td>
-      <td className="px-3 py-2 text-xs text-slate-500">N/A</td>
-      <td className="px-3 py-2 text-xs text-slate-500">N/A</td>
+      <td className="px-3 py-2 text-xs">
+        {row.outcome_h12_direction === 'UP' ? (
+          <span className="text-emerald-400">
+            H12 UP{' '}
+            {row.outcome_h12_net_pips != null
+              ? `+${row.outcome_h12_net_pips.toFixed(1)}p`
+              : ''}
+          </span>
+        ) : row.outcome_h12_direction === 'DOWN' ? (
+          <span className="text-red-400">
+            H12 DOWN{' '}
+            {row.outcome_h12_net_pips != null
+              ? `${row.outcome_h12_net_pips.toFixed(1)}p`
+              : ''}
+          </span>
+        ) : (
+          <span className="text-slate-500">N/A</span>
+        )}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {row.outcome_h12_direction === 'UP' ? (
+          <span className="text-amber-400">Missed</span>
+        ) : row.outcome_h12_direction === 'DOWN' ? (
+          <span className="text-emerald-400">Avoided</span>
+        ) : (
+          <span className="text-slate-500">—</span>
+        )}
+      </td>
       <td className="px-3 py-2 text-xs">{row.amd_outcome_tag ?? 'pending'}</td>
       <td className="px-3 py-2 text-xs">{row.decision_auto_direction ?? '—'}</td>
     </tr>
