@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
+import type { ConditionsMet, PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
 import { isPdlOutcomeCorrect } from '@/lib/pdlSweepStats';
 
 type HistoryTableProps = {
@@ -14,8 +14,11 @@ function formatPips(value: number | null): string {
 }
 
 function OutcomeCell({ row }: { row: PdlSweepSignalRow }) {
+  if (!row.signal_fired) {
+    return <span className="text-slate-500">N/A</span>;
+  }
   if (row.outcome_h12_direction == null) {
-    return <span className="text-slate-400">pending</span>;
+    return <span className="text-amber-400">Pending</span>;
   }
   return (
     <span>
@@ -69,6 +72,8 @@ function SignalHistoryRow({ row }: { row: PdlSweepSignalRow }) {
 }
 
 function NonSignalRow({ row }: { row: PdlSweepSignalRow }) {
+  const conditions = row.conditions_met as ConditionsMet | null;
+
   return (
     <tr className="text-slate-500 dark:text-slate-400">
       <td className="px-3 py-2 font-mono">{row.trade_date}</td>
@@ -79,9 +84,28 @@ function NonSignalRow({ row }: { row: PdlSweepSignalRow }) {
       <td className="px-3 py-2">
         {formatPips(row.h11_net_pips)} {row.h11_direction ?? ''}
       </td>
-      <td className="px-3 py-2 text-xs">—</td>
-      <td className="px-3 py-2 text-xs">—</td>
-      <td className="px-3 py-2 text-xs">—</td>
+      <td className="px-3 py-2 text-xs">
+        {conditions ? (
+          <div className="space-y-0.5">
+            <span className="block font-medium text-slate-400">NO FIRE</span>
+            <span className={conditions.pdl_breach ? 'text-emerald-400' : 'text-red-400'}>
+              PDL {conditions.pdl_breach ? '✓' : '✗'}
+            </span>
+            {' · '}
+            <span className={conditions.london_down ? 'text-emerald-400' : 'text-red-400'}>
+              LDN {conditions.london_down ? '✓' : '✗'}
+            </span>
+            {' · '}
+            <span className={conditions.h11_up ? 'text-emerald-400' : 'text-red-400'}>
+              H11 {conditions.h11_up ? '✓' : '✗'}
+            </span>
+          </div>
+        ) : (
+          <span className="text-slate-500">—</span>
+        )}
+      </td>
+      <td className="px-3 py-2 text-xs text-slate-500">N/A</td>
+      <td className="px-3 py-2 text-xs text-slate-500">N/A</td>
       <td className="px-3 py-2 text-xs">{row.amd_outcome_tag ?? 'pending'}</td>
       <td className="px-3 py-2 text-xs">{row.decision_auto_direction ?? '—'}</td>
     </tr>
