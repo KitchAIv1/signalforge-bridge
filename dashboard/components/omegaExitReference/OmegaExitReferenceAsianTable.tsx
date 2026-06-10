@@ -13,7 +13,7 @@ const ASIAN_SCHEDULE_ROWS = [
     timeUtc: '21:00',
     action: 'SET_LONG / SET_SHORT / NO_CHANGE',
     tone: 'emerald' as const,
-    meaning: 'AsianDirectionService sets omega_direction on AMD_SHIFTED days from prior D1.',
+    meaning: 'Four intraday crons (01:00, 03:05, 04:05, 04:10 UTC) detect candle patterns and set omega_direction. AsianDirectionService (21:10 UTC) writes prior AMD_SHIFTED flag for sizing only.',
   },
   {
     timeUtc: '21:00',
@@ -30,7 +30,7 @@ const ASIAN_SCHEDULE_ROWS = [
 ] as const;
 
 const ASIAN_VALIDITY_ROWS = [
-  ['omega_direction', 'long or short — inverted at signalRouter when omega executes'],
+  ['omega_direction', 'long or short — engine sends direction-aligned signals, bridge executes as-is'],
   ['omega_direction_valid_until', 'Next 08:00 UTC after 21:00 set (Asian window)'],
   ['Weekend fallback', 'Sunday 21:00 uses Friday amd_state row'],
   ['Log table', 'asian_direction_log — Activity panel ASIAN section'],

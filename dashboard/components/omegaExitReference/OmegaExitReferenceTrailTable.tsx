@@ -50,7 +50,7 @@ const TRAIL_STEP_ROWS = [
   {
     step: 'SL mirror',
     action: 'fill ± signalRSize',
-    detail: 'When omega_direction inverts signal, SL mirrored to correct side for R math.',
+    detail: 'SL mirrored to fill price on every omega execution — anchors R-size to actual fill for trail distance calculation.',
   },
 ] as const;
 
