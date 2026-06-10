@@ -6,10 +6,12 @@ import type { AmdState } from '@/lib/types';
 import type { AsianSessionDetection, AsianSessionVerdict } from '@/lib/directionDecisionTypes';
 import {
   allCronsFiredToday,
+  directionFromDetection,
   findTodayActiveDetection,
   findTodayChecks,
   nextPendingCron,
 } from '@/lib/asianDetectionDisplayHelpers';
+import { getPriorAmdContext, getPriorAmdSizeMultiplier } from '@/lib/priorAmdConfidence';
 import {
   isForexWeekendClosed,
   todayUtcDate,
@@ -88,13 +90,26 @@ export function buildAsianVerdict(
 
   if (active) {
     const condLabel = active.condition_fired ?? '?';
-    const dirLabel = active.direction_set === 'long' ? 'LONG' : 'SHORT';
+    const detectionDirection = directionFromDetection(active);
+    const dirLabel = detectionDirection === 'long' ? 'LONG' : 'SHORT';
     const timeLabel = active.condition_check_time;
-    const shiftedLabel = active.prior_amd_shifted ? 'AMD_SHIFTED prior' : 'Non-SHIFTED prior';
-    const sizeLabel = active.size_multiplier === 1.0 ? '1.0×' : '0.75×';
+    const priorCtx = getPriorAmdContext(active.prior_amd_tag ?? null);
+    const sizeLabel = getPriorAmdSizeMultiplier(
+      active.prior_amd_shifted,
+      active.size_multiplier,
+    );
+    const priorLabel = active.prior_amd_tag ?? 'No prior';
+    const confidenceWarning =
+      priorCtx.confidence === 'LOW' &&
+      priorCtx.bias !== 'NEUTRAL' &&
+      detectionDirection != null &&
+      ((priorCtx.bias === 'LONG' && detectionDirection === 'short') ||
+        (priorCtx.bias === 'SHORT' && detectionDirection === 'long'))
+        ? ' ⚠ conflicts with detection'
+        : '';
     return {
       headline: `${dirLabel} — Condition ${condLabel} @ ${timeLabel}`,
-      subline: `${shiftedLabel} · Size ${sizeLabel}`,
+      subline: `${priorLabel} prior · Size ${sizeLabel}${confidenceWarning}`,
       tone: 'complete',
     };
   }

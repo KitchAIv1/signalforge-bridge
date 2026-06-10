@@ -18,6 +18,7 @@ import {
   latestTodayCheck,
   nextPendingCron,
 } from '@/lib/asianDetectionDisplayHelpers';
+import { getPriorAmdContext, getPriorAmdSizeMultiplier } from '@/lib/priorAmdConfidence';
 
 function judasImpliedDirection(judas: string | null | undefined): DirectionSide | null {
   if (judas === 'UP') return 'short';
@@ -161,11 +162,31 @@ export function buildDistributionChecklist(
   ];
 }
 
-function formatSizeMultiplierLabel(multiplier: number | null | undefined): string {
-  if (multiplier == null) return '—';
-  if (multiplier === 1.0) return '1.0×';
-  if (multiplier === 0.75) return '0.75×';
-  return `${multiplier}×`;
+function formatPriorBiasValue(contextRow: AsianSessionDetection | null): string {
+  if (!contextRow) return '—';
+  const priorContext = getPriorAmdContext(contextRow.prior_amd_tag ?? null);
+  if (priorContext.bias === 'NEUTRAL' || priorContext.sampleSize < 3) {
+    return 'Neutral (no prior edge)';
+  }
+  return `${priorContext.bias} ${priorContext.pct}% (n=${priorContext.sampleSize})`;
+}
+
+function priorBiasImpliedDirection(contextRow: AsianSessionDetection | null): DirectionSide | null {
+  if (!contextRow) return null;
+  const priorContext = getPriorAmdContext(contextRow.prior_amd_tag ?? null);
+  if (priorContext.bias === 'LONG') return 'long';
+  if (priorContext.bias === 'SHORT') return 'short';
+  return null;
+}
+
+function priorBiasChecklistStatus(contextRow: AsianSessionDetection | null): ChecklistStatus {
+  if (!contextRow) return 'neutral';
+  const priorContext = getPriorAmdContext(contextRow.prior_amd_tag ?? null);
+  if (priorContext.bias === 'NEUTRAL' || priorContext.sampleSize < 3) return 'neutral';
+  const detectionDirection = directionFromDetection(contextRow);
+  if (priorContext.bias === 'LONG' && detectionDirection === 'short') return 'warn';
+  if (priorContext.bias === 'SHORT' && detectionDirection === 'long') return 'warn';
+  return 'pass';
 }
 
 function buildDetectionStatusRow(
@@ -234,8 +255,6 @@ export function buildAsianChecklist(
   const active = findTodayActiveDetection(detectionRows);
   const contextRow = active ?? latestTodayCheck(todayRows);
   const impliedDirection = directionFromDetection(active);
-  const priorShifted = contextRow?.prior_amd_shifted ?? false;
-  const sizeMultiplier = contextRow?.size_multiplier ?? null;
 
   return [
     buildDetectionStatusRow(todayRows, active),
@@ -247,22 +266,27 @@ export function buildAsianChecklist(
       status: impliedDirection ? 'pass' : 'neutral',
     },
     {
-      id: 'asian-prior-shifted',
-      label: 'Prior AMD_SHIFTED',
-      value: contextRow
-        ? priorShifted
-          ? 'Yes (1.0× size)'
-          : 'No (0.75× size)'
-        : '—',
+      id: 'asian-prior-tag',
+      label: 'Prior AMD Tag',
+      value: contextRow ? (contextRow.prior_amd_tag ?? 'Unknown') : '—',
       impliedDirection: null,
-      status: priorShifted ? 'pass' : 'neutral',
+      status: 'neutral',
     },
     {
-      id: 'asian-size',
+      id: 'asian-prior-confidence',
+      label: 'Prior Bias',
+      value: formatPriorBiasValue(contextRow),
+      impliedDirection: priorBiasImpliedDirection(contextRow),
+      status: priorBiasChecklistStatus(contextRow),
+    },
+    {
+      id: 'asian-size-multiplier',
       label: 'Size Multiplier',
-      value: formatSizeMultiplierLabel(sizeMultiplier),
+      value: contextRow
+        ? getPriorAmdSizeMultiplier(contextRow.prior_amd_shifted, contextRow.size_multiplier)
+        : '—',
       impliedDirection: null,
-      status: sizeMultiplier === 1.0 ? 'pass' : 'neutral',
+      status: 'neutral',
     },
   ];
 }
