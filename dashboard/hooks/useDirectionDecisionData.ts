@@ -116,7 +116,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
         fetchAudUsdTodayAmdState(),
         fetchRegimeState(),
         fetchAsianDirectionLog(),
-        fetchAsianSessionDetectionLog(),
+        fetchAsianSessionDetectionLog(7),
         fetchOmegaWindowStatus(),
         fetchEngineControlRows(supabase),
         fetchRebuildHourGateEnabled(supabase),

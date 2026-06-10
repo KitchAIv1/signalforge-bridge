@@ -46,14 +46,18 @@ const DETECTION_LOG_SELECT =
   'action, direction_set, valid_until, candle_count, ' +
   'error_message, created_at';
 
-export async function fetchAsianSessionDetectionLog(): Promise<AsianSessionDetection[]> {
+export async function fetchAsianSessionDetectionLog(
+  lookbackDays = 90,
+): Promise<AsianSessionDetection[]> {
   const supabase = getSupabase();
+  const rowLimit = lookbackDays * 4;
   const { data, error } = await supabase
     .from('asian_session_detection_log')
     .select(DETECTION_LOG_SELECT)
-    .gte('trade_date', lookbackTradeDate(7))
-    .order('created_at', { ascending: false })
-    .limit(56);
+    .gte('trade_date', lookbackTradeDate(lookbackDays))
+    .order('trade_date', { ascending: false })
+    .order('created_at', { ascending: true })
+    .limit(rowLimit);
 
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as AsianSessionDetection[];
