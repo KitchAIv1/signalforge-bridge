@@ -17,8 +17,35 @@ import { logAsianSessionDetection } from './asianDetection/logAsianSessionDetect
 import type { DetectionResult, M5Candle } from './asianDetection/types.js';
 
 type ConditionLabel = 'C' | 'B_SLOW' | 'B' | 'A';
+type ConfidenceTier = 'HIGH' | 'MEDIUM' | 'LOW';
 
 const OANDA_BAR_SETTLE_MS = 45_000;
+
+// Forward validation gates before any execution wiring:
+// - Minimum 30 HIGH confidence detections before wiring HIGH = larger size
+// - Minimum 30 LOW confidence detections before wiring LOW = skip/reduce
+// Not enforced yet — confidence is advisory/logged only.
+
+function computeHourBias(hourUtc: number): 'long' | 'short' | 'neutral' {
+  if (hourUtc >= 6) return 'long';
+  if (hourUtc === 4) return 'neutral';
+  return 'short';
+}
+
+function computeConfidenceTier(
+  patternDir: 'long' | 'short',
+  priorBias: string,
+  hourBias: 'long' | 'short' | 'neutral',
+): ConfidenceTier {
+  const priorConflicts = priorBias !== 'neutral' && priorBias !== patternDir;
+  const priorAgrees = priorBias === patternDir;
+  const hourAgrees = hourBias === patternDir;
+
+  if (priorConflicts) return 'LOW';
+  if (priorAgrees && hourAgrees) return 'HIGH';
+  if (priorAgrees || hourAgrees) return 'MEDIUM';
+  return 'MEDIUM';
+}
 
 function utcTodayDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -58,6 +85,10 @@ async function runConditionCheck(
   const priorAmdShifted = (await getBridgeConfigValue(supabase, 'asian_prior_amd_shifted')) === 'true';
   const priorAmdTag = await getBridgeConfigValue(supabase, 'asian_prior_amd_tag');
   const sizeMultiplier = priorAmdShifted ? 1.0 : 0.75;
+
+  const priorBias = (await getBridgeConfigValue(supabase, 'asian_prior_direction_bias')) ?? 'neutral';
+  const hourUtc = new Date().getUTCHours();
+  const hourBias = computeHourBias(hourUtc);
 
   await new Promise<void>((resolve) => setTimeout(resolve, OANDA_BAR_SETTLE_MS));
 
@@ -99,9 +130,13 @@ async function runConditionCheck(
   }
 
   const sessionExpiry = nextAsianSessionExpiry();
+  const patternDir = result.direction;
+  const confidenceTier = computeConfidenceTier(patternDir, priorBias, hourBias);
+
   await setBridgeConfigValues(supabase, {
     omega_direction: result.direction,
     omega_direction_valid_until: sessionExpiry,
+    asian_detection_confidence: confidenceTier,
   });
 
   const action = result.direction === 'long' ? 'SET_LONG' : 'SET_SHORT';
@@ -115,6 +150,8 @@ async function runConditionCheck(
     prior_amd_shifted: priorAmdShifted,
     prior_amd_tag: priorAmdTag,
     size_multiplier: sizeMultiplier,
+    confidence_tier: confidenceTier,
+    prior_direction_bias: priorBias,
     action,
     direction_set: result.direction,
     valid_until: sessionExpiry,
@@ -124,6 +161,9 @@ async function runConditionCheck(
   console.log(
     `[AsianDetection] ${checkTime} UTC — Condition ${conditionLabel} FIRED`,
     `direction=${result.direction}`,
+    `confidence=${confidenceTier}`,
+    `prior_bias=${priorBias}`,
+    `hour_bias=${hourBias}`,
     `prior_shifted=${priorAmdShifted}`,
     `size=${sizeMultiplier}x`,
     `valid_until=${sessionExpiry}`,

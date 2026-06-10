@@ -62,6 +62,8 @@ export interface AsianSessionDetection {
   prior_amd_shifted: boolean;
   prior_amd_tag: string | null;
   size_multiplier: number | null;
+  confidence_tier: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  prior_direction_bias: 'long' | 'short' | 'neutral' | null;
   action:
     | 'SET_LONG'
     | 'SET_SHORT'

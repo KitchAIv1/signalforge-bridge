@@ -11,7 +11,7 @@ import {
   findTodayChecks,
   nextPendingCron,
 } from '@/lib/asianDetectionDisplayHelpers';
-import { getPriorAmdContext, getPriorAmdSizeMultiplier } from '@/lib/priorAmdConfidence';
+import { getPriorAmdSizeMultiplier } from '@/lib/priorAmdConfidence';
 import {
   isForexWeekendClosed,
   todayUtcDate,
@@ -93,23 +93,26 @@ export function buildAsianVerdict(
     const detectionDirection = directionFromDetection(active);
     const dirLabel = detectionDirection === 'long' ? 'LONG' : 'SHORT';
     const timeLabel = active.condition_check_time;
-    const priorCtx = getPriorAmdContext(active.prior_amd_tag ?? null);
     const sizeLabel = getPriorAmdSizeMultiplier(
       active.prior_amd_shifted,
       active.size_multiplier,
     );
     const priorLabel = active.prior_amd_tag ?? 'No prior';
-    const confidenceWarning =
-      priorCtx.confidence === 'LOW' &&
-      priorCtx.bias !== 'NEUTRAL' &&
-      detectionDirection != null &&
-      ((priorCtx.bias === 'LONG' && detectionDirection === 'short') ||
-        (priorCtx.bias === 'SHORT' && detectionDirection === 'long'))
+    const confLabel =
+      active.confidence_tier === 'HIGH'
+        ? ' ✓ HIGH CONF'
+        : active.confidence_tier === 'LOW'
+          ? ' ⚠ LOW CONF'
+          : '';
+    const biasWarning =
+      active.confidence_tier === 'LOW'
         ? ' ⚠ conflicts with detection'
-        : '';
+        : active.confidence_tier === 'HIGH'
+          ? ' ✓ confirmed'
+          : '';
     return {
-      headline: `${dirLabel} — Condition ${condLabel} @ ${timeLabel}`,
-      subline: `${priorLabel} prior · Size ${sizeLabel}${confidenceWarning}`,
+      headline: `${dirLabel} — Condition ${condLabel} @ ${timeLabel}${confLabel}`,
+      subline: `${priorLabel} prior · Size ${sizeLabel}${biasWarning}`,
       tone: 'complete',
     };
   }

@@ -11,6 +11,8 @@ export interface AsianSessionDetectionLogRow {
   prior_amd_shifted?: boolean;
   prior_amd_tag?: string | null;
   size_multiplier?: number | null;
+  confidence_tier?: string | null;
+  prior_direction_bias?: string | null;
   action: string;
   direction_set?: string | null;
   valid_until?: string | null;

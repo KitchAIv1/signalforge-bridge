@@ -42,6 +42,7 @@ const DETECTION_LOG_SELECT =
   'id, trade_date, condition_fired, condition_check_time, ' +
   'detection_bar, detection_direction, detection_net_pips, ' +
   'prior_amd_shifted, prior_amd_tag, size_multiplier, ' +
+  'confidence_tier, prior_direction_bias, ' +
   'action, direction_set, valid_until, candle_count, ' +
   'error_message, created_at';
 

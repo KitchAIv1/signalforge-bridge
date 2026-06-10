@@ -288,6 +288,37 @@ export function buildAsianChecklist(
       impliedDirection: null,
       status: 'neutral',
     },
+    {
+      id: 'asian-confidence',
+      label: 'Signal Confidence',
+      value: (() => {
+        if (!contextRow?.confidence_tier) return '—';
+        switch (contextRow.confidence_tier) {
+          case 'HIGH':
+            return 'HIGH — all layers agree';
+          case 'MEDIUM':
+            return 'MEDIUM — pattern only';
+          case 'LOW':
+            return 'LOW — prior conflicts';
+          default:
+            return '—';
+        }
+      })(),
+      impliedDirection: null,
+      status: (() => {
+        if (!contextRow?.confidence_tier) return 'neutral' as ChecklistStatus;
+        switch (contextRow.confidence_tier) {
+          case 'HIGH':
+            return 'pass';
+          case 'MEDIUM':
+            return 'neutral';
+          case 'LOW':
+            return 'warn';
+          default:
+            return 'neutral';
+        }
+      })(),
+    },
   ];
 }
 

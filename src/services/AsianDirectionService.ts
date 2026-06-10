@@ -13,6 +13,19 @@ import type {
   AsianDirectionTriggerType,
 } from './asianDirection/types.js';
 import { writeBridgeConfigKey } from './asianDetection/bridgeConfigHelpers.js';
+import { logInfo } from '../utils/logger.js';
+
+// Backtest source: 42-day retroactive simulation, clean prior-day join
+// AMD_FAILED prior → 61.5% SHORT in next Asian session (n=13)
+// AMD_SHIFTED prior → coin flip (n=16) — no edge
+// Other tags → insufficient data or coin flip
+const PRIOR_BIAS_MAP: Record<string, 'long' | 'short' | 'neutral'> = {
+  AMD_FAILED: 'short',
+  AMD_SHIFTED: 'neutral',
+  AMD_COMPRESSION_BREAKOUT: 'neutral',
+  AMD_NONE: 'neutral',
+  AMD_TEXTBOOK: 'neutral',
+} as const;
 
 function utcTodayDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -142,10 +155,17 @@ export async function runAsianDirectionSet(): Promise<void> {
     );
     const tagOk = await writeBridgeConfigKey(supabase, 'asian_prior_amd_tag', amdTag);
 
+    const priorDirectionBias = PRIOR_BIAS_MAP[amdTag] ?? 'neutral';
+    const biasOk = await writeBridgeConfigKey(
+      supabase,
+      'asian_prior_direction_bias',
+      priorDirectionBias,
+    );
+
     const flagAction: AsianDirectionAction = isShifted
       ? 'AMD_SHIFTED_FLAG_SET'
       : 'AMD_NOT_SHIFTED_FLAG_SET';
-    const writeSuffix = shiftedOk && tagOk ? '' : ' (bridge_config update failed)';
+    const writeSuffix = shiftedOk && tagOk && biasOk ? '' : ' (bridge_config update failed)';
 
     await logAsianDirectionRow(supabase, {
       ...emptyLogFields(todayUtc, 'DIRECTION_SET'),
@@ -154,8 +174,13 @@ export async function runAsianDirectionSet(): Promise<void> {
       reason: `Prior day amd_tag=${amdTag} lookupDate=${lookupDate}${writeSuffix}`,
     });
 
+    logInfo('[AsianDirection] Prior direction bias written', {
+      amdTag,
+      priorDirectionBias,
+    });
+
     console.log(
-      `[AsianDirection] AMD flag set for ${todayUtc}: shifted=${isShifted}, tag=${amdTag}`,
+      `[AsianDirection] AMD flag set for ${todayUtc}: shifted=${isShifted}, tag=${amdTag}, bias=${priorDirectionBias}`,
     );
   } catch (runErr: unknown) {
     console.error('[AsianDirection] runAsianDirectionSet failed:', String(runErr));
