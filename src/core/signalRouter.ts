@@ -107,12 +107,10 @@ function buildTradeLogRow(
 function resolveOmegaDirection(
   engineId: string,
   signalDirection: string,
-  omegaDirection: string
+  _omegaDirection: string
 ): string {
   if (engineId !== 'omega') return signalDirection;
-  if (omegaDirection.toLowerCase() === 'short') {
-    return signalDirection === 'LONG' ? 'SHORT' : 'LONG';
-  }
+  // Engine sends direction-aligned signals only — no inversion at bridge.
   return signalDirection;
 }
 
