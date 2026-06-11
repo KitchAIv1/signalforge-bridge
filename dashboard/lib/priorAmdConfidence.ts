@@ -45,10 +45,10 @@ export function getPriorAmdContext(priorAmdTag: string | null): PriorAmdContext 
     case 'AMD_TEXTBOOK':
       return {
         bias: 'SHORT',
-        pct: 100,
-        confidence: 'LOW',
-        label: 'AMD_TEXTBOOK prior (n=1 only)',
-        sampleSize: 1,
+        pct: 57.9,
+        confidence: 'MEDIUM',
+        label: 'AMD_TEXTBOOK prior (57.9% SHORT)',
+        sampleSize: 38,
       };
     default:
       return {

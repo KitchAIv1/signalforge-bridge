@@ -28,7 +28,7 @@ const PRIOR_BIAS_MAP: Record<string, 'long' | 'short' | 'neutral'> = {
   AMD_SHIFTED: 'neutral',
   AMD_COMPRESSION_BREAKOUT: 'neutral',
   AMD_NONE: 'neutral',
-  AMD_TEXTBOOK: 'neutral',
+  AMD_TEXTBOOK: 'short',  // 57.9% SHORT next Asian session (n=38, 287-day clean backtest)
 } as const;
 
 function utcTodayDate(): string {
