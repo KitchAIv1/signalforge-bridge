@@ -51,6 +51,20 @@ export interface AsianSessionVerdict {
   tone: 'complete' | 'skipped' | 'active' | 'pending';
 }
 
+export type D1MomentumSignal =
+  | 'STRONG_CONTINUATION'
+  | 'WEAK_CONTINUATION'
+  | 'EXHAUSTION_BUILDING'
+  | 'NEUTRAL';
+
+export interface D1ContextConfig {
+  d1_prior_direction: 'long' | 'short' | 'equal' | null;
+  d1_prior_net_pips: string | null;
+  d1_prior_body_pct: string | null;
+  d1_prior_close_pos_pct: string | null;
+  d1_momentum_signal: D1MomentumSignal | null;
+}
+
 export interface AsianSessionDetection {
   id: string;
   trade_date: string;
@@ -64,6 +78,8 @@ export interface AsianSessionDetection {
   size_multiplier: number | null;
   confidence_tier: 'HIGH' | 'MEDIUM' | 'LOW' | null;
   prior_direction_bias: 'long' | 'short' | 'neutral' | null;
+  d1_prior_direction?: 'long' | 'short' | 'equal' | null;
+  d1_momentum_signal?: D1MomentumSignal | null;
   action:
     | 'SET_LONG'
     | 'SET_SHORT'

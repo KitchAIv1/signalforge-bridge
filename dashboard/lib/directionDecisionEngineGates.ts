@@ -7,6 +7,7 @@ import { REBUILD_BLOCKED_HOURS_UTC } from '@/lib/rebuildHourBlockedHoursUtc';
 import type {
   AlignmentSummary,
   AsianCloseGate,
+  D1ContextConfig,
   DirectionDecisionSnapshot,
   DistributionVerdict,
   EngineGateRow,
@@ -250,9 +251,14 @@ export function buildDirectionDecisionSnapshot(input: {
   pausedIds: string[];
   rebuildHourGateEnabled: boolean;
   engineActiveMap: Record<string, boolean>;
+  d1Config: D1ContextConfig;
 }): DirectionDecisionSnapshot {
   const distributionChecklist = buildDistributionChecklist(input.amdState, input.regimeState);
-  const asianChecklist = buildAsianChecklist(input.asianDetectionRows, input.amdState);
+  const asianChecklist = buildAsianChecklist(
+    input.asianDetectionRows,
+    input.amdState,
+    input.d1Config,
+  );
   const alignment = computeAlignment(distributionChecklist);
   const asianCloseGate = resolveAsianCloseGate(input.amdState);
 

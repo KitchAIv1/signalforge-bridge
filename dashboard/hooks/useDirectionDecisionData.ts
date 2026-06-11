@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { fetchAudUsdTodayAmdState } from '@/lib/fetchAudUsdTodayAmdState';
-import { fetchAsianDirectionLog, fetchAsianSessionDetectionLog } from '@/lib/fetchAsianDirectionLog';
+import { fetchAsianDirectionLog, fetchAsianSessionDetectionLog, fetchD1ContextConfig } from '@/lib/fetchAsianDirectionLog';
 import { findTodayActiveDetection } from '@/lib/asianDetectionDisplayHelpers';
 import { fetchOmegaWindowStatus } from '@/lib/fetchOmegaWindowStatus';
 import { fetchEngineControlRows } from '@/lib/engineControlConfig';
@@ -112,6 +112,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
         rebuildHourGateEnabled,
         scalperBundle,
         engineActiveMap,
+        d1Config,
       ] = await Promise.all([
         fetchAudUsdTodayAmdState(),
         fetchRegimeState(),
@@ -122,6 +123,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
         fetchRebuildHourGateEnabled(supabase),
         fetchScalperBundle(tradeDate),
         fetchEngineActiveMap(),
+        fetchD1ContextConfig(),
       ]);
 
       setAmdState(amdRow);
@@ -141,6 +143,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
           pausedIds: controls.pausedIds,
           rebuildHourGateEnabled,
           engineActiveMap,
+          d1Config,
         }),
       );
     } catch (err: unknown) {

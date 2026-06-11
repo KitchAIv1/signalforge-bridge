@@ -11,8 +11,9 @@ import {
   ASIAN_REFRESH_MS,
 } from '@/lib/asianSessionConstants';
 import { deriveNoFireTradeDates, isAsianFireAction } from '@/lib/asianSessionPageHelpers';
-import { fetchAsianSessionDetectionLog } from '@/lib/fetchAsianDirectionLog';
-import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
+import { fetchAsianSessionDetectionLog, fetchD1ContextConfig } from '@/lib/fetchAsianDirectionLog';
+import type { AsianSessionDetection, D1ContextConfig } from '@/lib/directionDecisionTypes';
+import { EMPTY_D1_CONTEXT_CONFIG } from '@/lib/d1ContextHelpers';
 
 export interface UseAsianSessionDetectionResult {
   rows: AsianSessionDetection[];
@@ -20,6 +21,7 @@ export interface UseAsianSessionDetectionResult {
   todayChecks: AsianSessionDetection[];
   firedRows: AsianSessionDetection[];
   noFireDays: string[];
+  d1Config: D1ContextConfig;
   loading: boolean;
   error: string | null;
 }
@@ -41,6 +43,7 @@ function sortTodayChecks(rows: AsianSessionDetection[]): AsianSessionDetection[]
 
 export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
   const [rows, setRows] = useState<AsianSessionDetection[]>([]);
+  const [d1Config, setD1Config] = useState<D1ContextConfig>(EMPTY_D1_CONTEXT_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,8 +54,14 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
       setLoading(true);
       setError(null);
       try {
-        const detectionRows = await fetchAsianSessionDetectionLog(ASIAN_FETCH_LOOKBACK_DAYS);
-        if (!cancelled) setRows(detectionRows);
+        const [detectionRows, d1Context] = await Promise.all([
+          fetchAsianSessionDetectionLog(ASIAN_FETCH_LOOKBACK_DAYS),
+          fetchD1ContextConfig(),
+        ]);
+        if (!cancelled) {
+          setRows(detectionRows);
+          setD1Config(d1Context);
+        }
       } catch (loadError: unknown) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Unknown error');
@@ -95,5 +104,5 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
   );
   const noFireDays = useMemo(() => deriveNoFireTradeDates(rows), [rows]);
 
-  return { rows, todayRow, todayChecks, firedRows, noFireDays, loading, error };
+  return { rows, todayRow, todayChecks, firedRows, noFireDays, d1Config, loading, error };
 }

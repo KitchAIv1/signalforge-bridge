@@ -12,6 +12,10 @@ import type {
   AsianDirectionLogRow,
   AsianDirectionTriggerType,
 } from './asianDirection/types.js';
+import {
+  computeD1MomentumSignal,
+  fetchPriorD1Context,
+} from './asianDirection/d1ContextHelpers.js';
 import { writeBridgeConfigKey } from './asianDetection/bridgeConfigHelpers.js';
 import { logInfo } from '../utils/logger.js';
 
@@ -182,6 +186,38 @@ export async function runAsianDirectionSet(): Promise<void> {
     console.log(
       `[AsianDirection] AMD flag set for ${todayUtc}: shifted=${isShifted}, tag=${amdTag}, bias=${priorDirectionBias}`,
     );
+
+    try {
+      const priorD1 = await fetchPriorD1Context(supabase, todayUtc);
+
+      if (priorD1 !== null) {
+        const momentumSignal = computeD1MomentumSignal(priorD1);
+
+        await Promise.all([
+          writeBridgeConfigKey(supabase, 'd1_prior_direction', priorD1.direction),
+          writeBridgeConfigKey(supabase, 'd1_prior_net_pips', String(priorD1.netPips)),
+          writeBridgeConfigKey(supabase, 'd1_prior_body_pct', String(priorD1.bodyPct)),
+          writeBridgeConfigKey(
+            supabase,
+            'd1_prior_close_pos_pct',
+            String(priorD1.closePositionPct),
+          ),
+          writeBridgeConfigKey(supabase, 'd1_momentum_signal', momentumSignal),
+        ]);
+
+        logInfo('[AsianDirection] D1 context written', {
+          priorDate: priorD1.tradeDate,
+          direction: priorD1.direction,
+          netPips: priorD1.netPips,
+          bodyPct: priorD1.bodyPct,
+          momentumSignal,
+        });
+      } else {
+        logInfo('[AsianDirection] No prior D1 context available', { todayUtc });
+      }
+    } catch (d1Err: unknown) {
+      console.error('[AsianDirection] D1 context write failed:', String(d1Err));
+    }
   } catch (runErr: unknown) {
     console.error('[AsianDirection] runAsianDirectionSet failed:', String(runErr));
   }

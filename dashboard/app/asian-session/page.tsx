@@ -7,7 +7,7 @@ import { AsianSessionPageHeader } from '@/components/asianSession/AsianSessionPa
 import { AsianSessionTodayPanel } from '@/components/asianSession/AsianSessionTodayPanel';
 
 export default function AsianSessionPage() {
-  const { rows, todayRow, todayChecks, firedRows, noFireDays, loading, error } =
+  const { rows, todayRow, todayChecks, firedRows, noFireDays, d1Config, loading, error } =
     useAsianSessionDetection();
 
   if (loading) {
@@ -33,7 +33,7 @@ export default function AsianSessionPage() {
       <div className="flex flex-col gap-6">
         <AsianSessionForwardGate firedRows={firedRows} />
 
-        <AsianSessionTodayPanel todayChecks={todayChecks} todayRow={todayRow} />
+        <AsianSessionTodayPanel todayChecks={todayChecks} todayRow={todayRow} d1Config={d1Config} />
 
         <section>
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">

@@ -19,6 +19,11 @@ import {
   nextPendingCron,
 } from '@/lib/asianDetectionDisplayHelpers';
 import { getPriorAmdContext, getPriorAmdSizeMultiplier } from '@/lib/priorAmdConfidence';
+import {
+  formatD1Direction,
+  formatD1MomentumSignal,
+} from '@/lib/d1ContextHelpers';
+import type { D1ContextConfig } from '@/lib/directionDecisionTypes';
 
 function judasImpliedDirection(judas: string | null | undefined): DirectionSide | null {
   if (judas === 'UP') return 'short';
@@ -250,6 +255,13 @@ function buildDetectionStatusRow(
 export function buildAsianChecklist(
   detectionRows: AsianSessionDetection[],
   _amdState: AmdState | null,
+  d1Config: D1ContextConfig = {
+    d1_prior_direction: null,
+    d1_prior_net_pips: null,
+    d1_prior_body_pct: null,
+    d1_prior_close_pos_pct: null,
+    d1_momentum_signal: null,
+  },
 ): ChecklistRow[] {
   const todayRows = findTodayChecks(detectionRows);
   const active = findTodayActiveDetection(detectionRows);
@@ -318,6 +330,39 @@ export function buildAsianChecklist(
             return 'neutral';
         }
       })(),
+    },
+    {
+      id: 'd1-prior-direction',
+      label: 'D1 Prior Day',
+      value: d1Config.d1_prior_direction
+        ? formatD1Direction(d1Config.d1_prior_direction, d1Config.d1_prior_net_pips)
+        : '—',
+      impliedDirection: (() => {
+        const direction = d1Config.d1_prior_direction;
+        if (direction === 'long') return 'long';
+        if (direction === 'short') return 'short';
+        return null;
+      })(),
+      status: 'neutral',
+    },
+    {
+      id: 'd1-momentum',
+      label: 'D1 Momentum',
+      value: formatD1MomentumSignal(d1Config.d1_momentum_signal).label,
+      impliedDirection: null,
+      status: formatD1MomentumSignal(d1Config.d1_momentum_signal).status,
+    },
+    {
+      id: 'd1-body',
+      label: 'D1 Body',
+      value: (() => {
+        const bodyPct = d1Config.d1_prior_body_pct;
+        const closePos = d1Config.d1_prior_close_pos_pct;
+        if (!bodyPct) return '—';
+        return `${bodyPct}% body · ${closePos ?? '—'}% close pos`;
+      })(),
+      impliedDirection: null,
+      status: 'neutral',
     },
   ];
 }

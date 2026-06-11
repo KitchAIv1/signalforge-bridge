@@ -13,7 +13,8 @@ export interface AsianDirectionLogEntry {
 }
 
 import { getSupabase } from '@/lib/supabase';
-import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
+import type { AsianSessionDetection, D1ContextConfig, D1MomentumSignal } from '@/lib/directionDecisionTypes';
+import { EMPTY_D1_CONTEXT_CONFIG } from '@/lib/d1ContextHelpers';
 
 const LOG_SELECT =
   'trade_date, triggered_at, amd_tag, prior_d1_direction, direction_set, ' +
@@ -62,3 +63,73 @@ export async function fetchAsianSessionDetectionLog(
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as AsianSessionDetection[];
 }
+
+const D1_CONTEXT_KEYS = [
+  'd1_prior_direction',
+  'd1_prior_net_pips',
+  'd1_prior_body_pct',
+  'd1_prior_close_pos_pct',
+  'd1_momentum_signal',
+] as const;
+
+function parseD1Direction(value: unknown): D1ContextConfig['d1_prior_direction'] {
+  if (value === 'long' || value === 'short' || value === 'equal') return value;
+  return null;
+}
+
+function parseD1MomentumSignal(value: unknown): D1MomentumSignal | null {
+  if (
+    value === 'STRONG_CONTINUATION' ||
+    value === 'WEAK_CONTINUATION' ||
+    value === 'EXHAUSTION_BUILDING' ||
+    value === 'NEUTRAL'
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function parseConfigString(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    const text = value.replace(/^"|"$/g, '').trim();
+    return text.length > 0 ? text : null;
+  }
+  const text = String(value).trim();
+  return text.length > 0 ? text : null;
+}
+
+export async function fetchD1ContextConfig(): Promise<D1ContextConfig> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('bridge_config')
+    .select('config_key, config_value')
+    .in('config_key', [...D1_CONTEXT_KEYS]);
+
+  if (error) throw new Error(error.message);
+
+  const configMap = Object.fromEntries(
+    (data ?? []).map((row) => [row.config_key as string, row.config_value]),
+  );
+
+  return {
+    d1_prior_direction: parseD1Direction(configMap.d1_prior_direction),
+    d1_prior_net_pips: parseConfigString(configMap.d1_prior_net_pips),
+    d1_prior_body_pct: parseConfigString(configMap.d1_prior_body_pct),
+    d1_prior_close_pos_pct: parseConfigString(configMap.d1_prior_close_pos_pct),
+    d1_momentum_signal: parseD1MomentumSignal(configMap.d1_momentum_signal),
+  };
+}
+
+export function mergeD1ContextIntoDetection<T extends AsianSessionDetection>(
+  row: T,
+  d1Config: D1ContextConfig,
+): T {
+  return {
+    ...row,
+    d1_prior_direction: d1Config.d1_prior_direction,
+    d1_momentum_signal: d1Config.d1_momentum_signal,
+  };
+}
+
+export { EMPTY_D1_CONTEXT_CONFIG };

@@ -3,11 +3,13 @@
 import { CRON_SCHEDULE } from '@/lib/asianDetectionDisplayHelpers';
 import { AsianSessionConfidencePill } from '@/components/asianSession/AsianSessionConfidencePill';
 import { formatAsianNetPips, formatAsianSizeMultiplier, formatAsianTradeDate, formatPriorBiasLabel } from '@/lib/asianSessionPageHelpers';
-import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
+import { formatD1ContextSummary } from '@/lib/d1ContextHelpers';
+import type { AsianSessionDetection, D1ContextConfig } from '@/lib/directionDecisionTypes';
 
 type TodayPanelProps = {
   todayChecks: AsianSessionDetection[];
   todayRow: AsianSessionDetection | null;
+  d1Config: D1ContextConfig;
 };
 
 function cronMinutes(cronTime: string): number {
@@ -78,7 +80,7 @@ function resolvePriorContextRow(
   return [...todayChecks].reverse().find((row) => row.prior_amd_tag != null) ?? todayChecks.at(-1) ?? null;
 }
 
-export function AsianSessionTodayPanel({ todayChecks, todayRow }: TodayPanelProps) {
+export function AsianSessionTodayPanel({ todayChecks, todayRow, d1Config }: TodayPanelProps) {
   const now = new Date();
   const todayUtc = now.toISOString().slice(0, 10);
   const priorContext = resolvePriorContextRow(todayRow, todayChecks);
@@ -110,6 +112,15 @@ export function AsianSessionTodayPanel({ todayChecks, todayRow }: TodayPanelProp
         Prior AMD: {priorContext?.prior_amd_tag ?? '—'} · Bias:{' '}
         {formatPriorBiasLabel(priorContext?.prior_direction_bias ?? null, priorContext?.prior_amd_tag ?? null)} ·
         Size: {formatAsianSizeMultiplier(priorContext?.size_multiplier ?? null)}
+      </div>
+      <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+        D1 Prior:{' '}
+        {formatD1ContextSummary(
+          d1Config.d1_prior_direction,
+          d1Config.d1_prior_net_pips,
+          d1Config.d1_prior_body_pct,
+          d1Config.d1_momentum_signal,
+        )}
       </div>
     </div>
   );
