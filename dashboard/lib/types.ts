@@ -107,6 +107,7 @@ export interface OmegaShadowSignalRow {
   centroid_distance: number;
   confidence: number;
   resolved_at: string | null;
+  outcome_candles: unknown | null;
   final_outcome: 'tp1r' | 'tp2r' | 'tp3r' | 'sl' | 'expired' | null;
   mfe_r: number | null;
   mae_r: number | null;

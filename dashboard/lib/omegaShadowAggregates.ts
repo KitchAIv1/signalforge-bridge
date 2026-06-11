@@ -121,7 +121,9 @@ function rollupResolved(resolvedList: OmegaShadowSignalRow[]): ResolvedRollup {
 }
 
 export function computeOmegaDerivedStats(signals: OmegaShadowSignalRow[]): OmegaDerivedStats {
-  const resolvedList = signals.filter((s) => s.resolved_at !== null);
+  const resolvedList = signals.filter(
+    (s) => s.resolved_at !== null && s.outcome_candles != null
+  );
   const pending = signals.filter((s) => s.resolved_at === null);
   const roll = rollupResolved(resolvedList);
   const { sessionMap, regimeMap } = buildPairMaps(signals);
