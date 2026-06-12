@@ -43,6 +43,7 @@ import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
 import { getNewsWindowEvent, type NewsWindowResult } from '../utils/newsCheck.js';
 import { closeAllOpenOmegaPositions } from '../services/omegaClosePositions.js';
+import { normalizeDirection } from './omegaInverseGates.js';
 import { processOmegaInverse } from './omegaInverseRouter.js';
 
 /** Last effective omega_direction (same source as resolveOmegaDirection). Used to detect DB/env flips. */
@@ -406,6 +407,27 @@ export async function processSignal(
     typeof directionModeRow.data?.config_value === 'string'
       ? directionModeRow.data.config_value
       : 'manual';
+
+  // ── Omega Inverse direction split ─────────────────────────────
+  if (norm.engineId === 'omega') {
+    const dtwNorm = normalizeDirection(norm.direction);
+    const dirNorm = normalizeDirection(omegaDirection);
+
+    if (dtwNorm !== null && dirNorm !== null && dtwNorm !== dirNorm) {
+      // DTW opposes omega_direction — Inverse handles, Prime suppressed
+      await processOmegaInverse(payload, norm, omegaDirection, {
+        supabase,
+        config,
+        getCachedAccount,
+        engines,
+        decisionLatencyMs,
+      });
+      return;
+    }
+    // DTW agrees with omega_direction — Prime executes normally
+    // Inverse suppressed (its internal gate also catches this)
+  }
+  // ── End Omega Inverse direction split ─────────────────────────
 
   const engine = findEngine(engines, norm.engineId);
   if (!engine || !engine.is_active) {
@@ -1113,17 +1135,6 @@ export async function processSignal(
       directionSource: directionMode === 'auto' ? 'auto' : 'manual',
       engineId: norm.engineId,
     }).catch(() => {});
-    // ── Omega Inverse fork ────────────────────────────────────────
-    if (norm.engineId === 'omega') {
-      await processOmegaInverse(payload, norm, omegaDirection, {
-        supabase,
-        config,
-        getCachedAccount,
-        engines,
-        decisionLatencyMs,
-      });
-    }
-    // ── End Omega Inverse fork ────────────────────────────────────
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase.from('bridge_trade_log').insert({
