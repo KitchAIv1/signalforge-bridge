@@ -9,6 +9,14 @@ export function parseOmegaDirectionValue(raw: unknown): DirectionSide | null {
   return null;
 }
 
+/**
+ * Derives the original DTW signal direction by inverting execution direction.
+ * Valid assumption: Omega Inverse always executes the opposite of DTW signal.
+ * KNOWN LIMITATION: if SHORT→LONG inversion goes live in future,
+ * this derivation still holds (exec=LONG → DTW=SHORT) but becomes
+ * harder to reason about. At that point, store dtw_direction as a
+ * dedicated column in bridge_trade_log instead of deriving it.
+ */
 export function deriveDtwDirection(execDirection: string): DirectionSide {
   const normalized = execDirection.toLowerCase();
   return normalized === 'long' ? 'short' : 'long';
