@@ -125,7 +125,17 @@ async function runConditionCheck(
       condition_fired: null,
       action: 'NO_DETECTION',
       candle_count: candles.length,
+      failure_reason: result.failure_reason ?? null,
+      evaluated_net_pips: result.evaluated_net_pips ?? null,
+      evaluated_direction: result.evaluated_direction ?? null,
     });
+    console.log(
+      `[AsianDetection] ${checkTime} UTC — NO_DETECTION`,
+      `reason=${result.failure_reason ?? 'unknown'}`,
+      `net_pips=${result.evaluated_net_pips ?? 'n/a'}`,
+      `direction=${result.evaluated_direction ?? 'n/a'}`,
+      `candles=${candles.length}`,
+    );
     return;
   }
 

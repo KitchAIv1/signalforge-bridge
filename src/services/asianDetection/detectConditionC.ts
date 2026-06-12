@@ -6,7 +6,9 @@ const MIN_NET_PIPS = 15;
 const MAX_ADVERSE_BAR_PIPS = 5;
 
 export function detectConditionC(candles: M5Candle[]): DetectionResult {
-  if (candles.length < CHECK_BAR + 1) return notDetectedResult();
+  if (candles.length < CHECK_BAR + 1) {
+    return notDetectedResult({ failure_reason: 'INSUFFICIENT_CANDLES' });
+  }
 
   const open = candles[0].close;
   const bar12Close = candles[CHECK_BAR].close;
@@ -14,12 +16,24 @@ export function detectConditionC(candles: M5Candle[]): DetectionResult {
   const absNet = Math.abs(netPips);
   const direction: DetectionDirection = netPips < 0 ? 'short' : 'long';
 
-  if (absNet < MIN_NET_PIPS) return notDetectedResult();
+  if (absNet < MIN_NET_PIPS) {
+    return notDetectedResult({
+      failure_reason: 'BELOW_THRESHOLD',
+      evaluated_net_pips: round1(netPips),
+      evaluated_direction: direction,
+    });
+  }
 
   for (let bar = 1; bar <= CHECK_BAR; bar += 1) {
     const barMove = (candles[bar].close - candles[bar - 1].close) * 10000;
     const isAgainst = direction === 'short' ? barMove > MAX_ADVERSE_BAR_PIPS : barMove < -MAX_ADVERSE_BAR_PIPS;
-    if (isAgainst) return notDetectedResult();
+    if (isAgainst) {
+      return notDetectedResult({
+        failure_reason: 'ADVERSE_BAR',
+        evaluated_net_pips: round1(netPips),
+        evaluated_direction: direction,
+      });
+    }
   }
 
   return {

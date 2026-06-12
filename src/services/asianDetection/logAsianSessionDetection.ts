@@ -18,6 +18,9 @@ export interface AsianSessionDetectionLogRow {
   valid_until?: string | null;
   candle_count?: number | null;
   error_message?: string | null;
+  failure_reason?: string | null;
+  evaluated_net_pips?: number | null;
+  evaluated_direction?: string | null;
 }
 
 export async function logAsianSessionDetection(

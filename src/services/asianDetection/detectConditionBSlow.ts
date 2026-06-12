@@ -41,8 +41,28 @@ function findMomentumBar(
   return null;
 }
 
+function momentumFailureReason(
+  candles: M5Candle[],
+  recoveryDirection: DetectionDirection,
+): 'BELOW_THRESHOLD' | 'NO_MOMENTUM' {
+  let sawThresholdNet = false;
+  for (let start = MOMENTUM_START_MIN; start <= MOMENTUM_START_MAX; start += 1) {
+    const window = candles.slice(start, start + MOMENTUM_WINDOW);
+    if (window.length < MOMENTUM_WINDOW) break;
+
+    const netMove = (window[11].close - window[0].open) * 10000;
+    const meetsNet = recoveryDirection === 'long'
+      ? netMove >= MIN_MOMENTUM_NET
+      : netMove <= -MIN_MOMENTUM_NET;
+    if (meetsNet) sawThresholdNet = true;
+  }
+  return sawThresholdNet ? 'NO_MOMENTUM' : 'BELOW_THRESHOLD';
+}
+
 export function detectConditionBSlow(candles: M5Candle[]): DetectionResult {
-  if (candles.length < 49) return notDetectedResult();
+  if (candles.length < 49) {
+    return notDetectedResult({ failure_reason: 'INSUFFICIENT_CANDLES' });
+  }
 
   const open = candles[0].close;
   let extremeBar = 0;
@@ -67,20 +87,43 @@ export function detectConditionBSlow(candles: M5Candle[]): DetectionResult {
     }
   }
 
-  if (extremePipsFromOpen < MIN_EXTREME_PIPS) return notDetectedResult();
+  if (extremePipsFromOpen < MIN_EXTREME_PIPS) {
+    const evaluatedDirection: DetectionDirection = extremeType === 'low' ? 'long' : 'short';
+    return notDetectedResult({
+      failure_reason: 'NO_EARLY_EXTREME',
+      evaluated_net_pips: round1(
+        extremeType === 'low' ? -extremePipsFromOpen : extremePipsFromOpen,
+      ),
+      evaluated_direction: evaluatedDirection,
+    });
+  }
 
   for (let bar = MOMENTUM_START_MIN; bar <= MOMENTUM_START_MAX; bar += 1) {
     if (extremeType === 'low' && candles[bar].low <= extremePrice + RETEST_BUFFER) {
-      return notDetectedResult();
+      return notDetectedResult({
+        failure_reason: 'NO_RETEST',
+        evaluated_net_pips: round1((candles[bar].close - open) * 10000),
+        evaluated_direction: 'long',
+      });
     }
     if (extremeType === 'high' && candles[bar].high >= extremePrice - RETEST_BUFFER) {
-      return notDetectedResult();
+      return notDetectedResult({
+        failure_reason: 'NO_RETEST',
+        evaluated_net_pips: round1((candles[bar].close - open) * 10000),
+        evaluated_direction: 'short',
+      });
     }
   }
 
   const recoveryDirection: DetectionDirection = extremeType === 'low' ? 'long' : 'short';
   const momentumBar = findMomentumBar(candles, recoveryDirection);
-  if (momentumBar === null) return notDetectedResult();
+  if (momentumBar === null) {
+    return notDetectedResult({
+      failure_reason: momentumFailureReason(candles, recoveryDirection),
+      evaluated_net_pips: round1((candles[MOMENTUM_START_MAX].close - open) * 10000),
+      evaluated_direction: recoveryDirection,
+    });
+  }
 
   return {
     detected: true,

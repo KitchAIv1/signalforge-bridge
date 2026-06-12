@@ -8,19 +8,35 @@ export interface M5Candle {
 
 export type DetectionDirection = 'long' | 'short';
 
+export type DetectionFailureReason =
+  | 'INSUFFICIENT_CANDLES'
+  | 'BELOW_THRESHOLD'
+  | 'ADVERSE_BAR'
+  | 'NO_MOMENTUM'
+  | 'NO_RETEST'
+  | 'NO_EARLY_EXTREME';
+
 export interface DetectionResult {
   detected: boolean;
   direction: DetectionDirection | null;
   detection_bar: number | null;
   net_pips: number | null;
+  failure_reason?: DetectionFailureReason;
+  evaluated_net_pips?: number | null;
+  evaluated_direction?: DetectionDirection | null;
 }
 
-export function notDetectedResult(): DetectionResult {
+export function notDetectedResult(diagnostics?: {
+  failure_reason?: DetectionFailureReason;
+  evaluated_net_pips?: number | null;
+  evaluated_direction?: DetectionDirection | null;
+}): DetectionResult {
   return {
     detected: false,
     direction: null,
     detection_bar: null,
     net_pips: null,
+    ...diagnostics,
   };
 }
 
