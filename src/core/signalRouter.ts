@@ -43,6 +43,7 @@ import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
 import { getNewsWindowEvent, type NewsWindowResult } from '../utils/newsCheck.js';
 import { closeAllOpenOmegaPositions } from '../services/omegaClosePositions.js';
+import { processOmegaInverse } from './omegaInverseRouter.js';
 
 /** Last effective omega_direction (same source as resolveOmegaDirection). Used to detect DB/env flips. */
 let cachedOmegaDirection: string | null = null;
@@ -1112,6 +1113,17 @@ export async function processSignal(
       directionSource: directionMode === 'auto' ? 'auto' : 'manual',
       engineId: norm.engineId,
     }).catch(() => {});
+    // ── Omega Inverse fork ────────────────────────────────────────
+    if (norm.engineId === 'omega') {
+      await processOmegaInverse(payload, norm, omegaDirection, {
+        supabase,
+        config,
+        getCachedAccount,
+        engines,
+        decisionLatencyMs,
+      });
+    }
+    // ── End Omega Inverse fork ────────────────────────────────────
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase.from('bridge_trade_log').insert({
