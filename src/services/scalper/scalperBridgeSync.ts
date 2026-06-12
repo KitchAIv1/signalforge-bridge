@@ -15,9 +15,12 @@ const SYNCABLE_RESULTS: ScalperTradeResult[] = [
 
 function mapBridgeResult(
   result: ScalperTradeResult,
+  pnlPips: number | null,
 ): 'win' | 'loss' | 'breakeven' {
   if (result === 'win') return 'win';
   if (result === 'loss') return 'loss';
+  if (pnlPips != null && pnlPips > 0) return 'win';
+  if (pnlPips != null && pnlPips < 0) return 'loss';
   return 'breakeven';
 }
 
@@ -52,7 +55,7 @@ function buildMirrorRow(trade: ScalperTrade, dayState: ScalperDayState): Record<
     direction: trade.direction,
     decision: 'EXECUTED',
     status: 'closed',
-    result: mapBridgeResult(trade.result!),
+    result: mapBridgeResult(trade.result!, trade.pnl_pips_actual ?? trade.pnl_pips),
     fill_price: trade.entry_price,
     exit_price: trade.exit_price,
     stop_loss: trade.sl_price,
