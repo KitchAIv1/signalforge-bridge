@@ -16,7 +16,13 @@ import {
   computeD1MomentumSignal,
   fetchPriorD1Context,
 } from './asianDirection/d1ContextHelpers.js';
-import { writeBridgeConfigKey } from './asianDetection/bridgeConfigHelpers.js';
+import {
+  getBridgeConfigValue,
+  setBridgeConfigValues,
+  writeBridgeConfigKey,
+} from './asianDetection/bridgeConfigHelpers.js';
+import { logAsianSessionDetection } from './asianDetection/logAsianSessionDetection.js';
+import { nextAsianSessionExpiry } from './asianDirection/asianSessionExpiry.js';
 import { logInfo } from '../utils/logger.js';
 
 // Backtest source: 42-day retroactive simulation, clean prior-day join
@@ -111,6 +117,228 @@ async function fetchAmdTagForDate(
   }
 }
 
+function computeTomorrowUtc(): string {
+  const cursor = new Date();
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  return cursor.toISOString().slice(0, 10);
+}
+
+async function logD1FallbackDetection(
+  supabase: SupabaseClient,
+  tomorrowUtc: string,
+  action: string,
+  amdTag: string,
+  priorDirectionBias: string,
+  extras: {
+    direction_set?: string | null;
+    valid_until?: string | null;
+    evaluated_direction?: string | null;
+    evaluated_net_pips?: number | null;
+  } = {},
+): Promise<void> {
+  await logAsianSessionDetection(supabase, {
+    trade_date: tomorrowUtc,
+    condition_check_time: '21:10',
+    action,
+    prior_amd_tag: amdTag,
+    prior_direction_bias: priorDirectionBias,
+    ...extras,
+  });
+}
+
+function passesStrongD1Gate(
+  d1BodyPct: number,
+  d1ClosePct: number,
+  d1Direction: string | null,
+  priorDirectionBias: string,
+): boolean {
+  return (
+    d1BodyPct >= 60 &&
+    d1ClosePct <= 20 &&
+    d1Direction === priorDirectionBias &&
+    d1Direction !== 'equal'
+  );
+}
+
+async function readPriorD1BridgeConfig(supabase: SupabaseClient): Promise<{
+  d1Direction: string | null;
+  d1BodyPct: number;
+  d1ClosePct: number;
+  d1NetPips: number;
+}> {
+  const [directionStr, bodyPctStr, closePosPctStr, netPipsStr] = await Promise.all([
+    getBridgeConfigValue(supabase, 'd1_prior_direction'),
+    getBridgeConfigValue(supabase, 'd1_prior_body_pct'),
+    getBridgeConfigValue(supabase, 'd1_prior_close_pos_pct'),
+    getBridgeConfigValue(supabase, 'd1_prior_net_pips'),
+  ]);
+
+  return {
+    d1Direction: directionStr,
+    d1BodyPct: parseFloat(bodyPctStr ?? '0'),
+    d1ClosePct: parseFloat(closePosPctStr ?? '100'),
+    d1NetPips: parseFloat(netPipsStr ?? '0'),
+  };
+}
+
+async function skipD1FallbackManualMode(
+  supabase: SupabaseClient,
+  tomorrowUtc: string,
+  amdTag: string,
+  priorDirectionBias: string,
+): Promise<boolean> {
+  const directionMode = await getBridgeConfigValue(supabase, 'direction_mode');
+  if (directionMode !== 'manual') return false;
+
+  console.log('[AsianDirection] D1_FALLBACK skipped — direction_mode=manual');
+  await logD1FallbackDetection(
+    supabase,
+    tomorrowUtc,
+    'D1_FALLBACK_SKIPPED_MANUAL',
+    amdTag,
+    priorDirectionBias,
+  );
+  return true;
+}
+
+async function skipD1FallbackNonFailedTag(
+  supabase: SupabaseClient,
+  tomorrowUtc: string,
+  amdTag: string,
+  priorDirectionBias: string,
+): Promise<boolean> {
+  if (amdTag === 'AMD_FAILED') return false;
+
+  await logD1FallbackDetection(
+    supabase,
+    tomorrowUtc,
+    'D1_FALLBACK_SKIPPED_TAG',
+    amdTag,
+    priorDirectionBias,
+  );
+  return true;
+}
+
+async function skipD1FallbackWeakD1(
+  supabase: SupabaseClient,
+  tomorrowUtc: string,
+  amdTag: string,
+  priorDirectionBias: string,
+  priorD1: Awaited<ReturnType<typeof readPriorD1BridgeConfig>>,
+): Promise<boolean> {
+  if (
+    passesStrongD1Gate(
+      priorD1.d1BodyPct,
+      priorD1.d1ClosePct,
+      priorD1.d1Direction,
+      priorDirectionBias,
+    )
+  ) {
+    return false;
+  }
+
+  await logD1FallbackDetection(
+    supabase,
+    tomorrowUtc,
+    'D1_FALLBACK_SKIPPED_WEAK_D1',
+    amdTag,
+    priorDirectionBias,
+    {
+      evaluated_net_pips: priorD1.d1NetPips,
+      evaluated_direction: priorD1.d1Direction,
+    },
+  );
+  return true;
+}
+
+async function skipD1FallbackActiveWindow(
+  supabase: SupabaseClient,
+  tomorrowUtc: string,
+  amdTag: string,
+  priorDirectionBias: string,
+): Promise<boolean> {
+  const validUntilStr = await getBridgeConfigValue(supabase, 'omega_direction_valid_until');
+  const isAlreadyValid =
+    validUntilStr != null && new Date(validUntilStr).getTime() > Date.now();
+  if (!isAlreadyValid) return false;
+
+  console.log(
+    `[AsianDirection] D1_FALLBACK skipped — existing window valid until ${validUntilStr}`,
+  );
+  await logD1FallbackDetection(
+    supabase,
+    tomorrowUtc,
+    'D1_FALLBACK_SKIPPED_WINDOW_ACTIVE',
+    amdTag,
+    priorDirectionBias,
+  );
+  return true;
+}
+
+async function writeD1FallbackWindow(
+  supabase: SupabaseClient,
+  tomorrowUtc: string,
+  amdTag: string,
+  priorDirectionBias: string,
+  priorD1: Awaited<ReturnType<typeof readPriorD1BridgeConfig>>,
+): Promise<void> {
+  const sessionExpiry = nextAsianSessionExpiry();
+  await setBridgeConfigValues(supabase, {
+    omega_direction: priorDirectionBias,
+    omega_direction_valid_until: sessionExpiry,
+  });
+
+  console.log(
+    `[AsianDirection] D1_FALLBACK SET — direction=${priorDirectionBias} ` +
+      `valid_until=${sessionExpiry} amd_tag=${amdTag} ` +
+      `d1_body=${priorD1.d1BodyPct}% d1_close_pos=${priorD1.d1ClosePct}%`,
+  );
+
+  await logD1FallbackDetection(
+    supabase,
+    tomorrowUtc,
+    'D1_FALLBACK',
+    amdTag,
+    priorDirectionBias,
+    {
+      direction_set: priorDirectionBias,
+      valid_until: sessionExpiry,
+      evaluated_direction: priorD1.d1Direction,
+      evaluated_net_pips: priorD1.d1NetPips,
+    },
+  );
+}
+
+async function runD1FallbackWindow(
+  supabase: SupabaseClient,
+  amdTag: string,
+  priorDirectionBias: string,
+): Promise<void> {
+  try {
+    const tomorrowUtc = computeTomorrowUtc();
+    if (await skipD1FallbackManualMode(supabase, tomorrowUtc, amdTag, priorDirectionBias)) return;
+    if (await skipD1FallbackNonFailedTag(supabase, tomorrowUtc, amdTag, priorDirectionBias)) return;
+
+    const priorD1 = await readPriorD1BridgeConfig(supabase);
+    if (await skipD1FallbackWeakD1(supabase, tomorrowUtc, amdTag, priorDirectionBias, priorD1)) {
+      return;
+    }
+    if (await skipD1FallbackActiveWindow(supabase, tomorrowUtc, amdTag, priorDirectionBias)) {
+      return;
+    }
+
+    await writeD1FallbackWindow(
+      supabase,
+      tomorrowUtc,
+      amdTag,
+      priorDirectionBias,
+      priorD1,
+    );
+  } catch (fallbackErr: unknown) {
+    console.error('[AsianDirection] D1_FALLBACK block failed:', String(fallbackErr));
+  }
+}
+
 async function readOmegaDirection(supabase: SupabaseClient): Promise<string | null> {
   try {
     const { data, error } = await supabase
@@ -177,6 +405,8 @@ export async function runAsianDirectionSet(): Promise<void> {
       action: flagAction,
       reason: `Prior day amd_tag=${amdTag} lookupDate=${lookupDate}${writeSuffix}`,
     });
+
+    await runD1FallbackWindow(supabase, amdTag, priorDirectionBias);
 
     logInfo('[AsianDirection] Prior direction bias written', {
       amdTag,
