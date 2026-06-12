@@ -7,6 +7,7 @@ import { RebuildHourGateSwitch } from '@/components/RebuildHourGateSwitch';
 
 const LIVE_ENGINE_ROWS = [
   { id: 'omega', display: 'Omega' },
+  { id: 'omega_inverse', display: 'Omega Inverse' },
   { id: 'engine_rebuild', display: 'Rebuild' },
   { id: 'falcon', display: 'Falcon' },
   { id: 'sigma', display: 'Sigma' },
