@@ -2,6 +2,7 @@
 
 import { CRON_SCHEDULE } from '@/lib/asianDetectionDisplayHelpers';
 import { AsianSessionConfidencePill } from '@/components/asianSession/AsianSessionConfidencePill';
+import { AsianSessionDirectionPill } from '@/components/asianSession/AsianSessionDirectionPill';
 import { formatAsianNetPips, formatAsianSizeMultiplier, formatAsianTradeDate, formatPriorBiasLabel } from '@/lib/asianSessionPageHelpers';
 import { formatD1ContextSummary } from '@/lib/d1ContextHelpers';
 import type { AsianSessionDetection, D1ContextConfig } from '@/lib/directionDecisionTypes';
@@ -30,6 +31,49 @@ function isCronPending(cronTime: string, checkRow: AsianSessionDetection | undef
 function isInsufficientCandles(row: AsianSessionDetection): boolean {
   const message = row.error_message?.toLowerCase() ?? '';
   return message.includes('insufficient');
+}
+
+function PriorAmdTagPill({ tag }: { tag: string | null }) {
+  if (tag == null || tag.length === 0) {
+    return <span className="text-slate-400">—</span>;
+  }
+  return (
+    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      {tag}
+    </span>
+  );
+}
+
+function PriorBiasDisplay({ bias }: { bias: D1ContextConfig['asian_prior_direction_bias'] }) {
+  if (bias === 'neutral') {
+    return (
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+        NEUTRAL
+      </span>
+    );
+  }
+  if (bias === 'long' || bias === 'short') {
+    return <AsianSessionDirectionPill direction={bias} />;
+  }
+  return <span className="text-slate-400">21:10 not yet run tonight</span>;
+}
+
+function ShiftedPill({ shifted }: { shifted: boolean | null }) {
+  if (shifted === true) {
+    return (
+      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+        SHIFTED
+      </span>
+    );
+  }
+  if (shifted === false) {
+    return (
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+        NOT SHIFTED
+      </span>
+    );
+  }
+  return <span className="text-slate-400">—</span>;
 }
 
 function renderCheckStatus(row: AsianSessionDetection | undefined, cronTime: string, now: Date) {
@@ -80,6 +124,22 @@ function resolvePriorContextRow(
   return [...todayChecks].reverse().find((row) => row.prior_amd_tag != null) ?? todayChecks.at(-1) ?? null;
 }
 
+function PriorContextRow({ d1Config }: { d1Config: D1ContextConfig }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2 text-sm">
+      <span className="w-full text-xs font-medium uppercase tracking-wide text-slate-500">
+        21:10 UTC — Prior Context
+      </span>
+      <span className="text-slate-600 dark:text-slate-400">Prior AMD</span>
+      <PriorAmdTagPill tag={d1Config.asian_prior_amd_tag} />
+      <span className="text-slate-600 dark:text-slate-400">Prior bias</span>
+      <PriorBiasDisplay bias={d1Config.asian_prior_direction_bias} />
+      <span className="text-slate-600 dark:text-slate-400">Prior SHIFTED</span>
+      <ShiftedPill shifted={d1Config.asian_prior_amd_shifted} />
+    </div>
+  );
+}
+
 export function AsianSessionTodayPanel({ todayChecks, todayRow, d1Config }: TodayPanelProps) {
   const now = new Date();
   const todayUtc = now.toISOString().slice(0, 10);
@@ -91,6 +151,7 @@ export function AsianSessionTodayPanel({ todayChecks, todayRow, d1Config }: Toda
         Today — {formatAsianTradeDate(todayUtc)}
       </div>
       <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+        <PriorContextRow d1Config={d1Config} />
         {CRON_SCHEDULE.map((cron) => {
           const checkRow = todayChecks.find((row) => row.condition_check_time === cron.time);
           return (
@@ -109,7 +170,7 @@ export function AsianSessionTodayPanel({ todayChecks, todayRow, d1Config }: Toda
         })}
       </div>
       <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-400">
-        Prior AMD: {priorContext?.prior_amd_tag ?? '—'} · Bias:{' '}
+        Session prior AMD: {priorContext?.prior_amd_tag ?? '—'} · Bias:{' '}
         {formatPriorBiasLabel(priorContext?.prior_direction_bias ?? null, priorContext?.prior_amd_tag ?? null)} ·
         Size: {formatAsianSizeMultiplier(priorContext?.size_multiplier ?? null)}
       </div>

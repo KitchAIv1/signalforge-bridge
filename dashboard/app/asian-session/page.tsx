@@ -28,7 +28,7 @@ export default function AsianSessionPage() {
 
   return (
     <div className="flex flex-col bg-white p-4 dark:bg-slate-950 sm:p-6">
-      <AsianSessionPageHeader rows={rows} firedRows={firedRows} />
+      <AsianSessionPageHeader rows={rows} firedRows={firedRows} d1Config={d1Config} />
 
       <div className="flex flex-col gap-6">
         <AsianSessionForwardGate firedRows={firedRows} />

@@ -63,6 +63,9 @@ export interface D1ContextConfig {
   d1_prior_body_pct: string | null;
   d1_prior_close_pos_pct: string | null;
   d1_momentum_signal: D1MomentumSignal | null;
+  asian_prior_amd_tag: string | null;
+  asian_prior_amd_shifted: boolean | null;
+  asian_prior_direction_bias: 'long' | 'short' | 'neutral' | null;
 }
 
 export interface AsianSessionDetection {
@@ -90,6 +93,9 @@ export interface AsianSessionDetection {
   valid_until: string | null;
   candle_count: number | null;
   error_message: string | null;
+  failure_reason: string | null;
+  evaluated_net_pips: number | null;
+  evaluated_direction: 'long' | 'short' | null;
   created_at: string;
 }
 

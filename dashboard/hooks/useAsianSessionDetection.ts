@@ -43,7 +43,12 @@ function sortTodayChecks(rows: AsianSessionDetection[]): AsianSessionDetection[]
 
 export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
   const [rows, setRows] = useState<AsianSessionDetection[]>([]);
-  const [d1Config, setD1Config] = useState<D1ContextConfig>(EMPTY_D1_CONTEXT_CONFIG);
+  const [d1Config, setD1Config] = useState<D1ContextConfig>({
+    ...EMPTY_D1_CONTEXT_CONFIG,
+    asian_prior_amd_tag: null,
+    asian_prior_amd_shifted: null,
+    asian_prior_direction_bias: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

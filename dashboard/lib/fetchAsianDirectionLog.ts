@@ -45,7 +45,8 @@ const DETECTION_LOG_SELECT =
   'prior_amd_shifted, prior_amd_tag, size_multiplier, ' +
   'confidence_tier, prior_direction_bias, ' +
   'action, direction_set, valid_until, candle_count, ' +
-  'error_message, created_at';
+  'error_message, failure_reason, evaluated_net_pips, evaluated_direction, ' +
+  'created_at';
 
 export async function fetchAsianSessionDetectionLog(
   lookbackDays = 90,
@@ -70,6 +71,9 @@ const D1_CONTEXT_KEYS = [
   'd1_prior_body_pct',
   'd1_prior_close_pos_pct',
   'd1_momentum_signal',
+  'asian_prior_amd_tag',
+  'asian_prior_amd_shifted',
+  'asian_prior_direction_bias',
 ] as const;
 
 function parseD1Direction(value: unknown): D1ContextConfig['d1_prior_direction'] {
@@ -99,6 +103,20 @@ function parseConfigString(value: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
+function parseAsianPriorShifted(value: unknown): boolean | null {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return null;
+}
+
+function parseAsianPriorBias(
+  value: unknown,
+): D1ContextConfig['asian_prior_direction_bias'] {
+  const text = parseConfigString(value)?.toLowerCase();
+  if (text === 'long' || text === 'short' || text === 'neutral') return text;
+  return null;
+}
+
 export async function fetchD1ContextConfig(): Promise<D1ContextConfig> {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -118,6 +136,9 @@ export async function fetchD1ContextConfig(): Promise<D1ContextConfig> {
     d1_prior_body_pct: parseConfigString(configMap.d1_prior_body_pct),
     d1_prior_close_pos_pct: parseConfigString(configMap.d1_prior_close_pos_pct),
     d1_momentum_signal: parseD1MomentumSignal(configMap.d1_momentum_signal),
+    asian_prior_amd_tag: parseConfigString(configMap.asian_prior_amd_tag),
+    asian_prior_amd_shifted: parseAsianPriorShifted(configMap.asian_prior_amd_shifted),
+    asian_prior_direction_bias: parseAsianPriorBias(configMap.asian_prior_direction_bias),
   };
 }
 

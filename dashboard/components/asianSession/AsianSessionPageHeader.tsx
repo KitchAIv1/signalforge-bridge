@@ -1,13 +1,15 @@
 'use client';
 
 import { AsianSessionShadowPill } from '@/components/asianSession/AsianSessionShadowPill';
+import { AsianSessionDirectionPill } from '@/components/asianSession/AsianSessionDirectionPill';
 import { ASIAN_FORWARD_GATE_DAYS } from '@/lib/asianSessionConstants';
 import { countDistinctTradeDates } from '@/lib/asianSessionPageHelpers';
-import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
+import type { AsianSessionDetection, D1ContextConfig } from '@/lib/directionDecisionTypes';
 
 type PageHeaderProps = {
   rows: AsianSessionDetection[];
   firedRows: AsianSessionDetection[];
+  d1Config: D1ContextConfig;
 };
 
 function StatTile({ label, value, detail }: { label: string; value: string; detail?: string }) {
@@ -20,7 +22,31 @@ function StatTile({ label, value, detail }: { label: string; value: string; deta
   );
 }
 
-export function AsianSessionPageHeader({ rows, firedRows }: PageHeaderProps) {
+function TonightPriorBiasTile({ bias }: { bias: D1ContextConfig['asian_prior_direction_bias'] }) {
+  if (bias === 'long' || bias === 'short') {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Tonight&apos;s Prior Bias
+        </div>
+        <div className="mt-2">
+          <AsianSessionDirectionPill direction={bias} />
+        </div>
+        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">From 21:10 UTC bridge_config</div>
+      </div>
+    );
+  }
+  const label = bias === 'neutral' ? 'NEUTRAL' : 'No bias';
+  return (
+    <StatTile
+      label="Tonight's Prior Bias"
+      value={label}
+      detail="From 21:10 UTC bridge_config"
+    />
+  );
+}
+
+export function AsianSessionPageHeader({ rows, firedRows, d1Config }: PageHeaderProps) {
   const monitoredDays = countDistinctTradeDates(rows);
   const fireRatePct = monitoredDays > 0 ? Math.round((firedRows.length / monitoredDays) * 100) : 0;
 
@@ -40,7 +66,7 @@ export function AsianSessionPageHeader({ rows, firedRows }: PageHeaderProps) {
           value={`${firedRows.length} (${fireRatePct}%)`}
           detail={`Gate ${firedRows.length}/${ASIAN_FORWARD_GATE_DAYS}`}
         />
-        <StatTile label="SHORT accuracy" value="Accumulating" detail="Outcome tracking pending" />
+        <TonightPriorBiasTile bias={d1Config.asian_prior_direction_bias} />
         <StatTile label="LONG accuracy" value="Accumulating" detail="Outcome tracking pending" />
       </div>
     </header>

@@ -17,6 +17,35 @@ type HistoryTableProps = {
   rows: AsianSessionDetection[];
 };
 
+function PriorBiasCell({ bias }: { bias: AsianSessionDetection['prior_direction_bias'] }) {
+  if (bias === 'neutral') {
+    return (
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+        NEUTRAL
+      </span>
+    );
+  }
+  return <AsianSessionDirectionPill direction={bias} />;
+}
+
+function formatSessionResultLabel(row: AsianSessionDetection): string {
+  if (row.evaluated_net_pips == null || row.evaluated_direction == null) return '—';
+  const pipsLabel = formatAsianNetPips(row.evaluated_net_pips);
+  const directionLabel = row.evaluated_direction === 'long' ? 'UP' : 'DOWN';
+  return `${pipsLabel} ${directionLabel}`;
+}
+
+function sessionResultTone(row: AsianSessionDetection): string {
+  if (row.evaluated_net_pips == null || row.evaluated_direction == null) {
+    return 'text-slate-400';
+  }
+  if (row.detection_direction == null) return 'text-slate-600 dark:text-slate-400';
+  if (row.evaluated_direction === row.detection_direction) {
+    return 'text-emerald-600 dark:text-emerald-400';
+  }
+  return 'text-red-600 dark:text-red-400';
+}
+
 function FiredHistoryRow({ row }: { row: AsianSessionDetection }) {
   return (
     <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
@@ -35,11 +64,17 @@ function FiredHistoryRow({ row }: { row: AsianSessionDetection }) {
       <td className="px-3 py-2">
         <AsianSessionConfidencePill tier={row.confidence_tier} />
       </td>
-      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
-        {row.prior_amd_tag ?? '—'}
+      <td className="px-3 py-2">
+        <PriorBiasCell bias={row.prior_direction_bias} />
+      </td>
+      <td className={`px-3 py-2 text-xs ${sessionResultTone(row)}`}>
+        {formatSessionResultLabel(row)}
+      </td>
+      <td className="px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+        {row.failure_reason ?? ''}
       </td>
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
-        {formatPriorBiasLabel(row.prior_direction_bias, row.prior_amd_tag)}
+        {row.prior_amd_tag ?? '—'}
       </td>
       <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
         {formatAsianSizeMultiplier(row.size_multiplier)}
@@ -60,8 +95,10 @@ export function AsianSessionHistoryTable({ firedRows, noFireDays, rows }: Histor
               <th className="px-3 py-2 text-left">Direction</th>
               <th className="px-3 py-2 text-left">Net pips</th>
               <th className="px-3 py-2 text-left">Confidence</th>
+              <th className="px-3 py-2 text-left">Prior Bias</th>
+              <th className="px-3 py-2 text-left">Session Result</th>
+              <th className="px-3 py-2 text-left">Failure</th>
               <th className="px-3 py-2 text-left">Prior AMD</th>
-              <th className="px-3 py-2 text-left">Prior bias</th>
               <th className="px-3 py-2 text-left">Size</th>
             </tr>
           </thead>
@@ -74,8 +111,8 @@ export function AsianSessionHistoryTable({ firedRows, noFireDays, rows }: Histor
       </div>
 
       <p className="text-xs text-slate-400">
-        Showing {firedRows.length} fired day{firedRows.length === 1 ? '' : 's'} · Correct column pending
-        outcome tracking
+        Showing {firedRows.length} fired day{firedRows.length === 1 ? '' : 's'} · Session result from
+        evaluated_net_pips / evaluated_direction
       </p>
 
       {noFireDays.length > 0 ? (

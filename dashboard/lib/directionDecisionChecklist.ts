@@ -261,6 +261,9 @@ export function buildAsianChecklist(
     d1_prior_body_pct: null,
     d1_prior_close_pos_pct: null,
     d1_momentum_signal: null,
+    asian_prior_amd_tag: null,
+    asian_prior_amd_shifted: null,
+    asian_prior_direction_bias: null,
   },
 ): ChecklistRow[] {
   const todayRows = findTodayChecks(detectionRows);
