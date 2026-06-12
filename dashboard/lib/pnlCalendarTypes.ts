@@ -24,6 +24,8 @@ export type DaySummary = {
   omegaNetR: number;
   rebuildNetR: number;
   scalperNetR: number;
+  amdNetR: number;
+  omegaInverseNetR: number;
   winRate: number;
   longNetR: number;
   shortNetR: number;
@@ -37,4 +39,6 @@ export type EquityPoint = {
   cumR: number;
   omegaR: number;
   rebuildR: number;
+  amdR: number;
+  omegaInverseR: number;
 };

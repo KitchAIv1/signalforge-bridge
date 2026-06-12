@@ -11,6 +11,7 @@ import {
   YAxis,
 } from 'recharts';
 import { CurveTooltip } from '@/components/pnlCalendar/CurveTooltip';
+import { ENGINE_COLORS } from '@/lib/pnlCalendarConstants';
 import type { EquityPoint } from '@/lib/pnlCalendarTypes';
 
 interface PnlCalendarEquitySectionProps {
@@ -40,8 +41,10 @@ export function PnlCalendarEquitySection({ equityCurve }: PnlCalendarEquitySecti
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] leading-relaxed">
           <span style={{ color: '#0ea5e9' }}>── Combined</span>
-          <span style={{ color: '#7c3aed' }}>── Omega</span>
-          <span style={{ color: '#d97706' }}>── Rebuild</span>
+          <span style={{ color: ENGINE_COLORS.omega }}>── Omega</span>
+          <span style={{ color: ENGINE_COLORS.engine_rebuild }}>── Rebuild</span>
+          <span style={{ color: ENGINE_COLORS.engine_amd }}>── AMD</span>
+          <span style={{ color: ENGINE_COLORS.omega_inverse }}>── Omega Inverse</span>
         </div>
       </div>
       <ResponsiveContainer width="100%" height={128}>
@@ -82,7 +85,7 @@ export function PnlCalendarEquitySection({ equityCurve }: PnlCalendarEquitySecti
             type="monotone"
             dataKey="omegaR"
             name="Omega"
-            stroke="#7c3aed"
+            stroke={ENGINE_COLORS.omega}
             strokeWidth={1.5}
             fill="none"
             dot={false}
@@ -92,7 +95,27 @@ export function PnlCalendarEquitySection({ equityCurve }: PnlCalendarEquitySecti
             type="monotone"
             dataKey="rebuildR"
             name="Rebuild"
-            stroke="#d97706"
+            stroke={ENGINE_COLORS.engine_rebuild}
+            strokeWidth={1.5}
+            fill="none"
+            dot={false}
+            strokeDasharray="4 2"
+          />
+          <Area
+            type="monotone"
+            dataKey="amdR"
+            name="AMD"
+            stroke={ENGINE_COLORS.engine_amd}
+            strokeWidth={1.5}
+            fill="none"
+            dot={false}
+            strokeDasharray="4 2"
+          />
+          <Area
+            type="monotone"
+            dataKey="omegaInverseR"
+            name="Omega Inverse"
+            stroke={ENGINE_COLORS.omega_inverse}
             strokeWidth={1.5}
             fill="none"
             dot={false}

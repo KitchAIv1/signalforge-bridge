@@ -10,4 +10,6 @@ export const ENGINE_COLORS: Record<string, string> = {
   omega: '#7c3aed',
   engine_rebuild: '#d97706',
   scalper: '#1D9E75',
+  engine_amd: '#f59e0b',
+  omega_inverse: '#c026d3',
 };

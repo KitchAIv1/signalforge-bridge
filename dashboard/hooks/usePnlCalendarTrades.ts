@@ -21,7 +21,13 @@ export function usePnlCalendarTrades() {
     const { data: rows, error: queryError } = await supabase
       .from('bridge_trade_log')
       .select(TRADE_LOG_SELECT)
-      .in('engine_id', ['omega', 'engine_rebuild', 'scalper'])
+      .in('engine_id', [
+        'omega',
+        'engine_rebuild',
+        'scalper',
+        'engine_amd',
+        'omega_inverse',
+      ])
       .eq('status', 'closed')
       .gte('created_at', PNL_CALENDAR_QUERY_START_ISO)
       .order('created_at', { ascending: true });

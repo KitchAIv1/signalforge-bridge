@@ -12,6 +12,13 @@ import { PnlCalendarGridSection } from '@/components/pnlCalendar/PnlCalendarGrid
 import { PnlCalendarLegend } from '@/components/pnlCalendar/PnlCalendarLegend';
 import { DayDetailPanel } from '@/components/pnlCalendar/DayDetailPanel';
 
+const CALENDAR_HEADER_BADGES: ReadonlyArray<{ engineKey: string; label: string }> = [
+  { engineKey: 'omega', label: 'Omega' },
+  { engineKey: 'engine_rebuild', label: 'Rebuild' },
+  { engineKey: 'engine_amd', label: 'AMD' },
+  { engineKey: 'omega_inverse', label: 'Omega Inverse' },
+];
+
 function initialViewMonthUtc(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -57,7 +64,7 @@ export function PnlCalendarView() {
                 P&L Calendar
               </h1>
               <div className="flex flex-wrap gap-1.5">
-                {(['omega', 'engine_rebuild'] as const).map((engineKey) => (
+                {CALENDAR_HEADER_BADGES.map(({ engineKey, label }) => (
                   <span
                     key={engineKey}
                     style={{
@@ -70,7 +77,7 @@ export function PnlCalendarView() {
                       padding: '2px 8px',
                     }}
                   >
-                    {engineKey === 'omega' ? 'Omega' : 'Rebuild'}
+                    {label}
                   </span>
                 ))}
               </div>

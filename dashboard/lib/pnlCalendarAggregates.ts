@@ -14,6 +14,8 @@ function createEmptyDaySummary(isoDateKey: string): DaySummary {
     omegaNetR: 0,
     rebuildNetR: 0,
     scalperNetR: 0,
+    amdNetR: 0,
+    omegaInverseNetR: 0,
     winRate: 0,
     longNetR: 0,
     shortNetR: 0,
@@ -40,6 +42,8 @@ function foldTradeIntoDay(day: DaySummary, trade: PnlTradeRow): void {
   if (trade.engine_id === 'omega') day.omegaNetR += rComponent;
   if (trade.engine_id === 'engine_rebuild') day.rebuildNetR += rComponent;
   if (trade.engine_id === 'scalper') day.scalperNetR += rComponent;
+  if (trade.engine_id === 'engine_amd') day.amdNetR += rComponent;
+  if (trade.engine_id === 'omega_inverse') day.omegaInverseNetR += rComponent;
   const side = trade.direction?.toLowerCase();
   if (side === 'long') {
     day.longNetR += rComponent;
@@ -59,6 +63,8 @@ function roundDayRollups(day: DaySummary): void {
   day.omegaNetR = Math.round(day.omegaNetR * 1000) / 1000;
   day.rebuildNetR = Math.round(day.rebuildNetR * 1000) / 1000;
   day.scalperNetR = Math.round(day.scalperNetR * 1000) / 1000;
+  day.amdNetR = Math.round(day.amdNetR * 1000) / 1000;
+  day.omegaInverseNetR = Math.round(day.omegaInverseNetR * 1000) / 1000;
 }
 
 export function buildDaySummaries(trades: PnlTradeRow[]): Map<string, DaySummary> {
@@ -83,12 +89,18 @@ export function buildEquityCurve(trades: PnlTradeRow[]): EquityPoint[] {
   let cumR = 0;
   let omegaR = 0;
   let rebuildR = 0;
-  const points: EquityPoint[] = [{ label: 'Apr 30', cumR: 0, omegaR: 0, rebuildR: 0 }];
+  let amdR = 0;
+  let omegaInverseR = 0;
+  const points: EquityPoint[] = [
+    { label: 'Apr 30', cumR: 0, omegaR: 0, rebuildR: 0, amdR: 0, omegaInverseR: 0 },
+  ];
   for (const trade of sorted) {
     const rComponent = trade.pnl_r ?? 0;
     cumR += rComponent;
     if (trade.engine_id === 'omega') omegaR += rComponent;
     if (trade.engine_id === 'engine_rebuild') rebuildR += rComponent;
+    if (trade.engine_id === 'engine_amd') amdR += rComponent;
+    if (trade.engine_id === 'omega_inverse') omegaInverseR += rComponent;
     const stamp = new Date(trade.created_at);
     const label = stamp.toLocaleDateString('en-US', {
       month: 'short',
@@ -100,6 +112,8 @@ export function buildEquityCurve(trades: PnlTradeRow[]): EquityPoint[] {
       cumR: Math.round(cumR * 100) / 100,
       omegaR: Math.round(omegaR * 100) / 100,
       rebuildR: Math.round(rebuildR * 100) / 100,
+      amdR: Math.round(amdR * 100) / 100,
+      omegaInverseR: Math.round(omegaInverseR * 100) / 100,
     });
   }
   return points;
