@@ -88,7 +88,12 @@ export interface AsianSessionDetection {
     | 'SET_SHORT'
     | 'NO_DETECTION'
     | 'SKIPPED_MANUAL_MODE'
-    | 'ALREADY_SET';
+    | 'ALREADY_SET'
+    | 'D1_FALLBACK'
+    | 'D1_FALLBACK_SKIPPED_MANUAL'
+    | 'D1_FALLBACK_SKIPPED_TAG'
+    | 'D1_FALLBACK_SKIPPED_WEAK_D1'
+    | 'D1_FALLBACK_SKIPPED_WINDOW_ACTIVE';
   direction_set: 'long' | 'short' | null;
   valid_until: string | null;
   candle_count: number | null;

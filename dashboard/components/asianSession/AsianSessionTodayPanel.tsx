@@ -113,6 +113,20 @@ function renderCheckStatus(row: AsianSessionDetection | undefined, cronTime: str
   if (row.action === 'NO_DETECTION') {
     return <span className="text-slate-500">NO DETECTION · {row.candle_count ?? '—'} bars</span>;
   }
+  if (row.action === 'D1_FALLBACK') {
+    return (
+      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+        D1 fallback — direction set
+      </span>
+    );
+  }
+  if (row.action.startsWith('D1_FALLBACK_SKIPPED')) {
+    return (
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+        D1 fallback — skipped
+      </span>
+    );
+  }
   return <span className="text-slate-500">{row.action}</span>;
 }
 
