@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { OverrideChart } from '@/components/override/OverrideChart';
 
 interface LiveTrade {
   id: string;
@@ -26,6 +27,23 @@ function getUnrealizedPips(trade: LiveTrade): number {
   const units = Math.abs(parseFloat(trade.units));
   if (units === 0) return 0;
   return parseFloat((pl / units / 0.0001).toFixed(1));
+}
+
+function buildTradeLines(trades: LiveTrade[]): Array<{ price: number; label: string; color: string }> {
+  const lines: Array<{ price: number; label: string; color: string }> = [];
+  trades.forEach(trade => {
+    const dir = parseFloat(trade.units) > 0 ? 'L' : 'S';
+    if (trade.price) {
+      lines.push({ price: parseFloat(trade.price), label: `Entry ${dir}`, color: '#94a3b8' });
+    }
+    if (trade.stopLossPrice) {
+      lines.push({ price: parseFloat(trade.stopLossPrice), label: 'SL', color: '#ef4444' });
+    }
+    if (trade.takeProfitPrice) {
+      lines.push({ price: parseFloat(trade.takeProfitPrice), label: 'TP', color: '#10b981' });
+    }
+  });
+  return lines;
 }
 
 export function OverrideTerminal() {
@@ -99,8 +117,11 @@ export function OverrideTerminal() {
 
   if (loading) {
     return (
-      <div className="flex h-40 items-center justify-center text-sm text-slate-400">
-        Loading positions...
+      <div className="flex flex-col gap-3">
+        <OverrideChart tradeLines={[]} />
+        <div className="flex h-40 items-center justify-center text-sm text-slate-400">
+          Loading positions...
+        </div>
       </div>
     );
   }
@@ -115,14 +136,18 @@ export function OverrideTerminal() {
 
   if (trades.length === 0) {
     return (
-      <div className="flex h-40 items-center justify-center text-sm text-slate-400">
-        No open positions
+      <div className="flex flex-col gap-3">
+        <OverrideChart tradeLines={[]} />
+        <div className="flex h-40 items-center justify-center text-sm text-slate-400">
+          No open positions
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
+      <OverrideChart tradeLines={buildTradeLines(trades)} />
       {trades.map(trade => {
         const direction = getDirection(trade.units);
         const pips = getUnrealizedPips(trade);
