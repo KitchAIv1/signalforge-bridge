@@ -2,6 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  console.log('[Middleware] path:', request.nextUrl.pathname);
+  console.log('[Middleware] cookies:', request.cookies.getAll().map(c => c.name));
+
   const response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -25,6 +28,8 @@ export async function middleware(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
+  console.log('[Middleware] user:', user?.email ?? 'null');
+  console.log('[Middleware] redirecting to login:', !user && !request.nextUrl.pathname.startsWith('/login'));
 
   // Not logged in and not already on /login — redirect to login
   if (!user && !request.nextUrl.pathname.startsWith('/login')) {
