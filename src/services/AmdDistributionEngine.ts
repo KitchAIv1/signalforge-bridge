@@ -14,6 +14,7 @@ import {
 } from '../connectors/oanda.js';
 import { calculateUnits } from '../core/positionSizer.js';
 import { logInfo, logError } from '../utils/logger.js';
+import { sendTradeExecutedAlert } from './telegram/alertTradeExecution.js';
 
 const TAG_ENTRY_HOUR: Record<string, number> = {
   AMD_COMPRESSION_BREAKOUT: 10,
@@ -357,6 +358,18 @@ async function submitAmdOrder(
     plan.equity,
     plan.weight,
   );
+  void sendTradeExecutedAlert({
+    oandaInstrument: INSTRUMENT,
+    direction: direction.toUpperCase(),
+    fillPrice,
+    stopLoss: plan.hardSlPrice,
+    takeProfit: null,
+    filledUnits: Math.abs(plan.signedUnits),
+    amdTag: tag,
+    amdSizeMultiplier: plan.weight,
+    directionSource: 'auto',
+    engineId: ENGINE_ID,
+  }).catch(() => {});
   await persistTrailState(tag, direction, fillPrice, plan.hardSlPrice, tradeId, exitStrategy, todayStr);
   try {
     const now = new Date();

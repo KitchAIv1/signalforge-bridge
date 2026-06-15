@@ -22,6 +22,8 @@ import {
 import { getTrailEnabled } from './trailingStopSupport.js';
 import { runNewsAutoDetect } from '../utils/newsAutoDetect.js';
 import { fetchCloseCandles } from './closeCandleCapture.js';
+import { runPipThresholdMonitor } from './pipThresholdMonitor.js';
+import { sendTradeClosedAlert } from '../services/telegram/alertTradeClose.js';
 
 /** Do not infer "closed" from absent open list if trade age < this (OANDA propagation lag). */
 const MIN_OPEN_AGE_MS = 60_000;
@@ -113,6 +115,17 @@ export async function runTradeMonitor(
       }
       await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
       recordClosedTrade(resultFromPnl(details.pnlDollars));
+      void sendTradeClosedAlert({
+        engineId: (row.engine_id as string) ?? 'unknown',
+        instrument: (row.pair as string) ?? 'AUD_USD',
+        direction: (row.direction as string) ?? 'unknown',
+        entryPrice: typeof row.fill_price === 'number' ? row.fill_price : 0,
+        exitPrice: exitPriceNum ?? 0,
+        pnlPips: typeof derived.pnl_pips === 'number' ? derived.pnl_pips : 0,
+        pnlDollars: details.pnlDollars ?? 0,
+        closeReason: 'external_close',
+        durationMinutes: durationMinutes(openTime, closedAt) ?? 0,
+      }).catch(() => {});
       continue;
     }
     if (elapsed >= maxHold) {
@@ -143,6 +156,17 @@ export async function runTradeMonitor(
       }
       await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
       recordClosedTrade(resultFromPnl(pnlDollars));
+      void sendTradeClosedAlert({
+        engineId: (row.engine_id as string) ?? 'unknown',
+        instrument: (row.pair as string) ?? 'AUD_USD',
+        direction: (row.direction as string) ?? 'unknown',
+        entryPrice: typeof row.fill_price === 'number' ? row.fill_price : 0,
+        exitPrice: exitPriceNum ?? 0,
+        pnlPips: typeof derived.pnl_pips === 'number' ? derived.pnl_pips : 0,
+        pnlDollars: pnlDollars ?? 0,
+        closeReason: 'max_hold',
+        durationMinutes: durationMinutes(openTime, closedAt) ?? 0,
+      }).catch(() => {});
       continue;
     }
 
@@ -156,4 +180,15 @@ export async function runTradeMonitor(
       }
     }
   }
+
+  const openRows = (logOpen ?? [])
+    .filter((r) => r.oanda_trade_id && r.fill_price && r.direction && r.pair)
+    .map((r) => ({
+      oanda_trade_id: r.oanda_trade_id as string,
+      engine_id: r.engine_id as string,
+      pair: r.pair as string,
+      direction: r.direction as string,
+      fill_price: r.fill_price as number,
+    }));
+  void runPipThresholdMonitor(openRows).catch(() => {});
 }

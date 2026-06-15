@@ -14,6 +14,7 @@
 
 import { closeTrade, getTradeById } from '../../connectors/oanda.js';
 import { syncScalperTradeToBridgeLog } from './scalperBridgeSync.js';
+import { sendTradeClosedAlert } from '../telegram/alertTradeClose.js';
 import {
   loadFailedForceFlatTrades,
   loadOpenTrades,
@@ -56,6 +57,11 @@ function inferCloseReason(
   return 'external_close';
 }
 
+function computeScalperPnlDollars(trade: ScalperTrade, pnlPips: number): number {
+  const pipDollarValue = (trade.units ?? 0) * 0.0001;
+  return Math.round(pnlPips * pipDollarValue * 100) / 100;
+}
+
 async function syncClosedTrade(
   trade: ScalperTrade,
   fields: {
@@ -72,6 +78,20 @@ async function syncClosedTrade(
   const dayState = await loadTodayDayState(tradeDate, pair);
   if (!dayState) return;
   await syncScalperTradeToBridgeLog({ ...trade, ...fields }, dayState);
+  const effectivePips = fields.pnl_pips_actual ?? fields.pnl_pips ?? 0;
+  void sendTradeClosedAlert({
+    engineId: 'scalper',
+    instrument: pair,
+    direction: trade.direction,
+    entryPrice: trade.entry_price,
+    exitPrice: fields.exit_price ?? trade.entry_price,
+    pnlPips: effectivePips,
+    pnlDollars: computeScalperPnlDollars(trade, effectivePips),
+    closeReason: fields.close_reason ?? 'unknown',
+    durationMinutes: Math.floor(
+      (Date.now() - new Date(trade.opened_at ?? trade.created_at).getTime()) / 60000,
+    ),
+  }).catch(() => {});
 }
 
 async function forceCloseOne(

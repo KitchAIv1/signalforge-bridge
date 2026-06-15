@@ -14,6 +14,7 @@ import { insertTrade, loadOpenTrades, loadTodayDayState, recentTradeOpened } fro
 import { scalperError, scalperLog, scalperWarn } from './scalperLogger.js';
 import type { ScalperConfig } from './scalperTypes.js';
 import { pipsToPrice, todayUtcString } from './scalperTypes.js';
+import { sendTradeExecutedAlert } from '../telegram/alertTradeExecution.js';
 
 /** AUD_USD: quote currency is USD, pipValue = 0.0001 per unit. */
 function calculateScalperUnits(balance: number, riskPct: number, slPips: number): number {
@@ -152,6 +153,18 @@ export async function runEntryMonitor(config: ScalperConfig): Promise<void> {
     ratchet_index: dayState.ratchet_count + 1,
     opened_at: new Date().toISOString(),
   });
+  void sendTradeExecutedAlert({
+    oandaInstrument: config.pair,
+    direction: dayState.direction.toUpperCase(),
+    fillPrice,
+    stopLoss: slPrice,
+    takeProfit: tpPrice,
+    filledUnits: Math.abs(units),
+    amdTag: null,
+    amdSizeMultiplier: null,
+    directionSource: 'scalper',
+    engineId: 'scalper',
+  }).catch(() => {});
 
   scalperLog('Trade opened', {
     ratchetIndex: dayState.ratchet_count + 1,
