@@ -15,7 +15,9 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     const supabase = getSupabase();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    console.log('Auth response:', JSON.stringify({ data, error }));
     if (error) {
       setError(error.message);
       setLoading(false);
