@@ -1,0 +1,9 @@
+- Maximum 500 lines per file
+- Maximum 40 lines per function
+- Named exports only — no default exports except Next.js page components
+- No `any` types
+- `npx tsc --noEmit` must exit 0 before any commit
+- `git diff --stat` verification required after every change
+- Stop and report on any schema mismatch or ambiguity — never self-fix
+- No changes to files not listed in the spec
+- Read every file before editing it
