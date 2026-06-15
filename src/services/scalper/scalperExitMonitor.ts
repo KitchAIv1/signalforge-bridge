@@ -1,6 +1,6 @@
 /**
  * Exit monitor — polls each open DB trade via OANDA getTradeById().
- * Infers win/loss from averageClosePrice vs DB tp_price/sl_price.
+ * Infers win/loss from averageClosePrice vs DB sl_price (win = better than SL).
  * On SL: circuit breaker force-closes all other open positions (flat accounting).
  * Recovery: if day_stopped, retries any force_flat_failed trades.
  *
@@ -34,8 +34,26 @@ function inferResult(
   direction: ScalperDirection,
 ): 'win' | 'loss' {
   return direction === 'long'
-    ? averageClosePrice >= trade.tp_price ? 'win' : 'loss'
-    : averageClosePrice <= trade.tp_price ? 'win' : 'loss';
+    ? averageClosePrice > trade.sl_price ? 'win' : 'loss'
+    : averageClosePrice < trade.sl_price ? 'win' : 'loss';
+}
+
+function inferCloseReason(
+  averageClosePrice: number,
+  trade: ScalperTrade,
+  direction: ScalperDirection,
+): string {
+  const atSl = direction === 'long'
+    ? averageClosePrice <= trade.sl_price
+    : averageClosePrice >= trade.sl_price;
+  if (atSl) return 'sl_hit';
+
+  const atTp = direction === 'long'
+    ? averageClosePrice >= trade.tp_price
+    : averageClosePrice <= trade.tp_price;
+  if (atTp) return 'tp_hit';
+
+  return 'external_close';
 }
 
 async function syncClosedTrade(
@@ -112,21 +130,21 @@ async function handleWin(
   tradeDate: string,
   config: ScalperConfig,
 ): Promise<void> {
-  const pnlActual = signedPips(trade.entry_price, averageClosePrice, trade.direction as ScalperDirection);
+  const direction = trade.direction as ScalperDirection;
+  const pnlActual = signedPips(trade.entry_price, averageClosePrice, direction);
   const closeFields = {
     result: 'win' as const,
     exit_price: averageClosePrice,
-    pnl_pips: config.tpPips,
+    pnl_pips: pnlActual ?? config.tpPips,
     pnl_pips_actual: pnlActual,
     closed_at: new Date().toISOString(),
-    close_reason: 'tp_hit',
+    close_reason: inferCloseReason(averageClosePrice, trade, direction),
   };
   await updateTrade(trade.id, closeFields, tradeDate);
   await syncClosedTrade(trade, closeFields, tradeDate, config.pair);
 
   // IRON LAW 5: new reference can only move in direction of trade
   const newReference = trade.tp_price;
-  const direction = trade.direction as ScalperDirection;
   const newTrigger = direction === 'long'
     ? newReference - pipsToPrice(config.pullbackPips)
     : newReference + pipsToPrice(config.pullbackPips);
@@ -175,14 +193,15 @@ async function handleLoss(
   tradeDate: string,
   config: ScalperConfig,
 ): Promise<void> {
-  const pnlActual = signedPips(lossTrade.entry_price, averageClosePrice, lossTrade.direction as ScalperDirection);
+  const direction = lossTrade.direction as ScalperDirection;
+  const pnlActual = signedPips(lossTrade.entry_price, averageClosePrice, direction);
   const closeFields = {
     result: 'loss' as const,
     exit_price: averageClosePrice,
     pnl_pips: -config.slPips,
     pnl_pips_actual: pnlActual,
     closed_at: new Date().toISOString(),
-    close_reason: 'sl_hit',
+    close_reason: inferCloseReason(averageClosePrice, lossTrade, direction),
   };
   await updateTrade(lossTrade.id, closeFields, tradeDate);
   await syncClosedTrade(lossTrade, closeFields, tradeDate, config.pair);

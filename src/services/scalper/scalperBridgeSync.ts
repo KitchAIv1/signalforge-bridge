@@ -25,15 +25,17 @@ function mapBridgeResult(
 }
 
 function computePnlDollars(trade: ScalperTrade): number | null {
-  if (trade.pnl_pips == null || trade.units == null) return null;
+  const effectivePips = trade.pnl_pips_actual ?? trade.pnl_pips;
+  if (effectivePips == null || trade.units == null) return null;
   const pipDollarValue = trade.units * 0.0001;
-  return Math.round(trade.pnl_pips * pipDollarValue * 100) / 100;
+  return Math.round(effectivePips * pipDollarValue * 100) / 100;
 }
 
 function computePnlR(trade: ScalperTrade): number | null {
-  if (trade.pnl_pips == null) return null;
+  const effectivePips = trade.pnl_pips_actual ?? trade.pnl_pips;
+  if (effectivePips == null) return null;
   const { slPips } = loadScalperConfig();
-  return Math.round((trade.pnl_pips / slPips) * 1000) / 1000;
+  return Math.round((effectivePips / slPips) * 1000) / 1000;
 }
 
 async function mirrorAlreadyExists(oandaTradeId: string): Promise<boolean> {
