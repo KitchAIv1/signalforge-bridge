@@ -115,7 +115,7 @@ export function OverrideTerminal() {
 
   if (trades.length === 0) {
     return (
-      <div className="flex h-40 items-center justify-center text-sm text-slate-500">
+      <div className="flex h-40 items-center justify-center text-sm text-slate-400">
         No open positions
       </div>
     );
