@@ -3,9 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NAV_ROUTE_LINKS } from '@/components/navLinks';
+import { getSupabase } from '@/lib/supabase';
 
 export function Nav() {
   const pathname = usePathname();
+
+  async function handleSignOut() {
+    const supabase = getSupabase();
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  }
 
   return (
     <nav className="hidden h-full min-h-screen w-48 shrink-0 flex-col border-r border-slate-200 bg-white p-4 lg:flex">
@@ -27,6 +34,15 @@ export function Nav() {
           );
         })}
       </ul>
+      <div className="mt-auto pt-4">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="block w-full rounded-lg px-3 py-3 text-left text-sm text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+        >
+          Sign out
+        </button>
+      </div>
     </nav>
   );
 }

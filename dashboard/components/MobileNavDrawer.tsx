@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { NAV_ROUTE_LINKS } from '@/components/navLinks';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { useDrawerFocusTrap } from '@/hooks/useDrawerFocusTrap';
+import { getSupabase } from '@/lib/supabase';
 
 export function MobileNavDrawer() {
   const pathname = usePathname();
@@ -46,6 +47,12 @@ export function MobileNavDrawer() {
 
   function onBackdropActivate(): void {
     closeAndReturnFocus();
+  }
+
+  async function handleSignOut() {
+    const supabase = getSupabase();
+    await supabase.auth.signOut();
+    window.location.href = '/login';
   }
 
   return (
@@ -101,6 +108,15 @@ export function MobileNavDrawer() {
                 })}
               </ul>
             </nav>
+            <div className="border-t border-slate-100 px-3 pb-[max(env(safe-area-inset-bottom),1rem)] pt-3">
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="block w-full rounded-lg px-3 py-3 text-left text-sm text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+              >
+                Sign out
+              </button>
+            </div>
           </aside>
         </>
       )}
