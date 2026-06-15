@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { AccountSnapshotBar } from '@/components/AccountSnapshotBar';
 import { OverrideChart } from '@/components/override/OverrideChart';
 
 interface LiveTrade {
@@ -119,6 +120,7 @@ export function OverrideTerminal() {
     return (
       <div className="flex flex-col gap-3">
         <OverrideChart tradeLines={[]} />
+        <AccountSnapshotBar />
         <div className="flex h-40 items-center justify-center text-sm text-slate-400">
           Loading positions...
         </div>
@@ -138,6 +140,7 @@ export function OverrideTerminal() {
     return (
       <div className="flex flex-col gap-3">
         <OverrideChart tradeLines={[]} />
+        <AccountSnapshotBar />
         <div className="flex h-40 items-center justify-center text-sm text-slate-400">
           No open positions
         </div>
@@ -148,6 +151,7 @@ export function OverrideTerminal() {
   return (
     <div className="flex flex-col gap-3">
       <OverrideChart tradeLines={buildTradeLines(trades)} />
+      <AccountSnapshotBar />
       {trades.map(trade => {
         const direction = getDirection(trade.units);
         const pips = getUnrealizedPips(trade);
