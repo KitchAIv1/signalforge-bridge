@@ -39,7 +39,6 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
   const priceLineRefs = useRef<IPriceLine[]>([]);
   const [timeframe, setTimeframe] = useState<Timeframe>('M5');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const fetchAndRender = useCallback(async (tf: Timeframe) => {
     try {
@@ -54,8 +53,6 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
       setError(null);
     } catch (err) {
       setError(String(err));
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -63,7 +60,7 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
     if (!containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
+      width: containerRef.current.offsetWidth || 500,
       height: 280,
       layout: {
         background: { type: ColorType.Solid, color: '#0f172a' },
@@ -99,17 +96,19 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
     chartRef.current = chart;
     seriesRef.current = series;
 
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
+    const resizeObserver = new ResizeObserver(() => {
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: containerRef.current.offsetWidth,
+        });
       }
-    };
-    window.addEventListener('resize', handleResize);
+    });
+    resizeObserver.observe(containerRef.current);
 
     void fetchAndRender('M5');
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -140,7 +139,6 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
   }, [tradeLines]);
 
   useEffect(() => {
-    setLoading(true);
     void fetchAndRender(timeframe);
 
     const interval = setInterval(() => {
@@ -176,15 +174,8 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
         <div className="px-3 py-2 text-xs text-red-400">{error}</div>
       )}
 
-      {loading && !error && (
-        <div className="flex h-[280px] items-center justify-center text-xs text-slate-500">
-          Loading chart...
-        </div>
-      )}
-
       <div
         ref={containerRef}
-        className={loading ? 'hidden' : 'block'}
         style={{ height: '280px' }}
       />
     </div>
