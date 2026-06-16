@@ -35,9 +35,16 @@ function buildMarketParams(
   unitsForOrder: number,
   useTrailStop: boolean,
   includePriceBound: boolean,
-  priceBoundFormatted: string | undefined
+  priceBoundFormatted: string | undefined,
+  takeProfitPriceOverride?: string,
 ): PlaceOrderParams {
   const decimals = norm.oandaInstrument.includes('JPY') ? 3 : 5;
+  const brokerExitParams = takeProfitPriceOverride
+    ? { takeProfitPrice: takeProfitPriceOverride }
+    : {
+        stopLossPrice: norm.stopLoss.toFixed(decimals),
+        takeProfitPrice: norm.takeProfit.toFixed(decimals),
+      };
   return {
     instrument: norm.oandaInstrument,
     units: unitsForOrder,
@@ -45,12 +52,7 @@ function buildMarketParams(
       priceBoundFormatted != null && {
         priceBound: priceBoundFormatted,
       }),
-    ...(useTrailStop
-      ? {}
-      : {
-          stopLossPrice: norm.stopLoss.toFixed(decimals),
-          takeProfitPrice: norm.takeProfit.toFixed(decimals),
-        }),
+    ...(useTrailStop ? {} : brokerExitParams),
   };
 }
 
@@ -66,13 +68,28 @@ export async function placeMarketOrderWithRebuildBoundsRetry(params: {
   useTrailStop: boolean;
   maxOrderTimeoutMs: number;
   rebuildBoundsRetryEnabled: boolean;
+  takeProfitPriceOverride?: string;
 }): Promise<{ orderResult: PlaceOrderResult; retriedWithoutPriceBound: boolean }> {
-  const { norm, finalUnits, useTrailStop, maxOrderTimeoutMs, rebuildBoundsRetryEnabled } = params;
+  const {
+    norm,
+    finalUnits,
+    useTrailStop,
+    maxOrderTimeoutMs,
+    rebuildBoundsRetryEnabled,
+    takeProfitPriceOverride,
+  } = params;
   const priceBoundFormatted = computeRebuildPriceBound(norm);
   let retriedWithoutPriceBound = false;
 
   let orderResult = await placeMarketOrder(
-    buildMarketParams(norm, finalUnits, useTrailStop, true, priceBoundFormatted),
+    buildMarketParams(
+      norm,
+      finalUnits,
+      useTrailStop,
+      true,
+      priceBoundFormatted,
+      takeProfitPriceOverride,
+    ),
     maxOrderTimeoutMs
   );
 
@@ -97,7 +114,14 @@ export async function placeMarketOrderWithRebuildBoundsRetry(params: {
     );
     retriedWithoutPriceBound = true;
     orderResult = await placeMarketOrder(
-      buildMarketParams(norm, finalUnits, useTrailStop, false, priceBoundFormatted),
+      buildMarketParams(
+        norm,
+        finalUnits,
+        useTrailStop,
+        false,
+        priceBoundFormatted,
+        takeProfitPriceOverride,
+      ),
       maxOrderTimeoutMs
     );
   }

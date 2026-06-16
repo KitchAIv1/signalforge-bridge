@@ -75,7 +75,7 @@ export async function runTradeMonitor(
   const { data: logOpen } = await supabase
     .from('bridge_trade_log')
     .select(
-      'id, oanda_trade_id, engine_id, signal_received_at, pair, direction, fill_price, stop_loss, units, entry_price'
+      'id, oanda_trade_id, engine_id, signal_received_at, pair, direction, fill_price, stop_loss, units, entry_price, leg_type, take_profit'
     )
     .eq('status', 'open')
     .not('oanda_trade_id', 'is', null);
@@ -95,6 +95,20 @@ export async function runTradeMonitor(
       const closedAt = details.closedTime ?? new Date().toISOString();
       const exitPriceNum = details.exitPrice != null ? parseFloat(String(details.exitPrice)) : null;
       const derived = computeDerivedFields(row, exitPriceNum, details.pnlDollars);
+      const legType = row.leg_type as string | null;
+      const storedTakeProfit = row.take_profit as number | null;
+      let closeReason: string | undefined;
+      if (
+        (legType === 'tp1' || legType === 'tp2') &&
+        storedTakeProfit != null &&
+        exitPriceNum != null
+      ) {
+        const tolerance = 0.00005;
+        closeReason =
+          Math.abs(exitPriceNum - storedTakeProfit) <= tolerance
+            ? 'tp_hit'
+            : 'external_close';
+      }
       const update: Record<string, unknown> = {
         status: 'closed',
         closed_at: closedAt,
@@ -102,6 +116,7 @@ export async function runTradeMonitor(
         pnl_dollars: details.pnlDollars,
         result: resultFromPnl(details.pnlDollars),
         duration_minutes: durationMinutes(openTime, closedAt),
+        ...(closeReason && { close_reason: closeReason }),
         ...derived,
       };
       if ((row.engine_id as string) === 'omega') {
@@ -123,7 +138,7 @@ export async function runTradeMonitor(
         exitPrice: exitPriceNum ?? 0,
         pnlPips: typeof derived.pnl_pips === 'number' ? derived.pnl_pips : 0,
         pnlDollars: details.pnlDollars ?? 0,
-        closeReason: 'external_close',
+        closeReason: closeReason ?? 'external_close',
         durationMinutes: durationMinutes(openTime, closedAt) ?? 0,
       }).catch(() => {});
       continue;
@@ -170,7 +185,9 @@ export async function runTradeMonitor(
       continue;
     }
 
-    if (isTrailStopEngine(row.engine_id as string) && oandaIds.has(tid)) {
+    const legType = row.leg_type as string | null;
+    const isTrailEligibleLeg = legType === null || legType === 'trail';
+    if (isTrailStopEngine(row.engine_id as string) && isTrailEligibleLeg && oandaIds.has(tid)) {
       const logRow = row as Record<string, unknown>;
       await ensureTrailStopState(supabase, logRow);
       const trail = await runTrailingStopCheck(supabase, logRow, tid);

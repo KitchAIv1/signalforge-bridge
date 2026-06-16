@@ -21,12 +21,13 @@ import { validateSignal } from './signalValidation.js';
 import { isTripped, getPeakEquity, getConsecutiveLosses, enterCooldown } from './circuitBreaker.js';
 import { sendCircuitBreakerAlert } from '../services/telegram/alertCircuitBreaker.js';
 import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
+import { sendMultiLegExecutedAlert } from '../services/telegram/alertMultiLegExecuted.js';
+import { computeRatchetLegs } from './omegaRatchetSplit.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
 import { calculateUnits } from './positionSizer.js';
 import {
-  fetchCompletedCandles,
   patchTradeTPSL,
 } from '../connectors/oanda.js';
 import {
@@ -104,6 +105,39 @@ function buildTradeLogRow(
     account_equity_at_signal: equity,
     open_positions_count: openCount,
   };
+}
+
+function attachOmegaAuditFields(
+  row: Record<string, unknown>,
+  regimeState: ActiveRegimeState | null,
+  regimeSizeMultiplier: number,
+  amdState: ActiveAmdState | null,
+  directionMode: string,
+): void {
+  row.regime_direction = regimeState?.direction ?? null;
+  row.regime_confidence = regimeState?.confidence ?? null;
+  row.regime_evaluated_at = regimeState?.evaluatedAt ?? null;
+  row.regime_size_multiplier = regimeSizeMultiplier;
+  row.layer4_result = regimeState?.layer4_result ?? null;
+  row.layer4_bullish_count = regimeState?.layer4_bullish_count ?? null;
+  row.layer4_bearish_count = regimeState?.layer4_bearish_count ?? null;
+  row.layer5_result = regimeState?.layer5_result ?? null;
+  row.layer5_pip_diff = regimeState?.layer5_pip_diff ?? null;
+  row.layer6_position_pct = regimeState?.layer6_position_pct ?? null;
+  row.layer7_active = regimeState?.layer7_override_active ?? null;
+  row.layer7_pip_diff = regimeState?.layer7_pip_diff ?? null;
+  row.choppy_extended = regimeState?.choppy_extended_override ?? null;
+  row.manual_tag = null;
+  row.close_tag = null;
+  row.signal_session = null;
+  row.amd_tag = amdState?.amdTag ?? null;
+  row.amd_evaluated_at = amdState?.evaluatedAt ?? null;
+  row.layer4_d1_bias = amdState?.layer4D1Bias ?? null;
+  row.daily_bias_alignment = amdState?.dailyBiasAlignment ?? null;
+  row.direction_source = directionMode === 'auto' ? 'auto' : 'manual';
+  row.amd_size_multiplier = amdState?.amdSizeMultiplier ?? null;
+  row.reversal_confirmed = amdState?.reversalConfirmed ?? null;
+  row.auto_direction_reason = amdState?.autoDirectionReason ?? null;
 }
 
 function resolveOmegaDirection(
@@ -919,6 +953,126 @@ export async function processSignal(
     ];
     const useTrailStop = TRAIL_STOP_ENGINES.includes(norm.engineId);
 
+    if (norm.engineId === 'omega') {
+      const legs = computeRatchetLegs(
+        finalUnits,
+        norm.entryPrice,
+        norm.direction as 'LONG' | 'SHORT',
+        norm.oandaInstrument,
+      );
+
+      const executedLegs: Array<{
+        legType: string;
+        units: number;
+        fillPrice: number;
+        takeProfitPrice: string | null;
+        oandaTradeId: string;
+      }> = [];
+
+      for (const leg of legs) {
+        if (leg.units === 0) {
+          logWarn('[Omega Ratchet] Skipping zero-unit leg', {
+            signalId,
+            legType: leg.legType,
+            finalUnits,
+          });
+          continue;
+        }
+
+        const legUseTrailStop = leg.legType === 'trail';
+
+        const { orderResult } = await placeMarketOrderWithRebuildBoundsRetry({
+          norm,
+          finalUnits: leg.units,
+          useTrailStop: legUseTrailStop,
+          maxOrderTimeoutMs: config.maxOrderTimeoutMs,
+          rebuildBoundsRetryEnabled: false,
+          takeProfitPriceOverride: leg.takeProfitPrice ?? undefined,
+        });
+
+        if (orderResult.orderCancelTransaction) {
+          logInfo('[Omega Ratchet] Leg cancelled', {
+            legType: leg.legType,
+            reason: orderResult.orderCancelTransaction.reason,
+          });
+          continue;
+        }
+
+        const fillTx = orderResult.orderFillTransaction;
+        const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id;
+        const filledUnits = fillTx?.units != null ? Number(fillTx.units) : leg.units;
+        const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
+
+        const row = buildTradeLogRow(
+          payload,
+          'EXECUTED',
+          null,
+          decisionLatencyMs,
+          cachedAccount?.equity ?? null,
+          openTrades.length,
+          norm.oandaInstrument,
+          norm.direction,
+        );
+        const rowRecord = row as Record<string, unknown>;
+        rowRecord.oanda_order_id = fillTx?.id;
+        rowRecord.oanda_trade_id = tradeId;
+        rowRecord.units = filledUnits;
+        rowRecord.leg_type = leg.legType;
+        if (fillPrice != null) rowRecord.fill_price = fillPrice;
+        if (leg.takeProfitPrice) {
+          rowRecord.take_profit = parseFloat(leg.takeProfitPrice);
+        }
+
+        if (fillPrice != null) {
+          const signalRSize = Math.abs(norm.entryPrice - norm.stopLoss);
+          const mirroredSL = norm.direction === 'SHORT'
+            ? fillPrice + signalRSize
+            : fillPrice - signalRSize;
+          rowRecord.stop_loss = mirroredSL;
+        }
+
+        attachOmegaAuditFields(rowRecord, regimeState, regimeSizeMultiplier, amdState, directionMode);
+
+        await supabase.from('bridge_trade_log').insert(row);
+        const { data: eng } = await supabase
+          .from('bridge_engines')
+          .select('trades_today')
+          .eq('engine_id', norm.engineId)
+          .single();
+        const newCount =
+          ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
+        await supabase
+          .from('bridge_engines')
+          .update({ trades_today: newCount, updated_at: new Date().toISOString() })
+          .eq('engine_id', norm.engineId);
+
+        if (fillPrice != null && tradeId) {
+          executedLegs.push({
+            legType: leg.legType,
+            units: filledUnits,
+            fillPrice,
+            takeProfitPrice: leg.takeProfitPrice,
+            oandaTradeId: tradeId,
+          });
+        }
+      }
+
+      if (executedLegs.length > 0) {
+        logInfo('Omega ratchet trade executed', {
+          signalId,
+          pair: norm.oandaInstrument,
+          legs: executedLegs.length,
+        });
+        void sendMultiLegExecutedAlert({
+          instrument: norm.oandaInstrument,
+          direction: norm.direction,
+          legs: executedLegs,
+        }).catch(() => {});
+      }
+
+      return;
+    }
+
     // Rebuild: 2-pip priceBound (see rebuildBoundsRetryOrder); optional
     // second attempt without priceBound when config + BOUNDS_VIOLATION.
     const { orderResult, retriedWithoutPriceBound } =
@@ -956,70 +1110,6 @@ export async function processSignal(
     (row as Record<string, unknown>).oanda_trade_id = tradeId;
     (row as Record<string, unknown>).units = filledUnits;
     if (fillPrice != null) (row as Record<string, unknown>).fill_price = fillPrice;
-    // ── Pre-entry candle capture — omega only ─────────────────────────────
-    // 3-second timeout prevents slow OANDA candle responses from blocking
-    // signal execution. On timeout, candles are skipped — row inserts cleanly.
-    if (norm.engineId === 'omega' && fillPrice != null) {
-      try {
-        const fillIso  = new Date().toISOString();
-        const fromM5   = new Date(Date.now() - 12 * 5 * 60 * 1000).toISOString();
-        const fromH1   = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-        const candleTimeout = new Promise<null>((resolve) =>
-          setTimeout(() => resolve(null), 3000)
-        );
-        const candleResult = await Promise.race([
-          Promise.all([
-            fetchCompletedCandles(norm.oandaInstrument, 'M5', fromM5, fillIso),
-            fetchCompletedCandles(norm.oandaInstrument, 'H1', fromH1, fillIso),
-          ]),
-          candleTimeout,
-        ]);
-        if (candleResult !== null) {
-          const [preEntryCandles, h1SessionCandles] = candleResult;
-          if (preEntryCandles.length > 0) {
-            (row as Record<string, unknown>).pre_entry_candles  = preEntryCandles;
-          }
-          if (h1SessionCandles.length > 0) {
-            (row as Record<string, unknown>).h1_session_candles = h1SessionCandles;
-          }
-        }
-      } catch {
-        // Candle fetch failure never blocks execution
-      }
-    }
-    // ── End pre-entry candle capture ──────────────────────────────────────
-    // ── Omega SL mirror for trail stop sizing ──────────────────
-    // When omega direction is inverted by resolveOmegaDirection,
-    // norm.stopLoss stays as the original signal SL (wrong side).
-    // bridge_trade_log.stop_loss feeds computeTrailInsertFields:
-    //   rSizeRaw = Math.abs(fillPrice - stopLoss)
-    // With wrong-side SL and fill near original SL → rSizeRaw≈0
-    // → trail_distance≈0 → instant trail_sl_hit (Trade 1108: 12s)
-    //
-    // Fix: mirror SL to correct side of fill using signal rSize.
-    // Covers both inversion directions:
-    //   LONG signal → SHORT execution: mirroredSL above fill
-    //   SHORT signal → LONG execution: mirroredSL below fill
-    //
-    // OANDA order unaffected — omega in TRAIL_STOP_ENGINES,
-    // no stopLossPrice ever sent to OANDA for omega.
-    // Position sizing unaffected — uses slPipsOverride from signal.
-    // signalValidation unaffected — runs before direction mutation.
-    if (norm.engineId === 'omega' && fillPrice != null) {
-      const signalRSize = Math.abs(norm.entryPrice - norm.stopLoss);
-      const mirroredSL = norm.direction === 'SHORT'
-        ? fillPrice + signalRSize   // SHORT: SL above fill
-        : fillPrice - signalRSize;  // LONG:  SL below fill
-      (row as Record<string, unknown>).stop_loss = mirroredSL;
-      console.log(
-        '[Omega] SL mirrored for trail sizing',
-        'direction=', norm.direction,
-        'fill=', fillPrice,
-        'signalRSize=', signalRSize,
-        'mirroredSL=', mirroredSL.toFixed(5)
-      );
-    }
-    // ── End Omega SL mirror ─────────────────────────────────────
     // Engine Rebuild execution fixes — RC1 + RC2 + RC3
     // ZERO effect on Omega, Charlie, Alpha, Delta, Falcon, Sigma
     if (norm.engineId === 'engine_rebuild' && fillPrice != null) {
@@ -1074,47 +1164,6 @@ export async function processSignal(
             bar1Data.strength;
         }
       }
-    }
-    if (norm.engineId === 'omega') {
-      (row as Record<string, unknown>).regime_direction = regimeState?.direction ?? null;
-      (row as Record<string, unknown>).regime_confidence = regimeState?.confidence ?? null;
-      (row as Record<string, unknown>).regime_evaluated_at = regimeState?.evaluatedAt ?? null;
-      (row as Record<string, unknown>).regime_size_multiplier = regimeSizeMultiplier;
-      // ── Regime layer detail — advisory training dataset ──────────────────────────
-      (row as Record<string, unknown>).layer4_result = regimeState?.layer4_result ?? null;
-      (row as Record<string, unknown>).layer4_bullish_count =
-        regimeState?.layer4_bullish_count ?? null;
-      (row as Record<string, unknown>).layer4_bearish_count =
-        regimeState?.layer4_bearish_count ?? null;
-      (row as Record<string, unknown>).layer5_result = regimeState?.layer5_result ?? null;
-      (row as Record<string, unknown>).layer5_pip_diff = regimeState?.layer5_pip_diff ?? null;
-      (row as Record<string, unknown>).layer6_position_pct =
-        regimeState?.layer6_position_pct ?? null;
-      (row as Record<string, unknown>).layer7_active =
-        regimeState?.layer7_override_active ?? null;
-      (row as Record<string, unknown>).layer7_pip_diff =
-        regimeState?.layer7_pip_diff ?? null;
-      (row as Record<string, unknown>).choppy_extended =
-        regimeState?.choppy_extended_override ?? null;
-      (row as Record<string, unknown>).manual_tag = null;
-      (row as Record<string, unknown>).close_tag = null;
-      (row as Record<string, unknown>).signal_session = null;
-      (row as Record<string, unknown>).amd_tag = amdState?.amdTag ?? null;
-      (row as Record<string, unknown>).amd_evaluated_at =
-        amdState?.evaluatedAt ?? null;
-      // D1 vote counts persist on amd_state; bridge_trade_log.layer4_* counts are regime snapshot fields.
-      (row as Record<string, unknown>).layer4_d1_bias =
-        amdState?.layer4D1Bias ?? null;
-      (row as Record<string, unknown>).daily_bias_alignment =
-        amdState?.dailyBiasAlignment ?? null;
-      (row as Record<string, unknown>).direction_source =
-        directionMode === 'auto' ? 'auto' : 'manual';
-      (row as Record<string, unknown>).amd_size_multiplier =
-        amdState?.amdSizeMultiplier ?? null;
-      (row as Record<string, unknown>).reversal_confirmed =
-        amdState?.reversalConfirmed ?? null;
-      (row as Record<string, unknown>).auto_direction_reason =
-        amdState?.autoDirectionReason ?? null;
     }
     await supabase.from('bridge_trade_log').insert(row);
     const { data: eng } = await supabase.from('bridge_engines').select('trades_today').eq('engine_id', norm.engineId).single();
