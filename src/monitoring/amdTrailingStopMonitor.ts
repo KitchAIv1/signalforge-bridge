@@ -14,6 +14,7 @@ import {
 } from '../connectors/oanda.js';
 import { logInfo, logError } from '../utils/logger.js';
 import { sendTradeClosedAlert } from '../services/telegram/alertTradeClose.js';
+import { reconcileAmdTpLegCloses } from './amdTpLegReconcile.js';
 
 const INSTRUMENT = 'AUD_USD';
 const ENGINE_ID = 'engine_amd';
@@ -172,6 +173,23 @@ async function closeAmdTrade(
   await finalizeClose(state, exitPrice, reason);
 }
 
+async function fetchStoredTakeProfit(tradeId: string): Promise<number | null> {
+  const { data } = await supabaseDb()
+    .from('bridge_trade_log')
+    .select('take_profit')
+    .eq('oanda_trade_id', tradeId)
+    .eq('engine_id', ENGINE_ID)
+    .maybeSingle();
+  const takeProfit = data?.take_profit;
+  return takeProfit != null ? Number(takeProfit) : null;
+}
+
+function resolveExternalCloseReason(exitPrice: number, storedTakeProfit: number | null): string {
+  if (storedTakeProfit == null) return 'hard_sl_external';
+  const tolerance = 0.00005;
+  return Math.abs(exitPrice - storedTakeProfit) <= tolerance ? 'tp_hit' : 'hard_sl_external';
+}
+
 async function handleExternalClose(state: TrailStateRow): Promise<void> {
   const tradeId = state.oanda_trade_id as string;
   const fillPrice = parseFloat(state.fill_price as string);
@@ -183,6 +201,8 @@ async function handleExternalClose(state: TrailStateRow): Promise<void> {
   } catch {
     // non-fatal
   }
+  const storedTakeProfit = await fetchStoredTakeProfit(tradeId);
+  const closeReason = resolveExternalCloseReason(exitPrice, storedTakeProfit);
   const captured = pipsCaptured(direction, fillPrice, exitPrice);
   const pnlR = captured / HARD_SL_PIPS;
   let pnlDollars: number | null = null;
@@ -193,9 +213,9 @@ async function handleExternalClose(state: TrailStateRow): Promise<void> {
   }
   const result = pnlR > 0 ? 'win' : pnlR < 0 ? 'loss' : 'breakeven';
   await markTrailClosed(tradeId);
-  await updateTradeLogClosed(tradeId, exitPrice, pnlR, pnlDollars, result, 'hard_sl_external', state);
+  await updateTradeLogClosed(tradeId, exitPrice, pnlR, pnlDollars, result, closeReason, state);
   await attachCloseCandleMetrics(state, captured);
-  logInfo('[AmdTrail] External close reconciled', { tradeId, pnlR, result });
+  logInfo('[AmdTrail] External close reconciled', { tradeId, pnlR, result, closeReason });
 }
 
 function trailExitFired(
@@ -254,7 +274,22 @@ async function processOpenState(
   }
 }
 
+function isTrailEligibleState(state: Record<string, unknown>): boolean {
+  const legType = state.leg_type as string | null;
+  return legType === null || legType === 'trail';
+}
+
 export async function runAmdTrailMonitor(): Promise<void> {
+  let oandaOpenIds: Set<string>;
+  try {
+    oandaOpenIds = new Set((await getOpenTrades()).map((tradeRow) => tradeRow.id));
+  } catch (err) {
+    logError('[AmdTrail] getOpenTrades failed — skipping cycle', { err: String(err) });
+    return;
+  }
+
+  await reconcileAmdTpLegCloses(supabaseDb(), oandaOpenIds);
+
   const { data: openStates, error } = await supabaseDb()
     .from('amd_trail_stop_state')
     .select('*')
@@ -263,14 +298,9 @@ export async function runAmdTrailMonitor(): Promise<void> {
     logError('[AmdTrail] Failed to fetch open states', { error: error.message });
     return;
   }
-  if (!openStates?.length) return;
-  let oandaOpenIds: Set<string>;
-  try {
-    oandaOpenIds = new Set((await getOpenTrades()).map((tradeRow) => tradeRow.id));
-  } catch (err) {
-    logError('[AmdTrail] getOpenTrades failed — skipping cycle', { err: String(err) });
-    return;
-  }
+  const trailEligibleStates = (openStates ?? []).filter(isTrailEligibleState);
+  if (!trailEligibleStates.length) return;
+
   let currentPrice: number | null;
   try {
     currentPrice = await fetchMidPrice();
@@ -283,7 +313,7 @@ export async function runAmdTrailMonitor(): Promise<void> {
     return;
   }
   const nowUtcHour = new Date().getUTCHours();
-  for (const state of openStates) {
+  for (const state of trailEligibleStates) {
     await processOpenState(state as TrailStateRow, oandaOpenIds, currentPrice, nowUtcHour);
   }
 }

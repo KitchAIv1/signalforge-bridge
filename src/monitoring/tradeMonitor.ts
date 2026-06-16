@@ -83,6 +83,9 @@ export async function runTradeMonitor(
   const engineById = new Map(engines.map((e) => [e.engine_id, e]));
 
   for (const row of logOpen ?? []) {
+    if ((row.engine_id as string) === 'engine_amd') {
+      continue;
+    }
     const tid = row.oanda_trade_id as string;
     const openTime = row.signal_received_at as string;
     const engine = engineById.get(row.engine_id as string);

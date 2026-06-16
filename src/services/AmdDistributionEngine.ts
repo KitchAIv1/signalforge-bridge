@@ -15,6 +15,7 @@ import {
 import { calculateUnits } from '../core/positionSizer.js';
 import { logInfo, logError } from '../utils/logger.js';
 import { sendTradeExecutedAlert } from './telegram/alertTradeExecution.js';
+import { submitAmdFailedRatchetOrder } from './amdFailedRatchetSubmit.js';
 
 const TAG_ENTRY_HOUR: Record<string, number> = {
   AMD_COMPRESSION_BREAKOUT: 10,
@@ -318,6 +319,11 @@ async function submitAmdOrder(
   plan: OrderPlan,
   todayStr: string,
 ): Promise<void> {
+  if (tag === 'AMD_FAILED') {
+    await submitAmdFailedRatchetOrder(supabaseDb(), direction, amdRow, plan, todayStr);
+    return;
+  }
+
   const exitStrategy = tag === 'AMD_NONE' ? 'S1' : plan.exitStrategy;
   logInfo('[AmdDistribution] Placing order', {
     tag,
