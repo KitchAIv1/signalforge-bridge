@@ -37,7 +37,9 @@ import {
 } from './amdDetector/sendAmdTelegramAlert.js';
 import { applyAsianCloseAdvisory } from './amdDetector/asianCloseAdvisory.js';
 import { fetchWindowOutcomeForDate } from './amdDetector/fetchWindowOutcomeForDate.js';
-import { logInfo } from '../utils/logger.js';
+import { classifyAsianShape, type AsianShapeResult } from './amdDetector/asianShapeClassifier.js';
+import { fetchAsianM5Candles } from './amdDetector/fetchAsianM5Candles.js';
+import { logInfo, logWarn } from '../utils/logger.js';
 
 const AUD_AMD_PAIR = 'AUD_USD';
 
@@ -84,11 +86,25 @@ type InsertAmdOpts = {
   dailyBias: AmdDailyBiasSnapshot;
   autoDir: AmdAutoDirectionSnapshot;
   m5Signal: AmdM5Signal;
+  asianShape: AsianShapeResult | null;
 };
 
 type PersistAmdRowOpts = InsertAmdOpts & {
   decisionSnapshot: DecisionSnapshotFields;
 };
+
+function buildAsianShapeUpsertFields(asianShape: AsianShapeResult | null) {
+  if (!asianShape) return {};
+  return {
+    asian_turn_time: asianShape.turnTime,
+    asian_turn_position: asianShape.turnPosition,
+    asian_pre_turn_speed: asianShape.preTurnSpeed,
+    asian_post_turn_speed: asianShape.postTurnSpeed,
+    asian_retracement_pct: asianShape.retracementPct,
+    asian_shape: asianShape.shape,
+    asian_shape_unclassified_reason: asianShape.unclassifiedReason,
+  };
+}
 
 function buildAmdStateUpsertRow(insertOpts: PersistAmdRowOpts) {
   const { tradeDate, evaluatedAtISO, candlesForChart, features, dailyBias, decisionSnapshot } =
@@ -148,6 +164,7 @@ function buildAmdStateUpsertRow(insertOpts: PersistAmdRowOpts) {
     asian_net_direction: insertOpts.autoDir.asian_net_direction ?? null,
     asian_close_position_pct: features.asian_close_position_pct ?? null,
     asian_close_bias_signal: features.asian_close_bias_signal ?? null,
+    ...buildAsianShapeUpsertFields(insertOpts.asianShape),
     decision_auto_direction: decisionSnapshot.decision_auto_direction,
     decision_evaluated_at: decisionSnapshot.decision_evaluated_at,
     ...buildInitialDetectionLockFields(evaluatedAtISO),
@@ -514,6 +531,7 @@ async function recordAmdInsightForEmptyH1(
     dailyBias: emptyDailyBias,
     autoDir,
     m5Signal: emptyM5Signal,
+    asianShape: null,
   });
   if (persisted) {
     const alertCtx: AmdDirectionAlertContext = {
@@ -541,6 +559,22 @@ async function recordAmdInsightForEmptyH1(
     });
   } catch (tgErr: unknown) {
     console.warn('[AmdDetector] Telegram alert failed:', tgErr);
+  }
+}
+
+async function loadAsianShapeForTradeDate(
+  supabaseDb: SupabaseClient,
+  tradeDate: string,
+): Promise<AsianShapeResult | null> {
+  try {
+    const asianM5 = await fetchAsianM5Candles(supabaseDb, tradeDate);
+    return asianM5 ? classifyAsianShape(tradeDate, asianM5) : null;
+  } catch (err: unknown) {
+    logWarn('[AmdDetector] Asian shape classification failed — continuing without it', {
+      tradeDate,
+      err: String(err),
+    });
+    return null;
   }
 }
 
@@ -586,6 +620,8 @@ async function recordAmdInsightForH1Window(
     features.asian_close_position_pct ?? null,
   );
 
+  const asianShape = await loadAsianShapeForTradeDate(supabaseDb, tradeDate);
+
   const persisted = await persistAmdInsightRow({
     amdSupabase: supabaseDb,
     tradeDate,
@@ -595,6 +631,7 @@ async function recordAmdInsightForH1Window(
     dailyBias: filledDailyBias,
     autoDir,
     m5Signal,
+    asianShape,
   });
 
   if (persisted) {

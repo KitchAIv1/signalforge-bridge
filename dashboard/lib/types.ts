@@ -266,6 +266,20 @@ export interface AmdState {
   amd_size_multiplier?: number | null;
   asian_close_position_pct?: number | null;
   asian_close_bias_signal?: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  asian_turn_time?: string | null;
+  asian_turn_position?: number | null;
+  asian_pre_turn_speed?: number | null;
+  asian_post_turn_speed?: number | null;
+  asian_retracement_pct?: number | null;
+  asian_shape?:
+    | 'clean-trend'
+    | 'clean-v'
+    | 'check'
+    | 'inverted-check'
+    | 'round-trip-spike'
+    | 'unclassified'
+    | null;
+  asian_shape_unclassified_reason?: string | null;
   // Window outcome (written at 16:30 UTC)
   window_tag_used?: string | null;
   window_from_utc?: string | null;

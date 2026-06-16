@@ -25,6 +25,7 @@ import {
   asianCloseBiasLabel,
   asianCloseFilterStatus,
 } from '@/lib/asianCloseBiasHelpers';
+import { AmdPanelAsianShapeFields } from '@/components/AmdPanelAsianShapeFields';
 import { AmdIntelSectionHeading } from '@/components/AmdIntelSectionHeading';
 import { AmdIntelPrimaryTag } from '@/components/AmdIntelPrimaryTag';
 import { AmdIntelStatTile } from '@/components/AmdIntelStatTile';
@@ -139,6 +140,7 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
                 </span>
               </div>
             )}
+            <AmdPanelAsianShapeFields amdState={amdState} />
             <p className="mt-1 max-w-xs truncate text-xs italic text-slate-500 dark:text-slate-400">
               {amdState.auto_direction_reason !== '' &&
               amdState.auto_direction_reason != null
