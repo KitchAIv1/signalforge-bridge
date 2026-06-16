@@ -360,6 +360,44 @@ async function readOmegaDirection(supabase: SupabaseClient): Promise<string | nu
   }
 }
 
+async function writePriorD1ContextToBridgeConfig(
+  supabase: SupabaseClient,
+  todayUtc: string,
+): Promise<void> {
+  try {
+    const priorD1 = await fetchPriorD1Context(supabase, todayUtc);
+
+    if (priorD1 === null) {
+      logInfo('[AsianDirection] No prior D1 context available', { todayUtc });
+      return;
+    }
+
+    const momentumSignal = computeD1MomentumSignal(priorD1);
+
+    await Promise.all([
+      writeBridgeConfigKey(supabase, 'd1_prior_direction', priorD1.direction),
+      writeBridgeConfigKey(supabase, 'd1_prior_net_pips', String(priorD1.netPips)),
+      writeBridgeConfigKey(supabase, 'd1_prior_body_pct', String(priorD1.bodyPct)),
+      writeBridgeConfigKey(
+        supabase,
+        'd1_prior_close_pos_pct',
+        String(priorD1.closePositionPct),
+      ),
+      writeBridgeConfigKey(supabase, 'd1_momentum_signal', momentumSignal),
+    ]);
+
+    logInfo('[AsianDirection] D1 context written', {
+      priorDate: priorD1.tradeDate,
+      direction: priorD1.direction,
+      netPips: priorD1.netPips,
+      bodyPct: priorD1.bodyPct,
+      momentumSignal,
+    });
+  } catch (d1Err: unknown) {
+    console.error('[AsianDirection] D1 context write failed:', String(d1Err));
+  }
+}
+
 export async function runAsianDirectionSet(): Promise<void> {
   try {
     const supabase = getSupabaseClient();
@@ -380,6 +418,10 @@ export async function runAsianDirectionSet(): Promise<void> {
 
     const amdTag = amdLookup.amdTag;
     const isShifted = amdTag === 'AMD_SHIFTED';
+    const priorDirectionBias = PRIOR_BIAS_MAP[amdTag] ?? 'neutral';
+
+    await writePriorD1ContextToBridgeConfig(supabase, todayUtc);
+
     const shiftedOk = await writeBridgeConfigKey(
       supabase,
       'asian_prior_amd_shifted',
@@ -387,7 +429,6 @@ export async function runAsianDirectionSet(): Promise<void> {
     );
     const tagOk = await writeBridgeConfigKey(supabase, 'asian_prior_amd_tag', amdTag);
 
-    const priorDirectionBias = PRIOR_BIAS_MAP[amdTag] ?? 'neutral';
     const biasOk = await writeBridgeConfigKey(
       supabase,
       'asian_prior_direction_bias',
@@ -416,38 +457,6 @@ export async function runAsianDirectionSet(): Promise<void> {
     console.log(
       `[AsianDirection] AMD flag set for ${todayUtc}: shifted=${isShifted}, tag=${amdTag}, bias=${priorDirectionBias}`,
     );
-
-    try {
-      const priorD1 = await fetchPriorD1Context(supabase, todayUtc);
-
-      if (priorD1 !== null) {
-        const momentumSignal = computeD1MomentumSignal(priorD1);
-
-        await Promise.all([
-          writeBridgeConfigKey(supabase, 'd1_prior_direction', priorD1.direction),
-          writeBridgeConfigKey(supabase, 'd1_prior_net_pips', String(priorD1.netPips)),
-          writeBridgeConfigKey(supabase, 'd1_prior_body_pct', String(priorD1.bodyPct)),
-          writeBridgeConfigKey(
-            supabase,
-            'd1_prior_close_pos_pct',
-            String(priorD1.closePositionPct),
-          ),
-          writeBridgeConfigKey(supabase, 'd1_momentum_signal', momentumSignal),
-        ]);
-
-        logInfo('[AsianDirection] D1 context written', {
-          priorDate: priorD1.tradeDate,
-          direction: priorD1.direction,
-          netPips: priorD1.netPips,
-          bodyPct: priorD1.bodyPct,
-          momentumSignal,
-        });
-      } else {
-        logInfo('[AsianDirection] No prior D1 context available', { todayUtc });
-      }
-    } catch (d1Err: unknown) {
-      console.error('[AsianDirection] D1 context write failed:', String(d1Err));
-    }
   } catch (runErr: unknown) {
     console.error('[AsianDirection] runAsianDirectionSet failed:', String(runErr));
   }

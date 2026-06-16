@@ -28,6 +28,7 @@ import {
 } from './services/AsianSessionDetectionService.js';
 import { fetchTodayAsianCandles } from './services/asianM5/asianM5CandleFetch.js';
 import { fetchTodayDistributionCandles } from './services/distributionM5/distributionM5CandleFetch.js';
+import { fetchTodayD1Candles } from './services/d1/fetchTodayD1Candle.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
 import {
@@ -139,6 +140,15 @@ async function main(): Promise<void> {
         '[AmdOutcome] Scheduled run error:',
         outcomeErr,
       );
+    }
+  }, { timezone: 'UTC' });
+
+  // 21:05 UTC Mon-Fri — OANDA D1 completes at 21:00 UTC; fetch before 21:10 direction-set cron
+  cron.schedule('5 21 * * 1-5', async () => {
+    try {
+      await fetchTodayD1Candles();
+    } catch (d1FetchErr) {
+      console.error('[D1DailyFetch] Daily fetch error:', d1FetchErr);
     }
   }, { timezone: 'UTC' });
 
