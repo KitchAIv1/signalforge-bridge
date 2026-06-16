@@ -169,7 +169,7 @@ export function AmdHistoryTable({
               <SortableHeader label="Date" column="trade_date" sortState={sortState} onSort={handleSort} />
               <th className="px-3 py-2 text-left">Tag</th>
               <th className="px-3 py-2 text-left">Alignment</th>
-              <th className="px-3 py-2 text-left">Auto Dir</th>
+              <th className="px-3 py-2 text-left">Auto Dir (raw)</th>
               <th className="px-3 py-2 text-left">Judas</th>
               <th className="px-3 py-2 text-left">⚡ Timing</th>
               <SortableHeader label="Pips" column="judas_pips" sortState={sortState} onSort={handleSort} />

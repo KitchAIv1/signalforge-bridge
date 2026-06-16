@@ -43,14 +43,20 @@ import type { ScalperDirection } from './scalperTypes.js';
 
 type AmdStateRow = {
   auto_direction: string | null;
+  decision_auto_direction: string | null;
   asian_close_bias_signal: string | null;
   amd_tag: string | null;
 };
 
+function resolveAmdDirection(row: AmdStateRow): string | null {
+  return row.decision_auto_direction ?? row.auto_direction;
+}
+
 function isAgree(row: AmdStateRow): row is AmdStateRow & { auto_direction: ScalperDirection } {
-  if (row.auto_direction !== 'long' && row.auto_direction !== 'short') return false;
-  if (row.asian_close_bias_signal === 'BULLISH' && row.auto_direction === 'long') return true;
-  if (row.asian_close_bias_signal === 'BEARISH' && row.auto_direction === 'short') return true;
+  const direction = resolveAmdDirection(row);
+  if (direction !== 'long' && direction !== 'short') return false;
+  if (row.asian_close_bias_signal === 'BULLISH' && direction === 'long') return true;
+  if (row.asian_close_bias_signal === 'BEARISH' && direction === 'short') return true;
   // NEUTRAL: no strong Asian close signal — auto_direction alone is sufficient
   // Backtest validated: 44 days, +2.95 net/trade, +299 gross pips/year
   if (row.asian_close_bias_signal === 'NEUTRAL') return true;
@@ -60,7 +66,7 @@ function isAgree(row: AmdStateRow): row is AmdStateRow & { auto_direction: Scalp
 async function fetchAmdStateForToday(tradeDate: string): Promise<AmdStateRow | null> {
   const { data, error } = await getSupabaseClient()
     .from('amd_state')
-    .select('auto_direction, asian_close_bias_signal, amd_tag')
+    .select('auto_direction, decision_auto_direction, asian_close_bias_signal, amd_tag')
     .eq('pair', 'AUD_USD')
     .eq('trade_date', tradeDate)
     .maybeSingle();
@@ -86,7 +92,7 @@ export async function initializeDayState(): Promise<void> {
 
   const amdRow = await fetchAmdStateForToday(tradeDate);
 
-  if (!amdRow || !amdRow.auto_direction) {
+  if (!amdRow || !resolveAmdDirection(amdRow)) {
     const now = new Date();
     const isLastRetry = now.getUTCHours() === 10 && now.getUTCMinutes() >= 16;
     if (isLastRetry) {
@@ -106,14 +112,14 @@ export async function initializeDayState(): Promise<void> {
   // IRON LAW 7: only live-detectable fields used here (no amd_outcome_tag)
   if (!isAgree(amdRow)) {
     scalperLog('Day gate BLOCKED — not AGREE. No trades today.', {
-      auto_direction: amdRow.auto_direction,
+      auto_direction: resolveAmdDirection(amdRow),
       asian_close_bias_signal: amdRow.asian_close_bias_signal,
       tradeDate,
     });
     await upsertDayState({
       trade_date: tradeDate,
       pair: config.pair,
-      direction: amdRow.auto_direction,
+      direction: resolveAmdDirection(amdRow),
       amd_tag: amdRow.amd_tag ?? null,
       day_stopped: true,
       stop_reason: 'no_agree',
@@ -129,7 +135,7 @@ export async function initializeDayState(): Promise<void> {
   }
 
   const referencePrice = candle.close;
-  const direction = amdRow.auto_direction;
+  const direction = resolveAmdDirection(amdRow)!;
   const triggerLevel = direction === 'long'
     ? referencePrice - pipsToPrice(config.pullbackPips)
     : referencePrice + pipsToPrice(config.pullbackPips);

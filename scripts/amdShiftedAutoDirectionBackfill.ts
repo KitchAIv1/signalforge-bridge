@@ -20,6 +20,17 @@ import type {
 const AUD_AMD_PAIR = 'AUD_USD';
 const ROW_DELAY_MS = 200;
 
+const TODAY_UTC = new Date().toISOString().slice(0, 10);
+
+function assertNotToday(tradeDate: string, allowToday: boolean): void {
+  if (allowToday || tradeDate !== TODAY_UTC) return;
+  throw new Error(
+    `Refusing to run against today's live row (${tradeDate}). ` +
+      `This script can desync auto_direction from decision_auto_direction on a live trading day. ` +
+      `Re-run after market close or pass --allow-today to override (use with extreme caution).`,
+  );
+}
+
 type ShiftedBackfillRow = {
   id: string;
   trade_date: string;
@@ -78,7 +89,10 @@ async function loadShiftedNeutralRows(
 async function updateRowDirection(
   supabaseDb: SupabaseClient,
   row: ShiftedBackfillRow,
+  allowToday: boolean,
 ): Promise<void> {
+  assertNotToday(row.trade_date, allowToday);
+
   const autoDir = computeAutoDirectionSnapshot(
     castAmdTag(row.amd_tag),
     row.judas_direction,
@@ -136,13 +150,14 @@ async function logVerification(supabaseDb: SupabaseClient): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const allowToday = process.argv.includes('--allow-today');
   const supabaseDb = buildSupabaseClient();
   const rows = await loadShiftedNeutralRows(supabaseDb);
 
   const directionCounts = { long: 0, short: 0, neutral: 0 };
 
   for (let index = 0; index < rows.length; index++) {
-    await updateRowDirection(supabaseDb, rows[index]!);
+    await updateRowDirection(supabaseDb, rows[index]!, allowToday);
     const { data: updated } = await supabaseDb
       .from('amd_state')
       .select('auto_direction')

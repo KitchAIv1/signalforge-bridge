@@ -30,6 +30,7 @@ import { AmdIntelSectionHeading } from '@/components/AmdIntelSectionHeading';
 import { AmdIntelPrimaryTag } from '@/components/AmdIntelPrimaryTag';
 import { AmdIntelStatTile } from '@/components/AmdIntelStatTile';
 import { AmdIntelCompressionRow } from '@/components/AmdIntelCompressionRow';
+import { resolveEffectiveAutoDirection } from '@/lib/effectiveAutoDirection';
 
 interface AmdPanelMetricsProps {
   amdState: AmdState | null;
@@ -51,6 +52,12 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
   const asianMetric = amdState != null ? describeAsianRangePips(amdState) : '—';
   const judasMetric = amdState != null ? formatJudasSwingSummary(amdState) : '—';
   const reversalMetric = amdState != null ? describeReversalStatus(amdState) : '—';
+  const effectiveDirection = resolveEffectiveAutoDirection(amdState);
+  const rawDirection = amdState?.auto_direction ?? null;
+  const directionMismatch =
+    rawDirection != null &&
+    amdState?.decision_auto_direction != null &&
+    rawDirection !== amdState.decision_auto_direction;
 
   return (
     <>
@@ -86,19 +93,24 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
         />
       </div>
 
-      {amdState?.auto_direction != null && (
+      {amdState != null && effectiveDirection != null && (
           <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
               <span className="font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Auto Direction
+                Trade Direction
               </span>
-              <span className={`font-bold text-sm ${autoDirectionColor(amdState.auto_direction)}`}>
-                {autoDirectionLabel(amdState.auto_direction)}
+              <span className={`font-bold text-sm ${autoDirectionColor(effectiveDirection)}`}>
+                {autoDirectionLabel(effectiveDirection)}
               </span>
               <span className="text-slate-600 dark:text-slate-300">
                 {autoDirectionConfidenceLabel(amdState.auto_direction_confidence)}
               </span>
             </div>
+            {directionMismatch && (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                Raw (pre-freeze): {autoDirectionLabel(rawDirection)}
+              </p>
+            )}
             {amdState.asian_close_bias_signal !== undefined && (
               <div className="mt-1 flex items-center gap-2">
                 <span className="w-32 shrink-0 text-xs uppercase tracking-wide text-slate-500">
@@ -115,7 +127,7 @@ export function AmdPanelMetrics({ amdState, displayTag }: AmdPanelMetricsProps) 
                 {(() => {
                   const status = asianCloseFilterStatus(
                     amdState.asian_close_bias_signal,
-                    amdState.auto_direction,
+                    effectiveDirection,
                   );
                   return status ? (
                     <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${status.color}`}>

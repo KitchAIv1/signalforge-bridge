@@ -157,9 +157,14 @@ export function AmdHistoryIntelligenceDetail({ selectedRow }: AmdHistoryIntellig
           <DetailRow label="Net Pips">{formatNetPips(selectedRow.m5_first_3_net_pips)}</DetailRow>
 
           <SubsectionHeading>Auto Direction</SubsectionHeading>
-          <DetailRow label="Direction">
+          <DetailRow label="Auto Direction (raw)">
             <span className={autoDirectionColor(selectedRow.auto_direction)}>
               {autoDirectionLabel(selectedRow.auto_direction)}
+            </span>
+          </DetailRow>
+          <DetailRow label="Decision Direction (traded)">
+            <span className={autoDirectionColor(selectedRow.decision_auto_direction)}>
+              {autoDirectionLabel(selectedRow.decision_auto_direction)}
             </span>
           </DetailRow>
           <DetailRow label="Confidence">

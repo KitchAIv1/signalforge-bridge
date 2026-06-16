@@ -102,7 +102,7 @@ async function loadTodayAmdState(todayStr: string): Promise<AmdStateRow | null> 
   const { data, error } = await supabaseDb()
     .from('amd_state')
     .select(
-      'amd_tag, amd_tag_manual_override, auto_direction, daily_bias_alignment, ' +
+      'amd_tag, amd_tag_manual_override, auto_direction, decision_auto_direction, daily_bias_alignment, ' +
         'layer4_d1_bias, evaluated_at, judas_direction, auto_direction_reason, ' +
         'amd_size_multiplier, reversal_confirmed, ' +
         'asian_close_bias_signal, asian_close_position_pct',
@@ -412,7 +412,7 @@ async function passesExecutionGates(
   hourUtc: number,
   minUtc: number,
 ): Promise<{ ok: true; direction: TradeDirection; weight: number } | { ok: false }> {
-  const autoDirection = amdRow.auto_direction as string | null;
+  const autoDirection = (amdRow.decision_auto_direction ?? amdRow.auto_direction) as string | null;
   if (autoDirection !== 'long' && autoDirection !== 'short') {
     logInfo('[AmdDistribution] auto_direction neutral — no trade today', { autoDirection });
     return { ok: false };

@@ -162,9 +162,14 @@ export function AmdHistoryDetailPanel({
         <SectionHeading>Direction Intelligence</SectionHeading>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <StatTile
-            label="Auto Direction"
+            label="Auto Direction (raw, pre-decision-freeze)"
             value={selectedRow.auto_direction?.toUpperCase() ?? '—'}
             valueColor={directionColor(selectedRow.auto_direction)}
+          />
+          <StatTile
+            label="Decision Direction (what was traded)"
+            value={selectedRow.decision_auto_direction?.toUpperCase() ?? '—'}
+            valueColor={directionColor(selectedRow.decision_auto_direction)}
           />
           <StatTile
             label="Confidence"
