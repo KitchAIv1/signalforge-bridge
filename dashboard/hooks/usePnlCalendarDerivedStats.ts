@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { groupMultiLegTrades } from '@/lib/multiLegAggregation';
 import type { DaySummary, PnlTradeRow } from '@/lib/pnlCalendarTypes';
 
 export function usePnlCalendarDerivedStats(
@@ -14,8 +15,9 @@ export function usePnlCalendarDerivedStats(
       totalR += day.netR;
       totalDollars += day.netDollars;
     }
-    const totalTrades = trades.length;
-    const totalWins = trades.filter((t) => t.result?.toLowerCase() === 'win').length;
+    const effectiveTrades = groupMultiLegTrades(trades);
+    const totalTrades = effectiveTrades.length;
+    const totalWins = effectiveTrades.filter((trade) => trade.result === 'win').length;
     const globalWinRate = totalTrades > 0 ? Math.round((totalWins / totalTrades) * 100) : 0;
     let bestDay: DaySummary | null = null;
     let worstDay: DaySummary | null = null;

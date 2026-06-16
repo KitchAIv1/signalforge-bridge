@@ -4,6 +4,7 @@ import type { BridgeTradeLogRow } from '@/lib/types';
 import { amdTagLabel, amdTagColor } from '@/lib/amdPanelFormatters';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
+import { OmegaLegTypeBadge } from '@/components/shared/OmegaLegTypeBadge';
 
 interface ActivityTradeMobileCardProps {
   row: BridgeTradeLogRow;
@@ -44,6 +45,7 @@ export function ActivityTradeMobileCard({ row }: ActivityTradeMobileCardProps) {
           <div className="text-xs font-medium text-slate-600 dark:text-slate-400">{formatActivityIsoTimestamp(row.created_at)}</div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-900 dark:text-slate-100">
             <span className="font-semibold">{row.engine_id}</span>
+            <OmegaLegTypeBadge legType={row.leg_type} />
             <span className="text-slate-700 dark:text-slate-400">{row.pair}</span>
           </div>
         </div>

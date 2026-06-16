@@ -1,4 +1,8 @@
 import { toDateKeyFromInput } from '@/lib/pnlCalendarFormat';
+import {
+  applyEffectiveOutcomeCounts,
+  groupMultiLegTrades,
+} from '@/lib/multiLegAggregation';
 import type { DaySummary, EquityPoint, PnlTradeRow } from '@/lib/pnlCalendarTypes';
 
 function createEmptyDaySummary(isoDateKey: string): DaySummary {
@@ -25,9 +29,8 @@ function createEmptyDaySummary(isoDateKey: string): DaySummary {
   };
 }
 
-function foldTradeIntoDay(day: DaySummary, trade: PnlTradeRow): void {
+function foldTradeFinancials(day: DaySummary, trade: PnlTradeRow): void {
   day.trades.push(trade);
-  day.tradeCount += 1;
   const rComponent = trade.pnl_r ?? 0;
   day.netR += rComponent;
   if (trade.pnl_dollars === null || trade.pnl_dollars === undefined) {
@@ -35,23 +38,25 @@ function foldTradeIntoDay(day: DaySummary, trade: PnlTradeRow): void {
   } else {
     day.netDollars += trade.pnl_dollars;
   }
-  const verdict = trade.result?.toLowerCase();
-  if (verdict === 'win') day.wins += 1;
-  else if (verdict === 'loss') day.losses += 1;
-  else day.breakevens += 1;
   if (trade.engine_id === 'omega') day.omegaNetR += rComponent;
   if (trade.engine_id === 'engine_rebuild') day.rebuildNetR += rComponent;
   if (trade.engine_id === 'scalper') day.scalperNetR += rComponent;
   if (trade.engine_id === 'engine_amd') day.amdNetR += rComponent;
   if (trade.engine_id === 'omega_inverse') day.omegaInverseNetR += rComponent;
   const side = trade.direction?.toLowerCase();
-  if (side === 'long') {
-    day.longNetR += rComponent;
-    day.longCount += 1;
-  }
-  if (side === 'short') {
-    day.shortNetR += rComponent;
-    day.shortCount += 1;
+  if (side === 'long') day.longNetR += rComponent;
+  if (side === 'short') day.shortNetR += rComponent;
+}
+
+function applySignalLevelCounts(day: DaySummary): void {
+  const effectiveTrades = groupMultiLegTrades(day.trades);
+  day.tradeCount = effectiveTrades.length;
+
+  for (const effectiveTrade of effectiveTrades) {
+    applyEffectiveOutcomeCounts(day, effectiveTrade.result);
+    const side = effectiveTrade.direction?.toLowerCase();
+    if (side === 'long') day.longCount += 1;
+    if (side === 'short') day.shortCount += 1;
   }
 }
 
@@ -74,9 +79,15 @@ export function buildDaySummaries(trades: PnlTradeRow[]): Map<string, DaySummary
     if (!byDay.has(key)) {
       byDay.set(key, createEmptyDaySummary(key));
     }
-    foldTradeIntoDay(byDay.get(key)!, trade);
+    foldTradeFinancials(byDay.get(key)!, trade);
   }
   for (const day of byDay.values()) {
+    day.wins = 0;
+    day.losses = 0;
+    day.breakevens = 0;
+    day.longCount = 0;
+    day.shortCount = 0;
+    applySignalLevelCounts(day);
     roundDayRollups(day);
   }
   return byDay;

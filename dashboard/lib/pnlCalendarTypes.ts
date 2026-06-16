@@ -10,6 +10,8 @@ export type PnlTradeRow = {
   bar1_strength: string | null;
   oanda_trade_id: string | null;
   pair: string | null;
+  leg_type: string | null;
+  signal_id: string | null;
 };
 
 export type DaySummary = {

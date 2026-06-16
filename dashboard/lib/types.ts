@@ -84,6 +84,7 @@ export interface BridgeTradeLogRow {
   amd_size_multiplier?: number | null;
   reversal_confirmed?: boolean | null;
   auto_direction_reason?: string | null;
+  leg_type?: string | null;
 }
 
 export interface OmegaShadowSignalRow {

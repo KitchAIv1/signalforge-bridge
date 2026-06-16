@@ -8,7 +8,7 @@ import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 const REFRESH_MS = 5 * 60 * 1000;
 
 const TRADE_LOG_SELECT =
-  'id, created_at, engine_id, direction, result, pnl_r, pnl_dollars, close_reason, bar1_strength, oanda_trade_id, pair';
+  'id, created_at, engine_id, direction, result, pnl_r, pnl_dollars, close_reason, bar1_strength, oanda_trade_id, pair, leg_type, signal_id';
 
 export function usePnlCalendarTrades() {
   const [trades, setTrades] = useState<PnlTradeRow[]>([]);
