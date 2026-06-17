@@ -15,6 +15,11 @@ const BASE_URL =
 const DEFAULT_TIMEOUT_MS = 10000;
 const OPEN_TRADES_TIMEOUT_MS = 15000;
 
+function logOandaFetchTiming(path: string, startedAt: number, outcome: string): void {
+  const elapsedMs = Math.round(performance.now() - startedAt);
+  console.log(`[OANDA] fetch path=${path} elapsed=${elapsedMs}ms outcome=${outcome}`);
+}
+
 async function oandaFetch(
   path: string,
   options: RequestInit = {},
@@ -24,6 +29,7 @@ async function oandaFetch(
     throw new Error('Missing OANDA_API_TOKEN or OANDA_ACCOUNT_ID');
   }
   const url = `${BASE_URL}${path}`;
+  const startedAt = performance.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -36,7 +42,13 @@ async function oandaFetch(
       },
       signal: controller.signal,
     });
+    logOandaFetchTiming(path, startedAt, res.ok ? 'ok' : `http_${res.status}`);
     return res;
+  } catch (err) {
+    const outcome =
+      err instanceof Error && err.name === 'AbortError' ? 'abort' : 'error';
+    logOandaFetchTiming(path, startedAt, outcome);
+    throw err;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -78,19 +90,36 @@ export interface OpenTrade {
 }
 
 export async function getOpenTrades(): Promise<OpenTrade[]> {
-  const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/openTrades`, {}, OPEN_TRADES_TIMEOUT_MS);
-  if (!res.ok) throw new Error(`OANDA openTrades failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
-  const json = (await res.json()) as { trades?: Array<{ id: string; instrument: string; currentUnits: string; openTime: string; stopLossOrderID?: string; takeProfitOrderID?: string; unrealizedPL?: string }> };
-  const trades = json.trades ?? [];
-  return trades.map((t) => ({
-    id: t.id,
-    instrument: t.instrument,
-    units: t.currentUnits,
-    openTime: t.openTime,
-    stopLossOrderID: t.stopLossOrderID,
-    takeProfitOrderID: t.takeProfitOrderID,
-    unrealizedPL: t.unrealizedPL,
-  }));
+  const startedAt = performance.now();
+  const openTradesPath = `/v3/accounts/${OANDA_ACCOUNT_ID}/openTrades`;
+  try {
+    const res = await oandaFetch(openTradesPath, {}, OPEN_TRADES_TIMEOUT_MS);
+    if (!res.ok) {
+      throw new Error(`OANDA openTrades failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+    }
+    const json = (await res.json()) as { trades?: Array<{ id: string; instrument: string; currentUnits: string; openTime: string; stopLossOrderID?: string; takeProfitOrderID?: string; unrealizedPL?: string }> };
+    const trades = json.trades ?? [];
+    const mapped = trades.map((t) => ({
+      id: t.id,
+      instrument: t.instrument,
+      units: t.currentUnits,
+      openTime: t.openTime,
+      stopLossOrderID: t.stopLossOrderID,
+      takeProfitOrderID: t.takeProfitOrderID,
+      unrealizedPL: t.unrealizedPL,
+    }));
+    console.log(
+      `[OANDA] getOpenTrades elapsed=${Math.round(performance.now() - startedAt)}ms outcome=ok trades=${mapped.length}`
+    );
+    return mapped;
+  } catch (err) {
+    const outcome =
+      err instanceof Error && err.name === 'AbortError' ? 'abort' : 'error';
+    console.log(
+      `[OANDA] getOpenTrades elapsed=${Math.round(performance.now() - startedAt)}ms outcome=${outcome}`
+    );
+    throw err;
+  }
 }
 
 export interface PriceQuote {
