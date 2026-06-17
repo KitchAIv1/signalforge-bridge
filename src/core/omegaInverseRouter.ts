@@ -288,6 +288,7 @@ async function executeInverseShort(
   const engine = deps.engines.find((row) => row.engine_id === 'omega_inverse');
   if (!engine?.is_active) {
     console.log('[OmegaInverse] BLOCKED — omega_inverse engine inactive or missing');
+    await writeInverseBlockLog(deps, payload, norm.oandaInstrument, 'ENGINE_INACTIVE', openCount);
     return;
   }
   const { inverseNorm, shortStopLoss, shortTakeProfit } = buildInverseShortNorm(norm);
@@ -338,6 +339,7 @@ async function runInverseRiskGateChain(
   if (!gateResult.blocked) return true;
   if (gateResult.reason === 'DEDUP') {
     console.log('[OmegaInverse] Dedup: skipping');
+    await writeInverseBlockLog(deps, payload, norm.oandaInstrument, 'DEDUP', openTrades.length);
     return false;
   }
   if (gateResult.reason === 'OMEGA_WINDOW_EXPIRED') {
