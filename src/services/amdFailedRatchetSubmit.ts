@@ -1,8 +1,9 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { placeMarketOrder } from '../connectors/oanda.js';
+import { getOpenTrades, placeMarketOrder } from '../connectors/oanda.js';
 import { logInfo, logError, logWarn } from '../utils/logger.js';
 import { sendMultiLegExecutedAlert } from './telegram/alertMultiLegExecuted.js';
+import { sendRatchetUnprotectedLegAlert } from './telegram/alertRatchetUnprotectedLeg.js';
 import {
   computeAmdFailedRatchetLegs,
   type AmdRatchetLeg,
@@ -36,13 +37,48 @@ type ExecutedLeg = {
 type FillParseResult = {
   tradeId: string | null;
   fillPrice: number | null;
+  takeProfitOrderId: string | null;
 };
 
-function parseFillFromOrder(orderResult: Awaited<ReturnType<typeof placeMarketOrder>>): FillParseResult {
+type OandaPlaceOrderResponse = Awaited<ReturnType<typeof placeMarketOrder>> & {
+  takeProfitOrderTransaction?: { id?: string };
+};
+
+function parseFillFromOrder(orderResult: OandaPlaceOrderResponse): FillParseResult {
   const fillTx = orderResult.orderFillTransaction;
   const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id ?? null;
   const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
-  return { tradeId, fillPrice };
+  const takeProfitOrderId = orderResult.takeProfitOrderTransaction?.id ?? null;
+  return { tradeId, fillPrice, takeProfitOrderId };
+}
+
+async function confirmTakeProfitOnOpenTrade(tradeId: string): Promise<string | null> {
+  try {
+    const openTrades = await getOpenTrades();
+    return openTrades.find((trade) => trade.id === tradeId)?.takeProfitOrderID ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function alertUnprotectedRatchetLeg(
+  leg: AmdRatchetLeg,
+  direction: TradeDirection,
+  tradeId: string,
+): void {
+  logError('[AmdDistribution] Ratchet leg filled but TP order not confirmed — unprotected position', {
+    legType: leg.legType,
+    tradeId,
+    requestedTakeProfit: leg.takeProfitPrice,
+  });
+  void sendRatchetUnprotectedLegAlert({
+    instrument: INSTRUMENT,
+    direction: direction.toUpperCase(),
+    legType: leg.legType,
+    tradeId,
+    requestedTakeProfit: leg.takeProfitPrice!,
+    units: leg.units,
+  }).catch(() => {});
 }
 
 async function persistRatchetTradeLog(
@@ -53,6 +89,7 @@ async function persistRatchetTradeLog(
   plan: AmdOrderPlan,
   fillPrice: number,
   tradeId: string,
+  executionNotes: string | null,
 ): Promise<void> {
   await supabaseDb.from('bridge_trade_log').insert({
     signal_id: randomUUID(),
@@ -83,6 +120,7 @@ async function persistRatchetTradeLog(
     amd_exit_strategy: 'S0',
     amd_pip_trail: leg.legType === 'trail' ? AMD_FAILED_TRAIL_PIPS : null,
     amd_hard_sl_pips: HARD_SL_PIPS,
+    ...(executionNotes && { notes: executionNotes }),
   });
 }
 
@@ -133,6 +171,52 @@ async function placeRatchetLegOrder(
   }
 }
 
+async function resolveTakeProfitConfirmation(
+  leg: AmdRatchetLeg,
+  tradeId: string,
+  fillTpId: string | null,
+): Promise<{ takeProfitOrderId: string | null; tpUnconfirmed: boolean }> {
+  let takeProfitOrderId = fillTpId;
+  if (leg.takeProfitPrice && !takeProfitOrderId) {
+    takeProfitOrderId = await confirmTakeProfitOnOpenTrade(tradeId);
+  }
+  return {
+    takeProfitOrderId,
+    tpUnconfirmed: Boolean(leg.takeProfitPrice && !takeProfitOrderId),
+  };
+}
+
+async function recordExecutedRatchetLeg(
+  supabaseDb: SupabaseClient,
+  leg: AmdRatchetLeg,
+  direction: TradeDirection,
+  amdRow: AmdStateRow,
+  plan: AmdOrderPlan,
+  fillPrice: number,
+  tradeId: string,
+  todayStr: string,
+  tpUnconfirmed: boolean,
+): Promise<ExecutedLeg> {
+  await persistRatchetTradeLog(
+    supabaseDb,
+    leg,
+    direction,
+    amdRow,
+    plan,
+    fillPrice,
+    tradeId,
+    tpUnconfirmed ? 'TP_UNCONFIRMED' : null,
+  );
+  await persistRatchetTrailState(supabaseDb, leg, direction, fillPrice, plan, tradeId, todayStr);
+  return {
+    legType: leg.legType,
+    units: leg.units,
+    fillPrice,
+    takeProfitPrice: leg.takeProfitPrice,
+    oandaTradeId: tradeId,
+  };
+}
+
 async function processRatchetLeg(
   supabaseDb: SupabaseClient,
   leg: AmdRatchetLeg,
@@ -150,21 +234,27 @@ async function processRatchetLeg(
   }
   const orderResult = await placeRatchetLegOrder(leg, plan);
   if (!orderResult) return null;
-  const { tradeId, fillPrice: oandaFill } = parseFillFromOrder(orderResult);
+  const { tradeId, fillPrice: oandaFill, takeProfitOrderId: fillTpId } = parseFillFromOrder(orderResult);
   if (!tradeId) {
     logError('[AmdDistribution] Ratchet leg — no tradeId, skipping leg', { legType: leg.legType });
     return null;
   }
+  const { tpUnconfirmed } = await resolveTakeProfitConfirmation(leg, tradeId, fillTpId);
+  if (tpUnconfirmed) {
+    alertUnprotectedRatchetLeg(leg, direction, tradeId);
+  }
   const fillPrice = oandaFill ?? plan.entryPrice;
-  await persistRatchetTradeLog(supabaseDb, leg, direction, amdRow, plan, fillPrice, tradeId);
-  await persistRatchetTrailState(supabaseDb, leg, direction, fillPrice, plan, tradeId, todayStr);
-  return {
-    legType: leg.legType,
-    units: leg.units,
+  return recordExecutedRatchetLeg(
+    supabaseDb,
+    leg,
+    direction,
+    amdRow,
+    plan,
     fillPrice,
-    takeProfitPrice: leg.takeProfitPrice,
-    oandaTradeId: tradeId,
-  };
+    tradeId,
+    todayStr,
+    tpUnconfirmed,
+  );
 }
 
 export async function submitAmdFailedRatchetOrder(
