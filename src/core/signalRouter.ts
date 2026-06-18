@@ -23,6 +23,14 @@ import { sendCircuitBreakerAlert } from '../services/telegram/alertCircuitBreake
 import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
 import { sendMultiLegExecutedAlert } from '../services/telegram/alertMultiLegExecuted.js';
 import { computeRatchetLegs } from './omegaRatchetSplit.js';
+import {
+  parseOmegaRawModeFlag,
+  shouldBypassDirectionFlip,
+  shouldBypassExecutionThreshold,
+  shouldBypassInverseSplit,
+  shouldBypassIsActive,
+  shouldBypassWindowGate,
+} from './omegaRawModeGates.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
@@ -390,13 +398,15 @@ export async function processSignal(
   }
 
   // Live engine control — reads paused_engines, omega_direction,
-  // rebuild_bounds_retry, rebuild_hour_gate_enabled, direction_mode fresh per signal.
+  // rebuild_bounds_retry, rebuild_hour_gate_enabled, direction_mode,
+  // omega_raw_mode fresh per signal.
   const [
     pausedRow,
     dirRow,
     boundsRetryRow,
     hourGateRow,
     directionModeRow,
+    omegaRawModeRow,
   ] = await Promise.all([
     supabase
       .from('bridge_config')
@@ -423,6 +433,11 @@ export async function processSignal(
       .select('config_value')
       .eq('config_key', 'direction_mode')
       .maybeSingle(),
+    supabase
+      .from('bridge_config')
+      .select('config_value')
+      .eq('config_key', 'omega_raw_mode')
+      .maybeSingle(),
   ]);
   const pausedEngines: string[] =
     Array.isArray(pausedRow.data?.config_value)
@@ -442,9 +457,11 @@ export async function processSignal(
     typeof directionModeRow.data?.config_value === 'string'
       ? directionModeRow.data.config_value
       : 'manual';
+  const omegaRawMode = parseOmegaRawModeFlag(omegaRawModeRow.data?.config_value);
 
   // ── Omega Inverse direction split ─────────────────────────────
-  if (norm.engineId === 'omega') {
+  // Skipped in raw mode: signal direction goes straight to Prime.
+  if (norm.engineId === 'omega' && !shouldBypassInverseSplit(norm.engineId, omegaRawMode)) {
     const dtwNorm = normalizeDirection(norm.direction);
     const dirNorm = normalizeDirection(omegaDirection);
 
@@ -465,7 +482,8 @@ export async function processSignal(
   // ── End Omega Inverse direction split ─────────────────────────
 
   const engine = findEngine(engines, norm.engineId);
-  if (!engine || !engine.is_active) {
+  // In raw mode, omega bypasses is_active gate (engine row is currently inactive).
+  if (!engine || (!engine.is_active && !shouldBypassIsActive(norm.engineId, omegaRawMode))) {
     await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', engine ? 'Engine inactive' : 'Unregistered engine', decisionLatencyMs, null, 0, norm.oandaInstrument));
     return;
   }
@@ -555,7 +573,10 @@ export async function processSignal(
     config,
     cachedAccount,
     signalConfluenceScore: norm.confluenceScore,
-    engineThreshold: engine.execution_threshold,
+    // Raw mode bypasses execution_threshold (currently 99 for omega).
+    engineThreshold: shouldBypassExecutionThreshold(norm.engineId, omegaRawMode)
+      ? 0
+      : engine.execution_threshold,
     hasStopLoss: true,
     riskRewardRatio: null,
     engineId: norm.engineId,
@@ -616,7 +637,8 @@ export async function processSignal(
     }
   }
 
-  if (norm.engineId === 'omega') {
+  // Direction flip + auto-close skipped in raw mode: no direction config is managed.
+  if (norm.engineId === 'omega' && !shouldBypassDirectionFlip(norm.engineId, omegaRawMode)) {
     const currentOverride = omegaDirection.toLowerCase();
     if (
       cachedOmegaDirection !== null &&
@@ -724,7 +746,8 @@ export async function processSignal(
   //   Asian session:    21:00–08:00 UTC (written by AsianDirectionService)
   //   AMD distribution: tag entry hour–14:00 UTC (written by AmdDetectorService)
   // Outside these windows omega_direction_valid_until is expired → BLOCKED.
-  if (norm.engineId === 'omega') {
+  // Raw mode bypasses this gate — DTW pattern match is the only qualifier.
+  if (norm.engineId === 'omega' && !shouldBypassWindowGate(norm.engineId, omegaRawMode)) {
     const windowActive = await isOmegaWindowActive(supabase);
     if (!windowActive) {
       const blockMsg = 'OMEGA_WINDOW_EXPIRED: no active session window — direction validity expired';

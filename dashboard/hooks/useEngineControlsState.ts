@@ -6,6 +6,7 @@ import {
   fetchEngineControlRows,
   writeDirectionMode,
   writeOmegaDir,
+  writeOmegaRawMode,
   writePaused,
   writeRebuildRetry,
 } from '@/lib/engineControlConfig';
@@ -17,6 +18,7 @@ export function useEngineControlsState() {
   const [omegaDir, setOmegaDir] = useState<'long' | 'short'>('long');
   const [rebuildRetry, setRebuildRetry] = useState(false);
   const [directionMode, setDirectionMode] = useState<'auto' | 'manual'>('manual');
+  const [omegaRawMode, setOmegaRawMode] = useState(false);
   const [lastSyncedUtc, setLastSyncedUtc] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export function useEngineControlsState() {
       setOmegaDir(row.omegaDir);
       setRebuildRetry(row.rebuildRetry);
       setDirectionMode(row.directionMode);
+      setOmegaRawMode(row.omegaRawMode);
       setLastSyncedUtc(new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC');
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
@@ -108,11 +111,29 @@ export function useEngineControlsState() {
       showToast(`Update failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [rebuildRetry, showToast, sync]);
+
+  const toggleOmegaRawMode = useCallback(async () => {
+    const next = !omegaRawMode;
+    try {
+      await writeOmegaRawMode(getSupabase(), next);
+      setOmegaRawMode(next);
+      showToast(
+        next
+          ? 'Omega RAW MODE ON — direction/threshold/window bypassed'
+          : 'Omega raw mode OFF — layer stack restored',
+      );
+      void sync();
+    } catch (e) {
+      showToast(`Update failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [omegaRawMode, showToast, sync]);
+
   return {
     pausedIds,
     omegaDir,
     rebuildRetry,
     directionMode,
+    omegaRawMode,
     lastSyncedUtc,
     toast,
     loadError,
@@ -120,5 +141,6 @@ export function useEngineControlsState() {
     flipOmega,
     toggleDirectionMode,
     toggleRebuildRetry,
+    toggleOmegaRawMode,
   };
 }

@@ -144,6 +144,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
           rebuildHourGateEnabled,
           engineActiveMap,
           d1Config,
+          omegaRawMode: controls.omegaRawMode,
         }),
       );
     } catch (err: unknown) {

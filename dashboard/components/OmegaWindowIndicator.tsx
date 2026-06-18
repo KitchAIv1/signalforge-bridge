@@ -175,8 +175,36 @@ function OmegaWindowPanel({ children }: { children: ReactNode }) {
   );
 }
 
-export function OmegaWindowIndicator() {
+function OmegaWindowRaw() {
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-600 dark:bg-amber-900/20 px-4 py-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+        <span className="text-xs font-semibold tracking-wide text-amber-800 dark:text-amber-300">
+          RAW MODE ACTIVE
+        </span>
+      </div>
+      <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+        Fires on DTW match only
+      </p>
+      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+        Direction, window, and threshold gates bypassed.
+        News filter and circuit breaker always on.
+      </p>
+    </div>
+  );
+}
+
+export function OmegaWindowIndicator({ rawMode = false }: { rawMode?: boolean }) {
   const { status, loading } = useOmegaWindowStatus();
+
+  if (rawMode) {
+    return (
+      <OmegaWindowPanel>
+        <OmegaWindowRaw />
+      </OmegaWindowPanel>
+    );
+  }
 
   if (loading || !status) {
     return (

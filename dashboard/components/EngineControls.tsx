@@ -23,6 +23,7 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
     omegaDir,
     rebuildRetry,
     directionMode,
+    omegaRawMode,
     lastSyncedUtc,
     toast,
     loadError,
@@ -30,6 +31,7 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
     flipOmega,
     toggleDirectionMode,
     toggleRebuildRetry,
+    toggleOmegaRawMode,
   } = useEngineControlsState();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -63,6 +65,14 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
             <p className="px-2.5 py-1.5 text-sm text-red-600">
               {loadError ?? hourGateCtrl.loadError}
             </p>
+          ) : null}
+          {omegaRawMode ? (
+            <div className="border-b border-amber-300 bg-amber-50 px-2.5 py-2">
+              <p className="text-xs font-semibold text-amber-800">
+                OMEGA RAW MODE ACTIVE — direction, threshold &amp; window gates bypassed
+              </p>
+              <p className="text-xs text-amber-700">News filter &amp; circuit breaker always on</p>
+            </div>
           ) : null}
           <ul className="w-full">
             {LIVE_ENGINE_ROWS.map((row) => {
@@ -108,22 +118,41 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
                         <button
                           type="button"
                           onClick={() => (directionMode === 'manual' ? void flipOmega() : undefined)}
-                          disabled={directionMode === 'auto'}
+                          disabled={directionMode === 'auto' || omegaRawMode}
                           title={
-                            directionMode === 'auto'
-                              ? 'Auto mode active — direction set by AMD intelligence'
-                              : undefined
+                            omegaRawMode
+                              ? 'Raw mode active — direction gate bypassed'
+                              : directionMode === 'auto'
+                                ? 'Auto mode active — direction set by AMD intelligence'
+                                : undefined
                           }
                           className={`inline-flex h-8 min-w-[2.5rem] shrink-0 items-center justify-center border px-2 text-sm font-semibold max-md:min-h-[44px] md:min-w-[4.5rem] ${
                             omegaDir === 'long'
                               ? 'border-slate-200 bg-slate-100 text-slate-800'
                               : 'border-amber-300 bg-amber-100 text-amber-900'
-                          }${directionMode === 'auto' ? ' opacity-40 cursor-not-allowed' : ''}`}
+                          }${directionMode === 'auto' || omegaRawMode ? ' opacity-40 cursor-not-allowed' : ''}`}
                         >
                           <span className="md:hidden">{omegaDir === 'long' ? 'L' : 'S'}</span>
                           <span className="hidden md:inline">
                             {omegaDir === 'long' ? '↑ LONG' : '↓ SHORT'}
                           </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleOmegaRawMode()}
+                          title={
+                            omegaRawMode
+                              ? 'Raw mode ON — click to restore layer stack'
+                              : 'Raw mode OFF — click to bypass direction/threshold/window gates'
+                          }
+                          className={`inline-flex h-8 min-w-[2.5rem] shrink-0 items-center justify-center border px-2 text-xs font-semibold max-md:min-h-[44px] md:min-w-[4rem] ${
+                            omegaRawMode
+                              ? 'border-amber-400 bg-amber-500 text-white'
+                              : 'border-slate-200 bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          <span className="md:hidden">{omegaRawMode ? 'R' : 'r'}</span>
+                          <span className="hidden md:inline">{omegaRawMode ? 'RAW ●' : 'RAW ○'}</span>
                         </button>
                       </div>
                     ) : row.id === 'engine_rebuild' ? (

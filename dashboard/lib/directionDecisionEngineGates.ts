@@ -62,6 +62,7 @@ export function buildEngineGates(input: {
   rebuildHourGateEnabled: boolean;
   engineActiveMap: Record<string, boolean>;
   asianCloseGate: AsianCloseGate;
+  omegaRawMode?: boolean;
 }): EngineGateRow[] {
   const {
     amdState,
@@ -72,6 +73,7 @@ export function buildEngineGates(input: {
     rebuildHourGateEnabled,
     engineActiveMap,
     asianCloseGate,
+    omegaRawMode = false,
   } = input;
   const hourUtc = utcHourNow();
   const rebuildBlocked =
@@ -154,6 +156,9 @@ export function buildEngineGates(input: {
   } else if (isForexWeekendClosed()) {
     omegaState = 'blocked';
     omegaDetail = 'Weekend — market closed';
+  } else if (omegaRawMode) {
+    omegaState = 'active';
+    omegaDetail = 'RAW MODE · DTW match only · no window or direction gate';
   } else {
     const validUntilMs = omegaWindow?.validUntil ? Date.parse(omegaWindow.validUntil) : null;
     const windowExpired =
@@ -252,6 +257,7 @@ export function buildDirectionDecisionSnapshot(input: {
   rebuildHourGateEnabled: boolean;
   engineActiveMap: Record<string, boolean>;
   d1Config: D1ContextConfig;
+  omegaRawMode?: boolean;
 }): DirectionDecisionSnapshot {
   const distributionChecklist = buildDistributionChecklist(input.amdState, input.regimeState);
   const asianChecklist = buildAsianChecklist(
@@ -282,6 +288,7 @@ export function buildDirectionDecisionSnapshot(input: {
       rebuildHourGateEnabled: input.rebuildHourGateEnabled,
       engineActiveMap: input.engineActiveMap,
       asianCloseGate,
+      omegaRawMode: input.omegaRawMode,
     }),
     scalperSummary: summarizeScalperTrades(input.scalperTrades),
   };

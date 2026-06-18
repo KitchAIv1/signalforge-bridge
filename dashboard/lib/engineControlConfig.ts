@@ -6,6 +6,7 @@ export const KEY_OMEGA_DIR = 'omega_direction';
 export const KEY_REBUILD_RETRY = 'rebuild_bounds_retry';
 
 export const KEY_DIRECTION_MODE = 'direction_mode';
+export const KEY_OMEGA_RAW_MODE = 'omega_raw_mode';
 
 export function parseOmegaDir(raw: unknown): 'long' | 'short' {
   if (raw === 'short' || raw === 'SHORT') return 'short';
@@ -29,24 +30,30 @@ export function parseDirectionMode(raw: unknown): 'auto' | 'manual' {
   return 'manual';
 }
 
+export function parseOmegaRawMode(raw: unknown): boolean {
+  return raw === true;
+}
+
 type ConfigRow = { config_key: string; config_value: unknown };
 
 export async function fetchEngineControlRows(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from('bridge_config')
     .select('config_key, config_value')
-    .in('config_key', [KEY_PAUSED, KEY_OMEGA_DIR, KEY_REBUILD_RETRY, KEY_DIRECTION_MODE]);
+    .in('config_key', [KEY_PAUSED, KEY_OMEGA_DIR, KEY_REBUILD_RETRY, KEY_DIRECTION_MODE, KEY_OMEGA_RAW_MODE]);
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as ConfigRow[];
   const pa = rows.find((r) => r.config_key === KEY_PAUSED);
   const om = rows.find((r) => r.config_key === KEY_OMEGA_DIR);
   const br = rows.find((r) => r.config_key === KEY_REBUILD_RETRY);
   const dm = rows.find((r) => r.config_key === KEY_DIRECTION_MODE);
+  const rm = rows.find((r) => r.config_key === KEY_OMEGA_RAW_MODE);
   return {
     pausedIds: parsePaused(pa?.config_value),
     omegaDir: parseOmegaDir(om?.config_value),
     rebuildRetry: parseRebuildRetry(br?.config_value),
     directionMode: parseDirectionMode(dm?.config_value),
+    omegaRawMode: parseOmegaRawMode(rm?.config_value),
   };
 }
 
@@ -82,5 +89,13 @@ export async function writeDirectionMode(
     .from('bridge_config')
     .update({ config_value: mode, updated_at: new Date().toISOString() })
     .eq('config_key', KEY_DIRECTION_MODE);
+  if (error) throw new Error(error.message);
+}
+
+export async function writeOmegaRawMode(supabase: SupabaseClient, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('bridge_config')
+    .update({ config_value: enabled, updated_at: new Date().toISOString() })
+    .eq('config_key', KEY_OMEGA_RAW_MODE);
   if (error) throw new Error(error.message);
 }

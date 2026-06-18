@@ -1,9 +1,12 @@
 'use client';
 
+import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import { OmegaWindowIndicator } from '@/components/OmegaWindowIndicator';
 import { OmegaExitReferenceModal } from '@/components/omegaExitReference/OmegaExitReferenceModal';
 
 export default function OmegaPage() {
+  const { omegaRawMode } = useEngineControlsState();
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -15,7 +18,7 @@ export default function OmegaPage() {
         BRIDGE.
       </p>
       <div className="max-w-xl">
-        <OmegaWindowIndicator />
+        <OmegaWindowIndicator rawMode={omegaRawMode} />
       </div>
     </div>
   );
