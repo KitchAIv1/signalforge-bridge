@@ -1,4 +1,4 @@
-/** Fetch and upsert today's completed OANDA D1 bar into d1_candles. */
+/** Fetch and upsert the latest complete OANDA D1 bar into d1_candles. */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchCompletedCandles } from '../../connectors/oanda.js';
@@ -9,11 +9,23 @@ import {
   D1_PAIR,
 } from './d1Constants.js';
 import { computeD1ProfileMetrics } from './d1ProfileMetrics.js';
-import { buildD1Window } from './d1Window.js';
+import {
+  buildD1Window,
+  buildLatestCompleteD1FetchWindow,
+} from './d1Window.js';
 
-function parseOandaPrices(candle: {
+type OandaD1Candle = {
+  time: string;
+  complete: boolean;
   mid: { o: string; h: string; l: string; c: string };
-}): { o: number; h: number; l: number; c: number } {
+};
+
+function parseOandaPrices(candle: OandaD1Candle): {
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+} {
   return {
     o: parseFloat(candle.mid.o),
     h: parseFloat(candle.mid.h),
@@ -22,21 +34,17 @@ function parseOandaPrices(candle: {
   };
 }
 
-export async function fetchTodayD1Candle(
+function pickLatestCompleteCandle(candles: OandaD1Candle[]): OandaD1Candle | null {
+  const completeCandles = candles.filter((candle) => candle.complete === true);
+  if (completeCandles.length === 0) return null;
+  return [...completeCandles].sort((a, b) => b.time.localeCompare(a.time))[0];
+}
+
+async function persistD1CandleRow(
   supabase: SupabaseClient,
   tradeDate: string,
+  candle: OandaD1Candle,
 ): Promise<void> {
-  const { fromISO, toISO } = buildD1Window(tradeDate);
-  const candles = await fetchCompletedCandles(D1_PAIR, 'D', fromISO, toISO);
-
-  if (!candles || candles.length === 0) {
-    console.log(
-      `[D1DailyFetch] No complete D1 candle yet for ${tradeDate} — will retry next scheduled run`,
-    );
-    return;
-  }
-
-  const candle = candles[0];
   const prices = parseOandaPrices(candle);
   const metrics = computeD1ProfileMetrics(
     {
@@ -78,7 +86,43 @@ export async function fetchTodayD1Candle(
   );
 }
 
+/** Cron path: fetch latest complete D1 bar; trade_date derived from candle.time. */
+export async function fetchLatestCompleteD1Candle(supabase: SupabaseClient): Promise<void> {
+  const { fromISO, toISO } = buildLatestCompleteD1FetchWindow();
+  const candles = await fetchCompletedCandles(D1_PAIR, 'D', fromISO, toISO);
+
+  const candle = pickLatestCompleteCandle(candles as OandaD1Candle[]);
+  if (!candle) {
+    console.log(
+      '[D1DailyFetch] No complete D1 candle in fetch window — will retry next scheduled run',
+    );
+    return;
+  }
+
+  const tradeDate = candle.time.slice(0, 10);
+  console.log(`[D1DailyFetch] Latest complete candle time=${candle.time} trade_date=${tradeDate}`);
+  await persistD1CandleRow(supabase, tradeDate, candle);
+}
+
+/** Explicit trade_date path (midnight window) — used by manual callers; cron uses fetchLatestCompleteD1Candle. */
+export async function fetchTodayD1Candle(
+  supabase: SupabaseClient,
+  tradeDate: string,
+): Promise<void> {
+  const { fromISO, toISO } = buildD1Window(tradeDate);
+  const candles = await fetchCompletedCandles(D1_PAIR, 'D', fromISO, toISO);
+
+  const candle = pickLatestCompleteCandle(candles as OandaD1Candle[]);
+  if (!candle) {
+    console.log(
+      `[D1DailyFetch] No complete D1 candle yet for ${tradeDate} — will retry next scheduled run`,
+    );
+    return;
+  }
+
+  await persistD1CandleRow(supabase, tradeDate, candle);
+}
+
 export async function fetchTodayD1Candles(): Promise<void> {
-  const tradeDate = new Date().toISOString().slice(0, 10);
-  await fetchTodayD1Candle(getSupabaseClient(), tradeDate);
+  await fetchLatestCompleteD1Candle(getSupabaseClient());
 }
