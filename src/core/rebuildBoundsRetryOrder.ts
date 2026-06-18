@@ -40,7 +40,10 @@ function buildMarketParams(
 ): PlaceOrderParams {
   const decimals = norm.oandaInstrument.includes('JPY') ? 3 : 5;
   const brokerExitParams = takeProfitPriceOverride
-    ? { takeProfitPrice: takeProfitPriceOverride }
+    ? {
+        takeProfitPrice: takeProfitPriceOverride,
+        stopLossPrice: norm.stopLoss.toFixed(decimals),
+      }
     : {
         stopLossPrice: norm.stopLoss.toFixed(decimals),
         takeProfitPrice: norm.takeProfit.toFixed(decimals),
