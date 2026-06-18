@@ -38,7 +38,8 @@ import {
   isRebuildHourUtcBlocked,
   parseRebuildHourGateEnabled,
 } from './rebuildHourGate.js';
-import { logInfo, logWarn } from '../utils/logger.js';
+import { logError, logInfo, logWarn } from '../utils/logger.js';
+import { computeTrailInsertFields } from '../monitoring/trailingStopSupport.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
@@ -1033,7 +1034,48 @@ export async function processSignal(
 
         attachOmegaAuditFields(rowRecord, regimeState, regimeSizeMultiplier, amdState, directionMode);
 
-        await supabase.from('bridge_trade_log').insert(row);
+        const { error: insertError } = await supabase.from('bridge_trade_log').insert(row);
+        if (insertError) {
+          logError('[Omega Ratchet] bridge_trade_log insert failed', {
+            legType: leg.legType,
+            tradeId,
+            error: insertError.message,
+          });
+          continue;
+        }
+
+        if (leg.legType === 'trail' && tradeId && fillPrice != null) {
+          const trailMetrics = computeTrailInsertFields(rowRecord);
+          if (trailMetrics) {
+            const { error: trailInsErr } = await supabase.from('trail_stop_state').insert({
+              oanda_trade_id: tradeId,
+              engine_id: norm.engineId,
+              pair: norm.oandaInstrument,
+              direction: String(rowRecord.direction ?? norm.direction).toLowerCase(),
+              entry_price: fillPrice,
+              sl_distance: trailMetrics.slDistance,
+              trail_distance: trailMetrics.trailDistance,
+              r_size_raw: trailMetrics.rSizeRaw,
+              peak_favorable: 0,
+              trail_activated: false,
+              activation_threshold: trailMetrics.activationThreshold,
+            });
+            if (trailInsErr) {
+              logError('[Omega Ratchet] Trail state registration failed — trade monitor will retry', {
+                tradeId,
+                error: trailInsErr.message,
+              });
+            } else {
+              logInfo('[Omega Ratchet] Trail state registered in-loop', { tradeId, signalId });
+            }
+          } else {
+            logError('[Omega Ratchet] Trail metrics unavailable — trade monitor will retry', {
+              tradeId,
+              signalId,
+            });
+          }
+        }
+
         const { data: eng } = await supabase
           .from('bridge_engines')
           .select('trades_today')
