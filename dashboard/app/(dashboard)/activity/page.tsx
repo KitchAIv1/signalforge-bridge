@@ -7,6 +7,7 @@ import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import type { DecisionType } from '@/lib/types';
 import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
+import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import { usePresencePing } from '@/hooks/usePresencePing';
 import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDesktopTable';
 import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobileList';
@@ -92,6 +93,7 @@ export default function ActivityPage() {
   const [engine, setEngine] = useState('');
   const [engines, setEngines] = useState<string[]>([]);
   const rebuildHourGateCtrl = useRebuildHourGate();
+  const { omegaRawMode } = useEngineControlsState();
   usePresencePing(); // 60s heartbeat — bridge can treat as watching for omega sizing
 
   const fetchEngines = useCallback(async () => {
@@ -204,7 +206,7 @@ export default function ActivityPage() {
 
       <AccountSnapshotBar />
 
-      <DirectionDecisionPanel />
+      {!omegaRawMode && <DirectionDecisionPanel />}
 
       <NewsEventStrip />
 
