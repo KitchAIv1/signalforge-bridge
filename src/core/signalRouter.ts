@@ -31,6 +31,7 @@ import {
   shouldBypassIsActive,
   shouldBypassWindowGate,
 } from './omegaRawModeGates.js';
+import { checkOmegaSlPause } from './omegaSlPauseGate.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
@@ -740,6 +741,21 @@ export async function processSignal(
       return;
     }
   }
+
+  // ── Omega SL pause gate ────────────────────────────────────────────────────
+  // After 3 consecutive tp1 losses in the current session, omega pauses
+  // for the remainder of that session. Resumes automatically at session change.
+  if (norm.engineId === 'omega') {
+    const slPause = await checkOmegaSlPause(supabase);
+    if (slPause.blocked) {
+      logInfo('[Omega] SL pause gate — blocked', { signalId, reason: slPause.reason });
+      await supabase.from('bridge_trade_log').insert(
+        buildTradeLogRow(payload, 'BLOCKED', slPause.reason ?? 'OMEGA_SL_PAUSE', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument)
+      );
+      return;
+    }
+  }
+  // ── End Omega SL pause gate ───────────────────────────────────────────────
 
   // ── Omega window gate ────────────────────────────────────────────────────
   // Omega only fires during active windows:
