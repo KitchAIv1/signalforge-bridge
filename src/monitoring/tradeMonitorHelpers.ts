@@ -26,7 +26,10 @@ export function computeDerivedFields(
     return {};
   }
 
-  const pnlPips = (exitPrice - fillPrice) / pip;
+  // Direction-signed pips: a winning SHORT (exit < fill) must read positive.
+  const directionSign =
+    String(row.direction ?? '').toLowerCase() === 'short' ? -1 : 1;
+  const pnlPips = ((exitPrice - fillPrice) / pip) * directionSign;
   const signedPnlPips = Math.round(pnlPips * 10) / 10;
 
   const slDistancePips = Math.abs(fillPrice - stopLoss) / pip;
