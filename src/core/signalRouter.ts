@@ -32,6 +32,7 @@ import {
   shouldBypassWindowGate,
 } from './omegaRawModeGates.js';
 import { checkOmegaSlPause } from './omegaSlPauseGate.js';
+import { checkOmegaT1LossSkip } from './omegaT1LossSkipGate.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
@@ -703,27 +704,24 @@ export async function processSignal(
     }
   }
 
-  // Safety net: opposing Omega legs still open (auto-close lag / failure).
+  // One-trade-at-a-time: block any new omega signal while ANY omega trade is open
+  // (same or opposite direction). Prevents OANDA netting artifacts and signal stacking.
   if (norm.engineId === 'omega') {
-    const opposingDir =
-      norm.direction.toLowerCase() === 'long' ? 'short' : 'long';
-    const { data: opposingTradeRows } = await supabase
+    const { data: anyOpenTradeRows } = await supabase
       .from('bridge_trade_log')
-      .select('id, oanda_trade_id')
+      .select('id, oanda_trade_id, direction')
       .eq('engine_id', 'omega')
       .eq('status', 'open')
-      .ilike('direction', opposingDir)
       .not('oanda_trade_id', 'is', null)
       .limit(1);
 
-    if (opposingTradeRows != null && opposingTradeRows.length > 0) {
-      const blockerOandaId =
-        opposingTradeRows[0].oanda_trade_id as string;
+    if (anyOpenTradeRows != null && anyOpenTradeRows.length > 0) {
+      const blocker = anyOpenTradeRows[0];
       const blockMsg =
-        `OMEGA_OPPOSING_POSITION: ` +
-        `${opposingDir} trade ${blockerOandaId} ` +
-        `still open — blocking to prevent OANDA netting`;
-      logInfo('[Omega] Blocked — opposing position open', {
+        `OMEGA_TRADE_OPEN: ` +
+        `${blocker.direction} trade ${blocker.oanda_trade_id} ` +
+        `still open — one trade at a time`;
+      logInfo('[Omega] Blocked — trade already open', {
         signalId,
         blockReason: blockMsg,
       });
@@ -756,6 +754,28 @@ export async function processSignal(
     }
   }
   // ── End Omega SL pause gate ───────────────────────────────────────────────
+
+  // ── Omega T1-loss skip gate ───────────────────────────────────────────────
+  // Skip the first signal that arrives after a T1 loss. Resets after one skip.
+  if (norm.engineId === 'omega') {
+    const t1Skip = await checkOmegaT1LossSkip(supabase);
+    if (t1Skip.blocked) {
+      logInfo('[Omega] T1-loss skip gate — blocked', { signalId, reason: t1Skip.reason });
+      await supabase.from('bridge_trade_log').insert(
+        buildTradeLogRow(
+          payload,
+          'BLOCKED',
+          t1Skip.reason ?? 'OMEGA_T1_LOSS_SKIP',
+          decisionLatencyMs,
+          cachedAccount?.equity ?? null,
+          openTrades.length,
+          norm.oandaInstrument
+        )
+      );
+      return;
+    }
+  }
+  // ── End Omega T1-loss skip gate ───────────────────────────────────────────
 
   // ── Omega window gate ────────────────────────────────────────────────────
   // Omega only fires during active windows:
