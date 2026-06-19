@@ -704,24 +704,27 @@ export async function processSignal(
     }
   }
 
-  // One-trade-at-a-time: block any new omega signal while ANY omega trade is open
-  // (same or opposite direction). Prevents OANDA netting artifacts and signal stacking.
+  // One-trade-at-a-time: block if a tp1 leg is currently open.
+  // tp1 open = the entry trade hasn't resolved yet — no new signal.
+  // tp2/trail open = bonus legs riding after entry resolved — new signals allowed.
+  // Prevents OANDA netting artifacts and signal stacking during the entry window.
   if (norm.engineId === 'omega') {
-    const { data: anyOpenTradeRows } = await supabase
+    const { data: openTp1Rows } = await supabase
       .from('bridge_trade_log')
       .select('id, oanda_trade_id, direction')
       .eq('engine_id', 'omega')
       .eq('status', 'open')
+      .eq('leg_type', 'tp1')
       .not('oanda_trade_id', 'is', null)
       .limit(1);
 
-    if (anyOpenTradeRows != null && anyOpenTradeRows.length > 0) {
-      const blocker = anyOpenTradeRows[0];
+    if (openTp1Rows != null && openTp1Rows.length > 0) {
+      const blocker = openTp1Rows[0];
       const blockMsg =
         `OMEGA_TRADE_OPEN: ` +
         `${blocker.direction} trade ${blocker.oanda_trade_id} ` +
-        `still open — one trade at a time`;
-      logInfo('[Omega] Blocked — trade already open', {
+        `tp1 still open — one trade at a time`;
+      logInfo('[Omega] Blocked — tp1 leg still open', {
         signalId,
         blockReason: blockMsg,
       });
