@@ -3,6 +3,7 @@
 import { ENGINE_COLORS } from '@/lib/pnlCalendarConstants';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 import { getRColor, getRValue } from '@/lib/pnlCalendarFormat';
+import { formatCloseReason } from '@/lib/formatCloseReason';
 
 interface DayDetailTradeRowProps {
   trade: PnlTradeRow;
@@ -114,7 +115,7 @@ export function DayDetailTradeRow({ trade }: DayDetailTradeRowProps) {
           whiteSpace: 'nowrap',
         }}
       >
-        {trade.close_reason ?? '—'}
+        {formatCloseReason(trade.close_reason)}
       </td>
       <td style={{ padding: '7px 10px' }}>
         {trade.bar1_strength ? (

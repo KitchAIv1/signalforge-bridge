@@ -7,7 +7,7 @@ const OVERVIEW_CARDS = [
     label: 'Purpose',
     value: 'Bridge-side exit for omega engine',
     detail:
-      'No OANDA SL/TP on fill. Exits run through trail_stop_state, session sweeps, direction flips, and max_hold.',
+      'T1/T2 use OANDA broker TP (4p/6p). T2 floor ratchet + T3 R-trail are software-managed. Also: session sweeps, direction flips, max_hold.',
   },
   {
     label: 'Primary Pair',
@@ -23,9 +23,9 @@ const OVERVIEW_CARDS = [
   },
   {
     label: 'Close Reasons',
-    value: '5 production paths',
+    value: '6 production paths',
     detail:
-      'trail_stop, trail_sl_hit, direction_flip_auto_close, max_hold, plus OANDA external close (no reason set).',
+      'tp_hit, ratchet_floor, trail_stop, trail_sl_hit, direction_flip_auto_close, max_hold, plus external close.',
   },
 ] as const;
 
@@ -60,6 +60,8 @@ export function OmegaExitReferenceOverview() {
         <div className="mb-4 flex flex-wrap gap-2">
           <EnumChip tone="violet">omega</EnumChip>
           <EnumChip tone="slate">trail_stop_state</EnumChip>
+          <EnumChip tone="emerald">tp_hit</EnumChip>
+          <EnumChip tone="emerald">ratchet_floor</EnumChip>
           <EnumChip tone="emerald">trail_stop</EnumChip>
           <EnumChip tone="red">trail_sl_hit</EnumChip>
           <EnumChip tone="amber">direction_flip_auto_close</EnumChip>

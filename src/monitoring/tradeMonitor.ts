@@ -20,6 +20,18 @@ import {
   runTrailingStopCheck,
 } from './trailingStopMonitor.js';
 import { getTrailEnabled } from './trailingStopSupport.js';
+import {
+  cleanupOrphanedTp2FloorStates,
+  closeTp2FloorLeg,
+  ensureTp2FloorState,
+  isOmegaTp2FloorLeg,
+  runTp2FloorCheck,
+} from './omegaTp2FloorMonitor.js';
+import {
+  deleteTp2FloorState,
+  getOmegaTp2FloorEnabled,
+  inferOmegaTp2CloseReason,
+} from './omegaTp2FloorSupport.js';
 import { runNewsAutoDetect } from '../utils/newsAutoDetect.js';
 import { fetchCloseCandles } from './closeCandleCapture.js';
 import { runPipThresholdMonitor } from './pipThresholdMonitor.js';
@@ -71,6 +83,9 @@ export async function runTradeMonitor(
   if (getTrailEnabled()) {
     await cleanupOrphanedTrailStates(supabase);
   }
+  if (getOmegaTp2FloorEnabled()) {
+    await cleanupOrphanedTp2FloorStates(supabase);
+  }
 
   const { data: logOpen } = await supabase
     .from('bridge_trade_log')
@@ -101,16 +116,27 @@ export async function runTradeMonitor(
       const legType = row.leg_type as string | null;
       const storedTakeProfit = row.take_profit as number | null;
       let closeReason: string | undefined;
-      if (
-        (legType === 'tp1' || legType === 'tp2') &&
-        storedTakeProfit != null &&
-        exitPriceNum != null
-      ) {
+      if (legType === 'tp1' && storedTakeProfit != null && exitPriceNum != null) {
         const tolerance = 0.00005;
         closeReason =
           Math.abs(exitPriceNum - storedTakeProfit) <= tolerance
             ? 'tp_hit'
             : 'external_close';
+      } else if (
+        legType === 'tp2' &&
+        exitPriceNum != null &&
+        typeof row.fill_price === 'number'
+      ) {
+        closeReason = inferOmegaTp2CloseReason(
+          exitPriceNum,
+          row.fill_price as number,
+          row.direction as string,
+          row.pair as string,
+          storedTakeProfit,
+        );
+      }
+      if (legType === 'tp2') {
+        await deleteTp2FloorState(supabase, tid);
       }
       const update: Record<string, unknown> = {
         status: 'closed',
@@ -173,6 +199,9 @@ export async function runTradeMonitor(
         if (postExitCandles.length > 0)   update.post_exit_candles   = postExitCandles;
       }
       await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
+      if ((row.leg_type as string | null) === 'tp2') {
+        await deleteTp2FloorState(supabase, tid);
+      }
       recordClosedTrade(resultFromPnl(pnlDollars));
       void sendTradeClosedAlert({
         engineId: (row.engine_id as string) ?? 'unknown',
@@ -189,6 +218,16 @@ export async function runTradeMonitor(
     }
 
     const legType = row.leg_type as string | null;
+    if (isOmegaTp2FloorLeg(row.engine_id as string, legType) && oandaIds.has(tid)) {
+      const logRow = row as Record<string, unknown>;
+      await ensureTp2FloorState(supabase, logRow);
+      const floorDecision = await runTp2FloorCheck(supabase, logRow, tid);
+      if (floorDecision.shouldClose) {
+        await closeTp2FloorLeg(supabase, tid, row.id as string, logRow, floorDecision.reason);
+        continue;
+      }
+    }
+
     const isTrailEligibleLeg = legType === null || legType === 'trail';
     if (isTrailStopEngine(row.engine_id as string) && isTrailEligibleLeg && oandaIds.has(tid)) {
       const logRow = row as Record<string, unknown>;

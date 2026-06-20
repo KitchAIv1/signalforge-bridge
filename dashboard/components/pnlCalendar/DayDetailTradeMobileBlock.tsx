@@ -3,6 +3,7 @@
 import { ENGINE_COLORS } from '@/lib/pnlCalendarConstants';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 import { getRColor, getRValue } from '@/lib/pnlCalendarFormat';
+import { formatCloseReason } from '@/lib/formatCloseReason';
 
 interface DayDetailTradeMobileBlockProps {
   trade: PnlTradeRow;
@@ -71,7 +72,7 @@ export function DayDetailTradeMobileBlock({ trade }: DayDetailTradeMobileBlockPr
       </div>
       <div className="mt-2 break-words text-[11px] text-[#3d5470]">
         <span className="font-medium text-[#64748b]">Close: </span>
-        {trade.close_reason ?? '—'}
+        {formatCloseReason(trade.close_reason)}
       </div>
       <div className="mt-2">
         {trade.bar1_strength ? (

@@ -10,6 +10,20 @@ import {
 
 const EXIT_PATH_ROWS = [
   {
+    closeReason: 'tp_hit',
+    tone: 'emerald' as const,
+    trigger: 'OANDA takeProfitOnFill (T1=4p or T2=6p)',
+    source: 'tradeMonitor.ts reconcile',
+    meaning: 'Fixed leg target reached on broker.',
+  },
+  {
+    closeReason: 'ratchet_floor',
+    tone: 'emerald' as const,
+    trigger: 'Peak > 4p then live mid retraces to 4p floor',
+    source: 'omegaTp2FloorMonitor.ts',
+    meaning: 'T2 leg locked at first-peak floor — your 5p→4p scenario.',
+  },
+  {
     closeReason: 'trail_stop',
     tone: 'emerald' as const,
     trigger: 'Favorable ≤ peak − 0.5R after activation',
@@ -48,7 +62,7 @@ const EXIT_PATH_ROWS = [
 
 const CONTEXT_ROWS = [
   ['Opposing leg blocker', 'Blocks new omega entry if opposite direction still open on OANDA'],
-  ['Orphan cleanup', 'cleanupOrphanedTrailStates() removes stale trail_stop_state rows'],
+  ['Orphan cleanup', 'cleanupOrphanedTrailStates() + cleanupOrphanedTp2FloorStates()'],
   ['News sizing', '1.5× exploit / 0.5× pre-event reduce on units — does not change exit math'],
   ['AMD size multiplier', 'amd_state.amd_size_multiplier scales entry units only'],
 ] as const;

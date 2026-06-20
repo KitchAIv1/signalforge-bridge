@@ -1,6 +1,7 @@
 'use client';
 
 import { OmegaExitReferenceOverview } from '@/components/omegaExitReference/OmegaExitReferenceOverview';
+import { OmegaExitReferenceRatchetTable } from '@/components/omegaExitReference/OmegaExitReferenceRatchetTable';
 import { OmegaExitReferenceTrailTable } from '@/components/omegaExitReference/OmegaExitReferenceTrailTable';
 import { OmegaExitReferenceExitPaths } from '@/components/omegaExitReference/OmegaExitReferenceExitPaths';
 import { OmegaExitReferenceAmdGateTable } from '@/components/omegaExitReference/OmegaExitReferenceAmdGateTable';
@@ -11,6 +12,7 @@ export function OmegaExitReferenceContent() {
   return (
     <div className="flex flex-col gap-8 px-6 py-5">
       <OmegaExitReferenceOverview />
+      <OmegaExitReferenceRatchetTable />
       <OmegaExitReferenceTrailTable />
       <OmegaExitReferenceExitPaths />
       <OmegaExitReferenceAsianTable />

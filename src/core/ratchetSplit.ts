@@ -1,6 +1,6 @@
 /**
  * Shared ratchet split-exit utility.
- * Used by both Omega Prime (T1=6p/T2=8p) and AMD_FAILED (T1=3.5p/T2=5.25p).
+ * Used by both Omega Prime (T1=4p/T2=6p) and AMD_FAILED (T1=3.5p/T2=5.25p).
  * T3 is always a trail leg — no broker TP, trail activates after marker pip.
  * FIFO safeguard: T2 always gets remainder unit so T1 ≠ T2 unit count,
  * preventing OANDA FIFO_VIOLATION_SAFEGUARD_VIOLATION on same-direction

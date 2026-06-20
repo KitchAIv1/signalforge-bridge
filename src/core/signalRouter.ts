@@ -50,6 +50,8 @@ import {
 } from './rebuildHourGate.js';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
 import { computeTrailInsertFields } from '../monitoring/trailingStopSupport.js';
+import { getOmegaTp2FloorEnabled } from '../monitoring/omegaTp2FloorSupport.js';
+import { OMEGA_T1_PIPS, OMEGA_T2_PIPS } from './omegaRatchetConstants.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
@@ -1135,6 +1137,32 @@ export async function processSignal(
               tradeId,
               signalId,
             });
+          }
+        }
+
+        if (
+          leg.legType === 'tp2' &&
+          tradeId &&
+          fillPrice != null &&
+          getOmegaTp2FloorEnabled()
+        ) {
+          const { error: floorInsErr } = await supabase.from('omega_tp2_floor_state').insert({
+            oanda_trade_id: tradeId,
+            engine_id: norm.engineId,
+            pair: norm.oandaInstrument,
+            direction: String(rowRecord.direction ?? norm.direction).toLowerCase(),
+            fill_price: fillPrice,
+            floor_pips: OMEGA_T1_PIPS,
+            tp_target_pips: OMEGA_T2_PIPS,
+            peak_favorable_pips: 0,
+          });
+          if (floorInsErr) {
+            logError('[Omega Ratchet] tp2 floor state registration failed — monitor will retry', {
+              tradeId,
+              error: floorInsErr.message,
+            });
+          } else {
+            logInfo('[Omega Ratchet] tp2 floor state registered in-loop', { tradeId, signalId });
           }
         }
 

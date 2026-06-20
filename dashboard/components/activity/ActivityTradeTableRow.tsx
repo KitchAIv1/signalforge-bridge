@@ -6,6 +6,7 @@ import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
 import { CloseTagButton } from '@/components/activity/CloseTagButton';
 import { OmegaLegTypeBadge } from '@/components/shared/OmegaLegTypeBadge';
+import { formatCloseReason } from '@/lib/formatCloseReason';
 
 export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
   const isExecuted = row.decision === 'EXECUTED';
@@ -82,7 +83,7 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
         {row.duration_minutes != null ? Math.round(Number(row.duration_minutes)) + 'm' : '—'}
       </td>
-      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{row.close_reason ?? '—'}</td>
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{formatCloseReason(row.close_reason)}</td>
       <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-200">
         {row.result ? (
           <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${resultBadgeClasses}`}>
