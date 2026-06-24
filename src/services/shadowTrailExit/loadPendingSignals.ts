@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { PIP_SIZE, type PendingOmegaSignal } from './types.js';
 
 const TP1_SELECT =
-  'id, signal_id, created_at, direction, entry_price, stop_loss, pnl_pips, result, r_size_raw';
+  'id, signal_id, created_at, direction, entry_price, stop_loss, pnl_pips, result';
 
 function readNum(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -49,7 +49,7 @@ export async function loadPendingOmegaSignals(
     const entryPrice = readNum(row.entry_price);
     const stopLoss = readNum(row.stop_loss);
     if (!direction || entryPrice == null || stopLoss == null) continue;
-    const rSizeRaw = readNum(row.r_size_raw) ?? Math.abs(entryPrice - stopLoss);
+    const rSizeRaw = Math.abs(entryPrice - stopLoss);
     if (rSizeRaw <= 0) continue;
     pending.push({
       signalId,
