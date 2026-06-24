@@ -38,6 +38,7 @@ import {
 } from './services/scalper/ScalperEngine.js';
 import { runPdlSweepDetection } from './services/pdlSweepDetector/pdlSweepDetectorService.js';
 import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeService.js';
+import { runShadowTrailExitResolver } from './services/shadowTrailExit/shadowTrailExitService.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -255,6 +256,15 @@ async function main(): Promise<void> {
       console.error('[AmdDistribution] Scheduled run error:', amdDistError);
     }
   }, { timezone: 'UTC' });
+
+  cron.schedule('2,7,12,17,22,27,32,37,42,47,52,57 * * * *', async () => {
+    try {
+      await runShadowTrailExitResolver(supabase);
+    } catch (shadowTrailErr) {
+      console.error('[ShadowTrail] Resolver error:', shadowTrailErr);
+    }
+  }, { timezone: 'UTC' });
+  logInfo('[cron] registered shadow Trail v1 resolver every 5 min (offset +2m)');
 
   setInterval(() => {
     void runAmdTrailMonitor().catch((amdTrailErr) => {
