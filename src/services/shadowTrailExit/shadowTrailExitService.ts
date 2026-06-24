@@ -5,6 +5,7 @@ import { logInfo, logWarn } from '../../utils/logger.js';
 import { applySequencedGate } from './applySequencedGate.js';
 import { fetchM5BarsAfterEntry } from './fetchEntryCandles.js';
 import { loadLiveLegPnl, loadPendingOmegaSignals } from './loadPendingSignals.js';
+import { refreshStaleLivePnl } from './refreshStaleLivePnl.js';
 import { simulateTrailV1 } from './trailV1Sim.js';
 import {
   SHADOW_EXECUTION_COST_PIPS,
@@ -98,9 +99,13 @@ async function buildShadowRow(
 
 export async function runShadowTrailExitResolver(
   supabase: SupabaseClient,
-): Promise<{ inserted: number; resequenced: number }> {
+): Promise<{ inserted: number; resequenced: number; liveRefreshed: number }> {
+  const liveRefreshed = await refreshStaleLivePnl(supabase);
   const pending = await loadPendingOmegaSignals(supabase, 40);
-  if (pending.length === 0) return { inserted: 0, resequenced: 0 };
+  if (pending.length === 0) {
+    logInfo('[ShadowTrail] resolver done', { inserted: 0, resequenced: 0, liveRefreshed });
+    return { inserted: 0, resequenced: 0, liveRefreshed };
+  }
 
   const omegaDirection = await loadOmegaDirection(supabase);
   const newRows: ShadowTrailRow[] = [];
@@ -111,7 +116,10 @@ export async function runShadowTrailExitResolver(
       logWarn('[ShadowTrail] row failed', { signalId: signal.signalId, err: String(err) });
     }
   }
-  if (newRows.length === 0) return { inserted: 0, resequenced: 0 };
+  if (newRows.length === 0) {
+    logInfo('[ShadowTrail] resolver done', { inserted: 0, resequenced: 0, liveRefreshed });
+    return { inserted: 0, resequenced: 0, liveRefreshed };
+  }
 
   const { error } = await supabase.from('omega_shadow_trail_exit').upsert(newRows, {
     onConflict: 'signal_id',
@@ -119,8 +127,8 @@ export async function runShadowTrailExitResolver(
   if (error) throw new Error(`[ShadowTrail] upsert: ${error.message}`);
 
   const resequenced = await resequenceRecentDays(supabase);
-  logInfo('[ShadowTrail] resolver done', { inserted: newRows.length, resequenced });
-  return { inserted: newRows.length, resequenced };
+  logInfo('[ShadowTrail] resolver done', { inserted: newRows.length, resequenced, liveRefreshed });
+  return { inserted: newRows.length, resequenced, liveRefreshed };
 }
 
 async function resequenceRecentDays(supabase: SupabaseClient): Promise<number> {
