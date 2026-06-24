@@ -37,9 +37,13 @@ export async function loadPendingOmegaSignals(
 
   const { data: resolvedRows } = await supabase
     .from('omega_shadow_trail_exit')
-    .select('signal_id')
+    .select('signal_id, filter_reason')
     .limit(5000);
-  const resolved = new Set((resolvedRows ?? []).map(r => String(r.signal_id)));
+  const resolved = new Set(
+    (resolvedRows ?? [])
+      .filter(row => row.filter_reason !== 'insufficient_m5_bars')
+      .map(row => String(row.signal_id)),
+  );
 
   const pending: PendingOmegaSignal[] = [];
   for (const row of tp1Rows ?? []) {

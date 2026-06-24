@@ -571,7 +571,13 @@ export async function fetchCandleRange(
       },
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.warn(
+        `[OANDA] fetchCandleRange ${response.status} ${pair} ${granularity}: ${errBody.slice(0, 200)}`,
+      );
+      return [];
+    }
 
     const payload = await response.json() as {
       candles: Array<{
@@ -582,7 +588,8 @@ export async function fetchCandleRange(
     };
 
     return (payload.candles ?? []).filter(c => c.complete === true);
-  } catch {
+  } catch (err: unknown) {
+    console.warn(`[OANDA] fetchCandleRange exception ${pair}: ${String(err)}`);
     return [];
   }
 }
