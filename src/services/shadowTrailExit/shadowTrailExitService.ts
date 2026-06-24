@@ -2,15 +2,14 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logInfo, logWarn } from '../../utils/logger.js';
-import { applySequencedGate } from './applySequencedGate.js';
+import { applyAllSequencedGates } from './applySequencedGate.js';
+import { attachOptimizedShadowSim } from './attachOptimizedShadowSim.js';
+import { backfillOptimizedShadowRows } from './backfillOptimizedShadowRows.js';
 import { fetchM5BarsAfterEntry } from './fetchEntryCandles.js';
 import { loadLiveLegPnl, loadPendingOmegaSignals } from './loadPendingSignals.js';
 import { refreshStaleLivePnl } from './refreshStaleLivePnl.js';
 import { simulateTrailV1 } from './trailV1Sim.js';
-import {
-  SHADOW_EXECUTION_COST_PIPS,
-  type ShadowTrailRow,
-} from './types.js';
+import { SHADOW_EXECUTION_COST_PIPS, type ShadowTrailRow } from './types.js';
 import { evaluateWindowFilter, utcTradeDate } from './windowFilter.js';
 
 async function loadAmdDirection(
@@ -35,6 +34,29 @@ async function loadOmegaDirection(supabase: SupabaseClient): Promise<string | nu
     .maybeSingle();
   const raw = data?.config_value;
   return typeof raw === 'string' ? raw.replace(/^"|"$/g, '') : null;
+}
+
+function emptyOptFields(): Pick<
+  ShadowTrailRow,
+  | 'shadow_opt_sl_r'
+  | 'shadow_opt_exit_type'
+  | 'shadow_opt_pips_gross'
+  | 'shadow_opt_pips_net'
+  | 'shadow_opt_exit_bars'
+  | 'shadow_opt_win'
+  | 'sequenced_opt_status'
+  | 'sequenced_opt_pips_net'
+> {
+  return {
+    shadow_opt_sl_r: null,
+    shadow_opt_exit_type: null,
+    shadow_opt_pips_gross: null,
+    shadow_opt_pips_net: null,
+    shadow_opt_exit_bars: null,
+    shadow_opt_win: null,
+    sequenced_opt_status: null,
+    sequenced_opt_pips_net: null,
+  };
 }
 
 async function buildShadowRow(
@@ -69,6 +91,7 @@ async function buildShadowRow(
     shadow_pips_net: null,
     shadow_exit_bars: null,
     shadow_win: null,
+    ...emptyOptFields(),
     execution_cost_pips: SHADOW_EXECUTION_COST_PIPS,
     sequenced_status: 'skipped',
     sequenced_pips_net: null,
@@ -86,15 +109,16 @@ async function buildShadowRow(
       filter_reason: 'insufficient_m5_bars',
     };
   }
-  const outcome = simulateTrailV1(pending.direction, pending.entryPrice, pending.rSizeRaw, bars);
-  return {
+  const baseline = simulateTrailV1(pending.direction, pending.entryPrice, pending.rSizeRaw, bars);
+  const withBaseline: ShadowTrailRow = {
     ...base,
-    shadow_exit_type: outcome.exitType,
-    shadow_pips_gross: outcome.grossPips,
-    shadow_pips_net: outcome.netPips,
-    shadow_exit_bars: outcome.exitBars,
-    shadow_win: outcome.win,
+    shadow_exit_type: baseline.exitType,
+    shadow_pips_gross: baseline.grossPips,
+    shadow_pips_net: baseline.netPips,
+    shadow_exit_bars: baseline.exitBars,
+    shadow_win: baseline.win,
   };
+  return attachOptimizedShadowSim(withBaseline, bars);
 }
 
 export async function runShadowTrailExitResolver(
@@ -139,7 +163,8 @@ async function resequenceRecentDays(supabase: SupabaseClient): Promise<number> {
     .gte('trade_date', since);
   if (error || !data?.length) return 0;
 
-  const gated = applySequencedGate(data as ShadowTrailRow[]);
+  const backfilled = await backfillOptimizedShadowRows(data as ShadowTrailRow[]);
+  const gated = applyAllSequencedGates(backfilled);
   const { error: updateErr } = await supabase
     .from('omega_shadow_trail_exit')
     .upsert(gated, { onConflict: 'signal_id' });

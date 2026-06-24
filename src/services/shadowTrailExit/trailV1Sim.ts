@@ -1,4 +1,4 @@
-/** M5 trail v1 bar-walk (matches SIGNALFORGE backtest). */
+/** M5 trail v1 bar-walk — SL 1.5R enforced before and after activation. */
 
 import {
   MAX_FORWARD_BARS,
@@ -16,35 +16,58 @@ export function simulateTrailV1(
   entryPrice: number,
   rSizeRaw: number,
   bars: readonly M5Bar[],
+  slR: number = SHADOW_TRAIL_SL_R,
 ): TrailSimOutcome {
-  const slDist = rSizeRaw * SHADOW_TRAIL_SL_R;
-  const trailDist = rSizeRaw * SHADOW_TRAIL_DIST_R;
-  let peak = 0;
-  let active = SHADOW_TRAIL_ACTIVATION_R <= 0;
+  const slDist = rSizeRaw * slR;
+  const actNeed = SHADOW_TRAIL_ACTIVATION_R * rSizeRaw;
+  let activated = false;
+  let peakFavorable = 0;
+  const limit = Math.min(bars.length, MAX_FORWARD_BARS);
 
-  for (let i = 0; i < Math.min(bars.length, MAX_FORWARD_BARS); i += 1) {
+  for (let i = 0; i < limit; i += 1) {
     const bar = bars[i]!;
     const fav =
       direction === 'long' ? bar.high - entryPrice : entryPrice - bar.low;
     const adv =
       direction === 'long' ? entryPrice - bar.low : bar.high - entryPrice;
-    if (!active && adv >= slDist) {
-      const gross = -(slDist / PIP_SIZE);
-      return buildOutcome('trail_sl', gross, i + 1);
+
+    if (!activated && adv >= slDist) {
+      return buildOutcome('trail_sl', -(slDist / PIP_SIZE), i + 1);
     }
-    active = active || fav >= rSizeRaw * SHADOW_TRAIL_ACTIVATION_R;
-    if (active && fav > peak) peak = fav;
-    if (active && peak >= trailDist && fav <= peak - trailDist) {
-      const gross = (peak - trailDist) / PIP_SIZE;
-      return buildOutcome('trail_profit', gross, i + 1);
+
+    if (SHADOW_TRAIL_ACTIVATION_R <= 0 || fav >= actNeed) {
+      activated = true;
+    }
+
+    if (activated && fav > peakFavorable) {
+      peakFavorable = fav;
+    }
+
+    let trailCandidate = false;
+    let trailGross = 0;
+    if (activated && peakFavorable > 0) {
+      const trailLevel = peakFavorable - SHADOW_TRAIL_DIST_R * rSizeRaw;
+      if (fav <= trailLevel) {
+        trailCandidate = true;
+        trailGross = (peakFavorable - SHADOW_TRAIL_DIST_R * rSizeRaw) / PIP_SIZE;
+      }
+    }
+
+    if (activated && adv >= slDist) {
+      return buildOutcome('trail_sl', -(slDist / PIP_SIZE), i + 1);
+    }
+
+    if (trailCandidate) {
+      return buildOutcome('trail_profit', trailGross, i + 1);
     }
   }
-  const last = bars[Math.min(bars.length, MAX_FORWARD_BARS) - 1]?.close ?? entryPrice;
+
+  const last = bars[limit - 1]?.close ?? entryPrice;
   const gross =
     direction === 'long'
       ? (last - entryPrice) / PIP_SIZE
       : (entryPrice - last) / PIP_SIZE;
-  return buildOutcome('open', gross, bars.length);
+  return buildOutcome('open', gross, limit);
 }
 
 function buildOutcome(

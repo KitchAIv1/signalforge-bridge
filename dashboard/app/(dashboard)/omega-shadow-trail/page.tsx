@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchShadowTrailData } from '@/lib/fetchShadowTrailData';
 import type { ShadowTrailPayload } from '@/lib/shadowTrailTypes';
 import { ShadowTrailCompareTable } from '@/components/shadowTrail/ShadowTrailCompareTable';
+import { ShadowTrailSlLegend } from '@/components/shadowTrail/ShadowTrailSlLegend';
 import { ShadowTrailSummaryCards } from '@/components/shadowTrail/ShadowTrailSummaryCards';
 
 const POLL_MS = 30_000;
@@ -47,9 +48,10 @@ export default function OmegaShadowTrailPage() {
           Omega Shadow Trail v1
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Live ratchet vs hypothetical single-order trail (SL 1.5R / trail 0.5R). No OANDA execution.
+          Live ratchet vs shadow trail lanes — baseline SL 1.5R vs optimized SHORT 2.0R / LONG 3.0R.
         </p>
       </div>
+      <ShadowTrailSlLegend />
       <ShadowTrailSummaryCards summary={payload.summary} />
       <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">

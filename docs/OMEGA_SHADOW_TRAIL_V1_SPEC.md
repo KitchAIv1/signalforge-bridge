@@ -43,14 +43,18 @@ Signals outside windows → `filter_passed=false`, no shadow PnL.
 
 | Lane | Column | Meaning |
 |------|--------|---------|
-| **Ungated** | `shadow_pips_net` | Pure exit edge — every filtered signal (upper bound ~587p / 8d) |
-| **Sequenced** | `sequenced_pips_net`, `sequenced_status` | One-at-a-time until prior trail exits (`executed` \| `blocked`) — realistic ~115p / 8d |
+| **Ungated (baseline)** | `shadow_pips_net` | SL **1.5R** both directions |
+| **Sequenced (baseline)** | `sequenced_pips_net`, `sequenced_status` | One-at-a-time gate on baseline exit bars |
+| **Ungated (optimized)** | `shadow_opt_pips_net`, `shadow_opt_sl_r` | SL **SHORT 2.0R / LONG 3.0R** (migration 050) |
+| **Sequenced (optimized)** | `sequenced_opt_pips_net`, `sequenced_opt_status` | One-at-a-time gate on optimized exit bars |
+
+Baseline columns unchanged for backward compatibility.
 
 ---
 
 ## Data model
 
-**Table:** `omega_shadow_trail_exit` (migration `049_omega_shadow_trail_exit.sql`)
+**Table:** `omega_shadow_trail_exit` (migrations `049` + `050`)
 
 **Source rows:** `bridge_trade_log` where `engine_id='omega'`, `leg_type='tp1'`, `status IN ('open','closed')`
 
@@ -106,6 +110,7 @@ Tolerance: ±5% (M5 bar alignment, entry price vs backtest).
 | Path | Role |
 |------|------|
 | `migrations/049_omega_shadow_trail_exit.sql` | Table |
+| `migrations/050_omega_shadow_trail_exit_opt.sql` | Optimized SL columns |
 | `src/services/shadowTrailExit/*` | Resolver |
 | `src/index.ts` | Cron hook |
 | `dashboard/app/(dashboard)/omega-shadow-trail/page.tsx` | UI |

@@ -57,9 +57,17 @@ export interface ShadowTrailRow {
   shadow_pips_net: number | null;
   shadow_exit_bars: number | null;
   shadow_win: boolean | null;
+  shadow_opt_sl_r: number | null;
+  shadow_opt_exit_type: string | null;
+  shadow_opt_pips_gross: number | null;
+  shadow_opt_pips_net: number | null;
+  shadow_opt_exit_bars: number | null;
+  shadow_opt_win: boolean | null;
   execution_cost_pips: number;
   sequenced_status: SequencedStatus;
   sequenced_pips_net: number | null;
+  sequenced_opt_status: SequencedStatus | null;
+  sequenced_opt_pips_net: number | null;
   live_pnl_pips: number | null;
   live_result: string | null;
   resolved_at: string;
