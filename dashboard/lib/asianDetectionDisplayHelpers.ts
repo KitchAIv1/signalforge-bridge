@@ -34,8 +34,23 @@ export function nextPendingCron(firedTimes: string[]): string | null {
   return next ? `${next.condition} @ ${next.time}` : null;
 }
 
+const ASIAN_CRON_TIMES = new Set<string>(CRON_SCHEDULE.map((cron) => cron.time));
+
+export function filterAsianCronRows(
+  todayRows: AsianSessionDetection[],
+): AsianSessionDetection[] {
+  return todayRows.filter((row) => ASIAN_CRON_TIMES.has(row.condition_check_time));
+}
+
+export function allAsianCronsComplete(todayRows: AsianSessionDetection[]): boolean {
+  const cronRows = filterAsianCronRows(todayRows);
+  return CRON_SCHEDULE.every((cron) =>
+    cronRows.some((row) => row.condition_check_time === cron.time),
+  );
+}
+
 export function allCronsFiredToday(todayRows: AsianSessionDetection[]): boolean {
-  if (todayRows.length >= 4) return true;
+  if (allAsianCronsComplete(todayRows)) return true;
   return todayRows.some(
     (row) => row.action === 'NO_DETECTION' && row.condition_check_time === '04:10',
   );

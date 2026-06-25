@@ -12,6 +12,7 @@ import {
 } from '@/lib/asianSessionConstants';
 import { deriveNoFireTradeDates, isAsianFireAction } from '@/lib/asianSessionPageHelpers';
 import { fetchAsianSessionDetectionLog, fetchD1ContextConfig } from '@/lib/fetchAsianDirectionLog';
+import { fetchOmegaWindowStatus, type OmegaWindowStatus } from '@/lib/fetchOmegaWindowStatus';
 import type { AsianSessionDetection, D1ContextConfig } from '@/lib/directionDecisionTypes';
 import { EMPTY_D1_CONTEXT_CONFIG } from '@/lib/d1ContextHelpers';
 
@@ -22,6 +23,7 @@ export interface UseAsianSessionDetectionResult {
   firedRows: AsianSessionDetection[];
   noFireDays: string[];
   d1Config: D1ContextConfig;
+  omegaWindow: OmegaWindowStatus | null;
   loading: boolean;
   error: string | null;
 }
@@ -49,6 +51,7 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
     asian_prior_amd_shifted: null,
     asian_prior_direction_bias: null,
   });
+  const [omegaWindow, setOmegaWindow] = useState<OmegaWindowStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,13 +62,15 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
       setLoading(true);
       setError(null);
       try {
-        const [detectionRows, d1Context] = await Promise.all([
+        const [detectionRows, d1Context, windowStatus] = await Promise.all([
           fetchAsianSessionDetectionLog(ASIAN_FETCH_LOOKBACK_DAYS),
           fetchD1ContextConfig(),
+          fetchOmegaWindowStatus(),
         ]);
         if (!cancelled) {
           setRows(detectionRows);
           setD1Config(d1Context);
+          setOmegaWindow(windowStatus);
         }
       } catch (loadError: unknown) {
         if (!cancelled) {
@@ -109,5 +114,5 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
   );
   const noFireDays = useMemo(() => deriveNoFireTradeDates(rows), [rows]);
 
-  return { rows, todayRow, todayChecks, firedRows, noFireDays, d1Config, loading, error };
+  return { rows, todayRow, todayChecks, firedRows, noFireDays, d1Config, omegaWindow, loading, error };
 }

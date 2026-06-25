@@ -1,15 +1,18 @@
 'use client';
 
 import { AsianSessionShadowPill } from '@/components/asianSession/AsianSessionShadowPill';
+import { AsianSessionDirectionStatusTile } from '@/components/asianSession/AsianSessionDirectionStatusTile';
 import { AsianSessionDirectionPill } from '@/components/asianSession/AsianSessionDirectionPill';
 import { ASIAN_FORWARD_GATE_DAYS } from '@/lib/asianSessionConstants';
-import { countDistinctTradeDates } from '@/lib/asianSessionPageHelpers';
+import { countDistinctTradeDates, summarizeFireAccuracy } from '@/lib/asianSessionPageHelpers';
+import type { OmegaWindowStatus } from '@/lib/fetchOmegaWindowStatus';
 import type { AsianSessionDetection, D1ContextConfig } from '@/lib/directionDecisionTypes';
 
 type PageHeaderProps = {
   rows: AsianSessionDetection[];
   firedRows: AsianSessionDetection[];
   d1Config: D1ContextConfig;
+  omegaWindow: OmegaWindowStatus | null;
 };
 
 function StatTile({ label, value, detail }: { label: string; value: string; detail?: string }) {
@@ -46,7 +49,12 @@ function TonightPriorBiasTile({ bias }: { bias: D1ContextConfig['asian_prior_dir
   );
 }
 
-export function AsianSessionPageHeader({ rows, firedRows, d1Config }: PageHeaderProps) {
+function FireAccuracyTile({ firedRows }: { firedRows: AsianSessionDetection[] }) {
+  const accuracy = summarizeFireAccuracy(firedRows);
+  return <StatTile label="LONG accuracy" value={accuracy.headline} detail={accuracy.detail} />;
+}
+
+export function AsianSessionPageHeader({ rows, firedRows, d1Config, omegaWindow }: PageHeaderProps) {
   const monitoredDays = countDistinctTradeDates(rows);
   const fireRatePct = monitoredDays > 0 ? Math.round((firedRows.length / monitoredDays) * 100) : 0;
 
@@ -67,7 +75,10 @@ export function AsianSessionPageHeader({ rows, firedRows, d1Config }: PageHeader
           detail={`Gate ${firedRows.length}/${ASIAN_FORWARD_GATE_DAYS}`}
         />
         <TonightPriorBiasTile bias={d1Config.asian_prior_direction_bias} />
-        <StatTile label="LONG accuracy" value="Accumulating" detail="Outcome tracking pending" />
+        <FireAccuracyTile firedRows={firedRows} />
+      </div>
+      <div className="mt-3">
+        <AsianSessionDirectionStatusTile omegaWindow={omegaWindow} />
       </div>
     </header>
   );

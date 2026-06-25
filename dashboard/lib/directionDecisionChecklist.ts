@@ -24,6 +24,7 @@ import {
   formatD1MomentumSignal,
 } from '@/lib/d1ContextHelpers';
 import type { D1ContextConfig } from '@/lib/directionDecisionTypes';
+import { resolveAsianSessionPhase } from '@/lib/directionDecisionPhases';
 
 function judasImpliedDirection(judas: string | null | undefined): DirectionSide | null {
   if (judas === 'UP') return 'short';
@@ -218,6 +219,16 @@ function buildDetectionStatusRow(
       value: 'Manual mode — skipped',
       impliedDirection: null,
       status: 'neutral',
+    };
+  }
+
+  if (resolveAsianSessionPhase() === 'completed') {
+    return {
+      id: 'asian-detection',
+      label: 'Pattern Detection',
+      value: 'No pattern detected',
+      impliedDirection: null,
+      status: 'fail',
     };
   }
 

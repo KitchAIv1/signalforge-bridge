@@ -1,4 +1,5 @@
 import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
+import { classifyNonFireDay } from '@/lib/asianSessionNonFireSummary';
 import { getPriorAmdContext } from '@/lib/priorAmdConfidence';
 import { ASIAN_FIRE_ACTIONS } from '@/lib/asianSessionConstants';
 
@@ -49,11 +50,61 @@ export function deriveNoFireTradeDates(rows: readonly AsianSessionDetection[]): 
 export function summarizeNoFireDay(
   rows: readonly AsianSessionDetection[],
   tradeDate: string,
-): { checkCount: number; priorAmdTag: string | null } {
+): {
+  checkCount: number;
+  priorAmdTag: string | null;
+  outcomeLabel: string;
+  outcomeDetail: string | null;
+} {
   const dayRows = rows.filter((row) => row.trade_date === tradeDate);
   const priorRow = [...dayRows].reverse().find((row) => row.prior_amd_tag);
+  const outcome = classifyNonFireDay(dayRows);
   return {
     checkCount: dayRows.length,
     priorAmdTag: priorRow?.prior_amd_tag ?? null,
+    outcomeLabel: outcome.outcomeLabel,
+    outcomeDetail: outcome.outcomeDetail,
+  };
+}
+
+const FIRE_ACCURACY_MIN_SAMPLE = 10;
+
+export function summarizeFireAccuracy(
+  firedRows: readonly AsianSessionDetection[],
+  minSample = FIRE_ACCURACY_MIN_SAMPLE,
+): { headline: string; detail: string } {
+  const longRows = firedRows.filter((row) => row.detection_direction === 'long');
+  const evaluatedLongRows = longRows.filter(
+    (row) => row.evaluated_direction != null && row.detection_direction != null,
+  );
+
+  if (evaluatedLongRows.length < minSample) {
+    return {
+      headline: 'Accumulating',
+      detail: `Outcome tracking ${evaluatedLongRows.length}/${minSample} LONG fires`,
+    };
+  }
+
+  const hits = evaluatedLongRows.filter(
+    (row) => row.evaluated_direction === row.detection_direction,
+  ).length;
+  const hitRate = Math.round((hits / evaluatedLongRows.length) * 100);
+  const shortEvaluated = firedRows.filter(
+    (row) =>
+      row.detection_direction === 'short' &&
+      row.evaluated_direction != null &&
+      row.detection_direction != null,
+  );
+  const shortHits = shortEvaluated.filter(
+    (row) => row.evaluated_direction === row.detection_direction,
+  ).length;
+  const shortDetail =
+    shortEvaluated.length >= minSample
+      ? ` · SHORT ${Math.round((shortHits / shortEvaluated.length) * 100)}% (${shortEvaluated.length})`
+      : '';
+
+  return {
+    headline: `LONG ${hitRate}%`,
+    detail: `Session result hit rate · n=${evaluatedLongRows.length}${shortDetail}`,
   };
 }

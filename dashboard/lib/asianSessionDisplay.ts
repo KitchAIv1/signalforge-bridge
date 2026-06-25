@@ -14,6 +14,7 @@ import {
 import { getPriorAmdSizeMultiplier } from '@/lib/priorAmdConfidence';
 import {
   isForexWeekendClosed,
+  resolveAsianSessionPhase,
   todayUtcDate,
 } from '@/lib/directionDecisionPhases';
 
@@ -125,6 +126,14 @@ export function buildAsianVerdict(
     };
   }
 
+  if (resolveAsianSessionPhase() === 'completed') {
+    return {
+      headline: 'No pattern detected today',
+      subline: 'Asian session closed without a sustained directional signal',
+      tone: 'skipped',
+    };
+  }
+
   if (allCronsFiredToday(todayRows)) {
     return {
       headline: 'No pattern detected today',
@@ -140,15 +149,6 @@ export function buildAsianVerdict(
       headline: 'Monitoring in progress',
       subline: nextCron ? `Next check: ${nextCron}` : 'Awaiting final checks',
       tone: 'active',
-    };
-  }
-
-  const nowHour = new Date().getUTCHours();
-  if (nowHour >= 8) {
-    return {
-      headline: 'No pattern detected today',
-      subline: 'Asian session closed without a sustained directional signal',
-      tone: 'skipped',
     };
   }
 

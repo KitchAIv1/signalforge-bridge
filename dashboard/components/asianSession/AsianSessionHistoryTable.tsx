@@ -129,8 +129,14 @@ export function AsianSessionHistoryTable({ firedRows, noFireDays, rows }: Histor
                   className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm text-slate-500 dark:text-slate-400"
                 >
                   <span className="font-mono">{formatAsianTradeDate(tradeDate)}</span>
-                  <span>No detection · {summary.checkCount} checks</span>
+                  <span className="font-medium text-slate-600 dark:text-slate-300">
+                    {summary.outcomeLabel}
+                  </span>
+                  <span>{summary.checkCount} checks</span>
                   <span>Prior: {summary.priorAmdTag ?? '—'}</span>
+                  {summary.outcomeDetail ? (
+                    <span className="text-xs text-slate-400">{summary.outcomeDetail}</span>
+                  ) : null}
                 </div>
               );
             })}
