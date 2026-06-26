@@ -12,6 +12,11 @@ import {
 } from '@/lib/asianSessionConstants';
 import { deriveNoFireTradeDates, isAsianFireAction } from '@/lib/asianSessionPageHelpers';
 import { fetchAsianSessionDetectionLog, fetchD1ContextConfig } from '@/lib/fetchAsianDirectionLog';
+import { fetchAsianSessionAmdMetricsByDates } from '@/lib/fetchAsianSessionAmdMetrics';
+import {
+  buildAsianSessionAmdMetricsMap,
+  type AsianSessionAmdMetricsSlice,
+} from '@/lib/asianSessionAmdMetricsTypes';
 import { fetchOmegaWindowStatus, type OmegaWindowStatus } from '@/lib/fetchOmegaWindowStatus';
 import type { AsianSessionDetection, D1ContextConfig } from '@/lib/directionDecisionTypes';
 import { EMPTY_D1_CONTEXT_CONFIG } from '@/lib/d1ContextHelpers';
@@ -22,10 +27,15 @@ export interface UseAsianSessionDetectionResult {
   todayChecks: AsianSessionDetection[];
   firedRows: AsianSessionDetection[];
   noFireDays: string[];
+  amdMetricsByDate: ReadonlyMap<string, AsianSessionAmdMetricsSlice>;
   d1Config: D1ContextConfig;
   omegaWindow: OmegaWindowStatus | null;
   loading: boolean;
   error: string | null;
+}
+
+function distinctTradeDates(rows: readonly AsianSessionDetection[]): string[] {
+  return [...new Set(rows.map((row) => row.trade_date))];
 }
 
 function isActiveAsianPollWindow(): boolean {
@@ -52,6 +62,9 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
     asian_prior_direction_bias: null,
   });
   const [omegaWindow, setOmegaWindow] = useState<OmegaWindowStatus | null>(null);
+  const [amdMetricsByDate, setAmdMetricsByDate] = useState<
+    ReadonlyMap<string, AsianSessionAmdMetricsSlice>
+  >(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,13 +75,21 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
       setLoading(true);
       setError(null);
       try {
-        const [detectionRows, d1Context, windowStatus] = await Promise.all([
-          fetchAsianSessionDetectionLog(ASIAN_FETCH_LOOKBACK_DAYS),
+        const detectionRows = await fetchAsianSessionDetectionLog(ASIAN_FETCH_LOOKBACK_DAYS);
+        const tradeDates = distinctTradeDates(detectionRows);
+        let amdMetricRows: AsianSessionAmdMetricsSlice[] = [];
+        try {
+          amdMetricRows = await fetchAsianSessionAmdMetricsByDates(tradeDates);
+        } catch {
+          amdMetricRows = [];
+        }
+        const [d1Context, windowStatus] = await Promise.all([
           fetchD1ContextConfig(),
           fetchOmegaWindowStatus(),
         ]);
         if (!cancelled) {
           setRows(detectionRows);
+          setAmdMetricsByDate(buildAsianSessionAmdMetricsMap(amdMetricRows));
           setD1Config(d1Context);
           setOmegaWindow(windowStatus);
         }
@@ -114,5 +135,16 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
   );
   const noFireDays = useMemo(() => deriveNoFireTradeDates(rows), [rows]);
 
-  return { rows, todayRow, todayChecks, firedRows, noFireDays, d1Config, omegaWindow, loading, error };
+  return {
+    rows,
+    todayRow,
+    todayChecks,
+    firedRows,
+    noFireDays,
+    amdMetricsByDate,
+    d1Config,
+    omegaWindow,
+    loading,
+    error,
+  };
 }

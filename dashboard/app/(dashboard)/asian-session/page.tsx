@@ -8,8 +8,18 @@ import { AsianSessionPageHeader } from '@/components/asianSession/AsianSessionPa
 import { AsianSessionTodayPanel } from '@/components/asianSession/AsianSessionTodayPanel';
 
 export default function AsianSessionPage() {
-  const { rows, todayRow, todayChecks, firedRows, noFireDays, d1Config, omegaWindow, loading, error } =
-    useAsianSessionDetection();
+  const {
+    rows,
+    todayRow,
+    todayChecks,
+    firedRows,
+    noFireDays,
+    amdMetricsByDate,
+    d1Config,
+    omegaWindow,
+    loading,
+    error,
+  } = useAsianSessionDetection();
 
   if (loading) {
     return (
@@ -56,7 +66,12 @@ export default function AsianSessionPage() {
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">
             Signal history
           </h2>
-          <AsianSessionHistoryTable firedRows={firedRows} noFireDays={noFireDays} rows={rows} />
+          <AsianSessionHistoryTable
+            firedRows={firedRows}
+            noFireDays={noFireDays}
+            rows={rows}
+            amdMetricsByDate={amdMetricsByDate}
+          />
         </section>
       </div>
     </div>

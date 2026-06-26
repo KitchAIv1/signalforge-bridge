@@ -1,12 +1,13 @@
 'use client';
 
+import { AsianSessionAmdMetricsCell } from '@/components/asianSession/AsianSessionAmdMetricsCell';
 import { AsianSessionConfidencePill } from '@/components/asianSession/AsianSessionConfidencePill';
 import { AsianSessionDirectionPill } from '@/components/asianSession/AsianSessionDirectionPill';
+import type { AsianSessionAmdMetricsSlice } from '@/lib/asianSessionAmdMetricsTypes';
 import {
   formatAsianNetPips,
   formatAsianSizeMultiplier,
   formatAsianTradeDate,
-  formatPriorBiasLabel,
   summarizeNoFireDay,
 } from '@/lib/asianSessionPageHelpers';
 import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
@@ -15,6 +16,7 @@ type HistoryTableProps = {
   firedRows: AsianSessionDetection[];
   noFireDays: string[];
   rows: AsianSessionDetection[];
+  amdMetricsByDate: ReadonlyMap<string, AsianSessionAmdMetricsSlice>;
 };
 
 function PriorBiasCell({ bias }: { bias: AsianSessionDetection['prior_direction_bias'] }) {
@@ -46,7 +48,12 @@ function sessionResultTone(row: AsianSessionDetection): string {
   return 'text-red-600 dark:text-red-400';
 }
 
-function FiredHistoryRow({ row }: { row: AsianSessionDetection }) {
+type FiredHistoryRowProps = {
+  row: AsianSessionDetection;
+  amdMetricsByDate: ReadonlyMap<string, AsianSessionAmdMetricsSlice>;
+};
+
+function FiredHistoryRow({ row, amdMetricsByDate }: FiredHistoryRowProps) {
   return (
     <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
       <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">
@@ -79,11 +86,31 @@ function FiredHistoryRow({ row }: { row: AsianSessionDetection }) {
       <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
         {formatAsianSizeMultiplier(row.size_multiplier)}
       </td>
+      <td className="min-w-[14rem] px-3 py-2 align-top">
+        <AsianSessionAmdMetricsCell
+          tradeDate={row.trade_date}
+          metrics={amdMetricsByDate.get(row.trade_date)}
+        />
+      </td>
     </tr>
   );
 }
 
-export function AsianSessionHistoryTable({ firedRows, noFireDays, rows }: HistoryTableProps) {
+function AmdSnapshotFootnote() {
+  return (
+    <p className="text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+      AMD snapshot (~10:31 UTC) describes the finished Asian session (00:00–08:00 UTC). It was not
+      available at pattern check time. SHADOW fields are research-only and do not gate Asian fires.
+    </p>
+  );
+}
+
+export function AsianSessionHistoryTable({
+  firedRows,
+  noFireDays,
+  rows,
+  amdMetricsByDate,
+}: HistoryTableProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
@@ -100,11 +127,12 @@ export function AsianSessionHistoryTable({ firedRows, noFireDays, rows }: Histor
               <th className="px-3 py-2 text-left">Failure</th>
               <th className="px-3 py-2 text-left">Prior AMD</th>
               <th className="px-3 py-2 text-left">Size</th>
+              <th className="px-3 py-2 text-left">AMD snapshot (10:31)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {firedRows.map((row) => (
-              <FiredHistoryRow key={row.id} row={row} />
+              <FiredHistoryRow key={row.id} row={row} amdMetricsByDate={amdMetricsByDate} />
             ))}
           </tbody>
         </table>
@@ -114,6 +142,7 @@ export function AsianSessionHistoryTable({ firedRows, noFireDays, rows }: Histor
         Showing {firedRows.length} fired day{firedRows.length === 1 ? '' : 's'} · Session result from
         evaluated_net_pips / evaluated_direction
       </p>
+      <AmdSnapshotFootnote />
 
       {noFireDays.length > 0 ? (
         <details className="rounded-lg border border-slate-200 dark:border-slate-700">
@@ -124,19 +153,24 @@ export function AsianSessionHistoryTable({ firedRows, noFireDays, rows }: Histor
             {noFireDays.map((tradeDate) => {
               const summary = summarizeNoFireDay(rows, tradeDate);
               return (
-                <div
-                  key={tradeDate}
-                  className="flex flex-wrap items-center gap-2 px-4 py-2 text-sm text-slate-500 dark:text-slate-400"
-                >
-                  <span className="font-mono">{formatAsianTradeDate(tradeDate)}</span>
-                  <span className="font-medium text-slate-600 dark:text-slate-300">
-                    {summary.outcomeLabel}
-                  </span>
-                  <span>{summary.checkCount} checks</span>
-                  <span>Prior: {summary.priorAmdTag ?? '—'}</span>
-                  {summary.outcomeDetail ? (
-                    <span className="text-xs text-slate-400">{summary.outcomeDetail}</span>
-                  ) : null}
+                <div key={tradeDate} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <span className="font-mono">{formatAsianTradeDate(tradeDate)}</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-300">
+                      {summary.outcomeLabel}
+                    </span>
+                    <span>{summary.checkCount} checks</span>
+                    <span>Prior: {summary.priorAmdTag ?? '—'}</span>
+                    {summary.outcomeDetail ? (
+                      <span className="text-xs text-slate-400">{summary.outcomeDetail}</span>
+                    ) : null}
+                  </div>
+                  <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+                    <AsianSessionAmdMetricsCell
+                      tradeDate={tradeDate}
+                      metrics={amdMetricsByDate.get(tradeDate)}
+                    />
+                  </div>
                 </div>
               );
             })}
