@@ -18,8 +18,8 @@ const WINDOW_ROWS = [
   },
   {
     window: 'AMD',
-    expiryHour: '14:00 UTC',
-    range: 'Tag entry → 14:00 UTC',
+    expiryHour: '16:00 UTC',
+    range: '10:31 → 16:00 UTC (direction ungated)',
     setBy: 'AmdDetector / auto_direction (10:31 UTC)',
     tone: 'sky' as const,
   },

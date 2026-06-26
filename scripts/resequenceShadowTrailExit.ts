@@ -29,7 +29,16 @@ async function main(): Promise<void> {
   const { error: updateErr } = await supabase
     .from('omega_shadow_trail_exit')
     .upsert(gated, { onConflict: 'signal_id' });
-  if (updateErr) throw new Error(updateErr.message);
+  if (updateErr) {
+    const message = updateErr.message;
+    if (message.includes('sequenced_opt_pips_net') && message.includes('schema cache')) {
+      throw new Error(
+        `${message}\n\nApply migration 050 first:\n  npx tsx scripts/runMigration050.ts\n` +
+          'Or run migrations/050_omega_shadow_trail_exit_opt.sql in Supabase SQL Editor.',
+      );
+    }
+    throw new Error(message);
+  }
   console.log('[ShadowTrail] resequence done', { rows: gated.length, since });
 }
 

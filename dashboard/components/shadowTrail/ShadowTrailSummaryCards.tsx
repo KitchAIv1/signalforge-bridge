@@ -32,9 +32,9 @@ export function ShadowTrailSummaryCards({ summary }: ShadowTrailSummaryCardsProp
       <SectionLabel>Baseline — SL 1.5R / trail 0.5R</SectionLabel>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Live ratchet (legs sum)"
+          label="Live Trail v1"
           value={`${summary.liveTotal.toFixed(1)}p`}
-          hint={`${summary.rowCount} tp1 signals`}
+          hint={`${summary.rowCount} primary signals`}
         />
         <StatCard
           label="Shadow ungated"
@@ -68,7 +68,7 @@ export function ShadowTrailSummaryCards({ summary }: ShadowTrailSummaryCardsProp
         <StatCard
           label="Opt seq − live"
           value={`${optSeqDelta.toFixed(1)}p`}
-          hint="Optimized sequenced vs live ratchet"
+          hint="Optimized sequenced vs live Trail v1"
         />
         <StatCard
           label="Opt seq − baseline seq"

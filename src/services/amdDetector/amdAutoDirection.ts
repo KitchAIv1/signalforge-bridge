@@ -458,14 +458,14 @@ export type AmdDirectionAlertContext = {
 };
 
 /**
- * Returns ISO string for 14:00:00 UTC today.
- * AMD distribution window closes at 14:00 UTC.
- * If already past 14:00 UTC, returns 14:00 UTC tomorrow (late-run edge case).
+ * Returns ISO string for 16:00:00 UTC today.
+ * AMD distribution window closes at 16:00 UTC (hybrid dist_loose policy).
+ * If already past 16:00 UTC, returns 16:00 UTC tomorrow (late-run edge case).
  */
 function computeAmdWindowExpiry(): string {
   const now = new Date();
   const candidate = new Date(now);
-  candidate.setUTCHours(14, 0, 0, 0);
+  candidate.setUTCHours(16, 0, 0, 0);
   if (candidate.getTime() <= now.getTime()) {
     candidate.setUTCDate(candidate.getUTCDate() + 1);
   }

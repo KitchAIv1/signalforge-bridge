@@ -1,10 +1,10 @@
-/** Load omega tp1 legs pending shadow trail resolution. */
+/** Load omega primary legs pending shadow trail resolution. */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { PIP_SIZE, type PendingOmegaSignal } from './types.js';
 
-const TP1_SELECT =
-  'id, signal_id, created_at, direction, entry_price, stop_loss, pnl_pips, result';
+const PRIMARY_SELECT =
+  'id, signal_id, created_at, direction, entry_price, stop_loss, pnl_pips, result, leg_type';
 
 function readNum(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -16,24 +16,29 @@ function readNum(value: unknown): number | null {
 }
 
 function normalizeDir(raw: unknown): 'long' | 'short' | null {
-  const v = String(raw ?? '').toLowerCase();
-  if (v === 'long' || v === 'short') return v;
+  const value = String(raw ?? '').toLowerCase();
+  if (value === 'long' || value === 'short') return value;
   return null;
+}
+
+function isPrimaryOmegaLeg(legType: unknown): boolean {
+  if (legType == null) return true;
+  const label = String(legType).toLowerCase();
+  return label === 'tp1' || label === 'primary' || label === 'trail';
 }
 
 export async function loadPendingOmegaSignals(
   supabase: SupabaseClient,
   limit: number = 50,
 ): Promise<PendingOmegaSignal[]> {
-  const { data: tp1Rows, error } = await supabase
+  const { data: tradeRows, error } = await supabase
     .from('bridge_trade_log')
-    .select(TP1_SELECT)
+    .select(PRIMARY_SELECT)
     .eq('engine_id', 'omega')
-    .eq('leg_type', 'tp1')
     .in('status', ['open', 'closed'])
     .order('created_at', { ascending: false })
-    .limit(limit * 3);
-  if (error) throw new Error(`[ShadowTrail] tp1 fetch: ${error.message}`);
+    .limit(limit * 5);
+  if (error) throw new Error(`[ShadowTrail] primary fetch: ${error.message}`);
 
   const { data: resolvedRows } = await supabase
     .from('omega_shadow_trail_exit')
@@ -46,7 +51,8 @@ export async function loadPendingOmegaSignals(
   );
 
   const pending: PendingOmegaSignal[] = [];
-  for (const row of tp1Rows ?? []) {
+  for (const row of tradeRows ?? []) {
+    if (!isPrimaryOmegaLeg(row.leg_type)) continue;
     const signalId = String(row.signal_id ?? '');
     if (!signalId || resolved.has(signalId)) continue;
     const direction = normalizeDir(row.direction);
@@ -85,12 +91,15 @@ export async function loadLiveLegPnl(
   let sum = 0;
   let hasPnl = false;
   for (const row of data) {
-    const p = readNum(row.pnl_pips);
-    if (p != null) {
-      sum += p;
+    const pips = readNum(row.pnl_pips);
+    if (pips != null) {
+      sum += pips;
       hasPnl = true;
     }
   }
-  const closed = data.find(r => r.result != null);
-  return { pnlPips: hasPnl ? sum : null, result: closed?.result != null ? String(closed.result) : null };
+  const closed = data.find(row => row.result != null);
+  return {
+    pnlPips: hasPnl ? sum : null,
+    result: closed?.result != null ? String(closed.result) : null,
+  };
 }

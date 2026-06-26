@@ -21,18 +21,18 @@ import { validateSignal } from './signalValidation.js';
 import { isTripped, getPeakEquity, getConsecutiveLosses, enterCooldown } from './circuitBreaker.js';
 import { sendCircuitBreakerAlert } from '../services/telegram/alertCircuitBreaker.js';
 import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
-import { sendMultiLegExecutedAlert } from '../services/telegram/alertMultiLegExecuted.js';
-import { computeRatchetLegs } from './omegaRatchetSplit.js';
+import {
+  evaluateHybridEntryGate,
+} from './omegaHybridEntryGate.js';
+import { checkOmegaOpenTradeBlock } from './omegaOpenTradeSequencer.js';
+import { executeOmegaTrailV1Order } from './omegaTrailV1Execution.js';
 import {
   parseOmegaRawModeFlag,
   shouldBypassDirectionFlip,
   shouldBypassExecutionThreshold,
-  shouldBypassInverseSplit,
   shouldBypassIsActive,
   shouldBypassWindowGate,
 } from './omegaRawModeGates.js';
-import { checkOmegaSlPause } from './omegaSlPauseGate.js';
-import { checkOmegaT1LossSkip } from './omegaT1LossSkipGate.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
@@ -49,16 +49,11 @@ import {
   parseRebuildHourGateEnabled,
 } from './rebuildHourGate.js';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
-import { computeTrailInsertFields } from '../monitoring/trailingStopSupport.js';
-import { getOmegaTp2FloorEnabled } from '../monitoring/omegaTp2FloorSupport.js';
-import { OMEGA_T1_PIPS, OMEGA_T2_PIPS } from './omegaRatchetConstants.js';
 import { toOandaInstrument } from '../utils/pairs.js';
 import { isForexMarketOpen } from '../utils/time.js';
 import { getCachedConversionRates } from '../monitoring/heartbeat.js';
 import { getNewsWindowEvent, type NewsWindowResult } from '../utils/newsCheck.js';
 import { closeAllOpenOmegaPositions } from '../services/omegaClosePositions.js';
-import { normalizeDirection } from './omegaInverseGates.js';
-import { processOmegaInverse } from './omegaInverseRouter.js';
 
 /** Last effective omega_direction (same source as resolveOmegaDirection). Used to detect DB/env flips. */
 let cachedOmegaDirection: string | null = null;
@@ -462,28 +457,13 @@ export async function processSignal(
       ? directionModeRow.data.config_value
       : 'manual';
   const omegaRawMode = parseOmegaRawModeFlag(omegaRawModeRow.data?.config_value);
+  const signalFiredAtIso = String(payload.created_at ?? new Date().toISOString());
 
-  // ── Omega Inverse direction split ─────────────────────────────
-  // Skipped in raw mode: signal direction goes straight to Prime.
-  if (norm.engineId === 'omega' && !shouldBypassInverseSplit(norm.engineId, omegaRawMode)) {
-    const dtwNorm = normalizeDirection(norm.direction);
-    const dirNorm = normalizeDirection(omegaDirection);
-
-    if (dtwNorm !== null && dirNorm !== null && dtwNorm !== dirNorm) {
-      // DTW opposes omega_direction — Inverse handles, Prime suppressed
-      await processOmegaInverse(payload, norm, omegaDirection, {
-        supabase,
-        config,
-        getCachedAccount,
-        engines,
-        decisionLatencyMs,
-      });
-      return;
-    }
-    // DTW agrees with omega_direction — Prime executes normally
-    // Inverse suppressed (its internal gate also catches this)
-  }
-  // ── End Omega Inverse direction split ─────────────────────────
+  // ── Omega Inverse direction split (DISABLED) ───────────────────────────────
+  // Hybrid deployable policy: no processOmegaInverse routing from prime signals.
+  // Asian mismatch → hybrid entry gate BLOCK. Dist loose → prime DTW as fired.
+  // See omegaInverseSplitPolicy.ts and omegaInverseRouter.ts (history/dashboard).
+  // ── End Omega Inverse direction split ───────────────────────────────────────
 
   const engine = findEngine(engines, norm.engineId);
   // In raw mode, omega bypasses is_active gate (engine row is currently inactive).
@@ -706,86 +686,63 @@ export async function processSignal(
     }
   }
 
-  // One-trade-at-a-time: block if a tp1 leg is currently open.
-  // tp1 open = the entry trade hasn't resolved yet — no new signal.
-  // tp2/trail open = bonus legs riding after entry resolved — new signals allowed.
-  // Prevents OANDA netting artifacts and signal stacking during the entry window.
+  // One-trade-at-a-time: block if any omega trade is currently open.
   if (norm.engineId === 'omega') {
-    const { data: openTp1Rows } = await supabase
-      .from('bridge_trade_log')
-      .select('id, oanda_trade_id, direction')
-      .eq('engine_id', 'omega')
-      .eq('status', 'open')
-      .eq('leg_type', 'tp1')
-      .not('oanda_trade_id', 'is', null)
-      .limit(1);
-
-    if (openTp1Rows != null && openTp1Rows.length > 0) {
-      const blocker = openTp1Rows[0];
-      const blockMsg =
-        `OMEGA_TRADE_OPEN: ` +
-        `${blocker.direction} trade ${blocker.oanda_trade_id} ` +
-        `tp1 still open — one trade at a time`;
-      logInfo('[Omega] Blocked — tp1 leg still open', {
+    const openTradeBlock = await checkOmegaOpenTradeBlock(supabase);
+    if (openTradeBlock.blocked) {
+      logInfo('[Omega] Blocked — open trade still active', {
         signalId,
-        blockReason: blockMsg,
+        blockReason: openTradeBlock.reason,
       });
       await supabase.from('bridge_trade_log').insert(
         buildTradeLogRow(
           payload,
           'BLOCKED',
-          blockMsg,
+          openTradeBlock.reason ?? 'OMEGA_TRADE_OPEN',
           decisionLatencyMs,
           cachedAccount?.equity ?? null,
           openTrades.length,
-          norm.oandaInstrument
-        )
+          norm.oandaInstrument,
+        ),
       );
       return;
     }
   }
 
-  // ── Omega SL pause gate ────────────────────────────────────────────────────
-  // After 3 consecutive tp1 losses in the current session, omega pauses
-  // for the remainder of that session. Resumes automatically at session change.
-  if (norm.engineId === 'omega') {
-    const slPause = await checkOmegaSlPause(supabase);
-    if (slPause.blocked) {
-      logInfo('[Omega] SL pause gate — blocked', { signalId, reason: slPause.reason });
-      await supabase.from('bridge_trade_log').insert(
-        buildTradeLogRow(payload, 'BLOCKED', slPause.reason ?? 'OMEGA_SL_PAUSE', decisionLatencyMs, cachedAccount?.equity ?? null, openTrades.length, norm.oandaInstrument)
-      );
-      return;
-    }
-  }
-  // ── End Omega SL pause gate ───────────────────────────────────────────────
-
-  // ── Omega T1-loss skip gate ───────────────────────────────────────────────
-  // Skip the first signal that arrives after a T1 loss. Resets after one skip.
-  if (norm.engineId === 'omega') {
-    const t1Skip = await checkOmegaT1LossSkip(supabase);
-    if (t1Skip.blocked) {
-      logInfo('[Omega] T1-loss skip gate — blocked', { signalId, reason: t1Skip.reason });
+  // ── Omega hybrid entry gate ───────────────────────────────────────────────
+  // Asian gated; distribution 10:31–16:00 direction ungated. Raw mode bypasses.
+  if (norm.engineId === 'omega' && !shouldBypassWindowGate(norm.engineId, omegaRawMode)) {
+    const hybridGate = evaluateHybridEntryGate(
+      signalFiredAtIso,
+      norm.direction,
+      omegaDirection,
+    );
+    if (!hybridGate.passed) {
+      logInfo('[Omega] Blocked — hybrid entry gate', {
+        signalId,
+        session: hybridGate.session,
+        reason: hybridGate.reason,
+      });
       await supabase.from('bridge_trade_log').insert(
         buildTradeLogRow(
           payload,
           'BLOCKED',
-          t1Skip.reason ?? 'OMEGA_T1_LOSS_SKIP',
+          hybridGate.reason ?? 'OMEGA_HYBRID_GATE',
           decisionLatencyMs,
           cachedAccount?.equity ?? null,
           openTrades.length,
-          norm.oandaInstrument
-        )
+          norm.oandaInstrument,
+        ),
       );
       return;
     }
   }
-  // ── End Omega T1-loss skip gate ───────────────────────────────────────────
+  // ── End Omega hybrid entry gate ───────────────────────────────────────────
 
   // ── Omega window gate ────────────────────────────────────────────────────
   // Omega only fires during active windows:
   //   Asian session:    21:00–08:00 UTC (written by AsianDirectionService)
-  //   AMD distribution: tag entry hour–14:00 UTC (written by AmdDetectorService)
+  //   AMD distribution: tag entry hour–16:00 UTC (written by AmdDetectorService)
   // Outside these windows omega_direction_valid_until is expired → BLOCKED.
   // Raw mode bypasses this gate — DTW pattern match is the only qualifier.
   if (norm.engineId === 'omega' && !shouldBypassWindowGate(norm.engineId, omegaRawMode)) {
@@ -1019,189 +976,24 @@ export async function processSignal(
     const useTrailStop = TRAIL_STOP_ENGINES.includes(norm.engineId);
 
     if (norm.engineId === 'omega') {
-      const legs = computeRatchetLegs(
+      await executeOmegaTrailV1Order({
+        supabase,
+        payload,
+        norm,
         finalUnits,
-        norm.entryPrice,
-        norm.direction as 'LONG' | 'SHORT',
-        norm.oandaInstrument,
-      );
-
-      const executedLegs: Array<{
-        legType: string;
-        units: number;
-        fillPrice: number;
-        takeProfitPrice: string | null;
-        oandaTradeId: string;
-      }> = [];
-
-      for (const leg of legs) {
-        if (leg.units === 0) {
-          logWarn('[Omega Ratchet] Skipping zero-unit leg', {
-            signalId,
-            legType: leg.legType,
-            finalUnits,
-          });
-          continue;
-        }
-
-        const legUseTrailStop = leg.legType === 'trail';
-
-        const { orderResult } = await placeMarketOrderWithRebuildBoundsRetry({
-          norm,
-          finalUnits: leg.units,
-          useTrailStop: legUseTrailStop,
-          maxOrderTimeoutMs: config.maxOrderTimeoutMs,
-          rebuildBoundsRetryEnabled: false,
-          takeProfitPriceOverride: leg.takeProfitPrice ?? undefined,
-        });
-
-        if (orderResult.orderCancelTransaction) {
-          logInfo('[Omega Ratchet] Leg cancelled', {
-            legType: leg.legType,
-            reason: orderResult.orderCancelTransaction.reason,
-          });
-          continue;
-        }
-
-        const fillTx = orderResult.orderFillTransaction;
-        const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id;
-        const filledUnits = fillTx?.units != null ? Number(fillTx.units) : leg.units;
-        const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
-
-        const row = buildTradeLogRow(
-          payload,
-          'EXECUTED',
-          null,
-          decisionLatencyMs,
-          cachedAccount?.equity ?? null,
-          openTrades.length,
-          norm.oandaInstrument,
-          norm.direction,
-        );
-        const rowRecord = row as Record<string, unknown>;
-        rowRecord.oanda_order_id = fillTx?.id;
-        rowRecord.oanda_trade_id = tradeId;
-        rowRecord.units = filledUnits;
-        rowRecord.leg_type = leg.legType;
-        if (fillPrice != null) rowRecord.fill_price = fillPrice;
-        if (leg.takeProfitPrice) {
-          rowRecord.take_profit = parseFloat(leg.takeProfitPrice);
-        }
-
-        if (fillPrice != null) {
-          const signalRSize = Math.abs(norm.entryPrice - norm.stopLoss);
-          const mirroredSL = norm.direction === 'SHORT'
-            ? fillPrice + signalRSize
-            : fillPrice - signalRSize;
-          rowRecord.stop_loss = mirroredSL;
-        }
-
-        attachOmegaAuditFields(rowRecord, regimeState, regimeSizeMultiplier, amdState, directionMode);
-
-        const { error: insertError } = await supabase.from('bridge_trade_log').insert(row);
-        if (insertError) {
-          logError('[Omega Ratchet] bridge_trade_log insert failed', {
-            legType: leg.legType,
-            tradeId,
-            error: insertError.message,
-          });
-          continue;
-        }
-
-        if (leg.legType === 'trail' && tradeId && fillPrice != null) {
-          const trailMetrics = computeTrailInsertFields(rowRecord);
-          if (trailMetrics) {
-            const { error: trailInsErr } = await supabase.from('trail_stop_state').insert({
-              oanda_trade_id: tradeId,
-              engine_id: norm.engineId,
-              pair: norm.oandaInstrument,
-              direction: String(rowRecord.direction ?? norm.direction).toLowerCase(),
-              entry_price: fillPrice,
-              sl_distance: trailMetrics.slDistance,
-              trail_distance: trailMetrics.trailDistance,
-              r_size_raw: trailMetrics.rSizeRaw,
-              peak_favorable: 0,
-              trail_activated: false,
-              activation_threshold: trailMetrics.activationThreshold,
-            });
-            if (trailInsErr) {
-              logError('[Omega Ratchet] Trail state registration failed — trade monitor will retry', {
-                tradeId,
-                error: trailInsErr.message,
-              });
-            } else {
-              logInfo('[Omega Ratchet] Trail state registered in-loop', { tradeId, signalId });
-            }
-          } else {
-            logError('[Omega Ratchet] Trail metrics unavailable — trade monitor will retry', {
-              tradeId,
-              signalId,
-            });
-          }
-        }
-
-        if (
-          leg.legType === 'tp2' &&
-          tradeId &&
-          fillPrice != null &&
-          getOmegaTp2FloorEnabled()
-        ) {
-          const { error: floorInsErr } = await supabase.from('omega_tp2_floor_state').insert({
-            oanda_trade_id: tradeId,
-            engine_id: norm.engineId,
-            pair: norm.oandaInstrument,
-            direction: String(rowRecord.direction ?? norm.direction).toLowerCase(),
-            fill_price: fillPrice,
-            floor_pips: OMEGA_T1_PIPS,
-            tp_target_pips: OMEGA_T2_PIPS,
-            peak_favorable_pips: 0,
-          });
-          if (floorInsErr) {
-            logError('[Omega Ratchet] tp2 floor state registration failed — monitor will retry', {
-              tradeId,
-              error: floorInsErr.message,
-            });
-          } else {
-            logInfo('[Omega Ratchet] tp2 floor state registered in-loop', { tradeId, signalId });
-          }
-        }
-
-        const { data: eng } = await supabase
-          .from('bridge_engines')
-          .select('trades_today')
-          .eq('engine_id', norm.engineId)
-          .single();
-        const newCount =
-          ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
-        await supabase
-          .from('bridge_engines')
-          .update({ trades_today: newCount, updated_at: new Date().toISOString() })
-          .eq('engine_id', norm.engineId);
-
-        if (fillPrice != null && tradeId) {
-          executedLegs.push({
-            legType: leg.legType,
-            units: filledUnits,
-            fillPrice,
-            takeProfitPrice: leg.takeProfitPrice,
-            oandaTradeId: tradeId,
-          });
-        }
-      }
-
-      if (executedLegs.length > 0) {
-        logInfo('Omega ratchet trade executed', {
-          signalId,
-          pair: norm.oandaInstrument,
-          legs: executedLegs.length,
-        });
-        void sendMultiLegExecutedAlert({
-          instrument: norm.oandaInstrument,
-          direction: norm.direction,
-          legs: executedLegs,
-        }).catch(() => {});
-      }
-
+        signalId,
+        config,
+        engine,
+        decisionLatencyMs,
+        cachedAccountEquity: cachedAccount?.equity ?? null,
+        openTradeCount: openTrades.length,
+        regimeState,
+        regimeSizeMultiplier,
+        amdState,
+        directionMode,
+        buildTradeLogRow,
+        attachOmegaAuditFields,
+      });
       return;
     }
 

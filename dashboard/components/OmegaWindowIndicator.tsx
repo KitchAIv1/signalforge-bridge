@@ -48,7 +48,7 @@ function resolveDirectionColor(direction: string | null): string {
 
 function resolveWindowRangeLabel(windowType: OmegaWindowType): string {
   if (windowType === 'ASIAN') return 'Asian  21:00 – 08:00 UTC';
-  if (windowType === 'AMD') return 'AMD entry – 14:00 UTC';
+  if (windowType === 'AMD') return 'Distribution 10:31 – 16:00 UTC';
   return '—';
 }
 

@@ -4,6 +4,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import {
+  SHADOW_TRAIL_SL_R_LONG,
+  SHADOW_TRAIL_SL_R_SHORT,
+} from '../services/shadowTrailExit/resolveOptimizedSlR.js';
+
 export function getTrailEnabled(): boolean {
   return process.env.TRAIL_STOP_ENABLED === 'true';
 }
@@ -11,6 +16,22 @@ export function getTrailEnabled(): boolean {
 export function getTrailEngineIds(): string[] {
   const raw = process.env.TRAIL_STOP_ENGINE_IDS ?? '';
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+export function getSlMultiplierForTrade(
+  engineId?: string,
+  direction?: string,
+): number {
+  if (engineId === 'omega') {
+    const dir = String(direction ?? '').toLowerCase();
+    if (dir === 'short') {
+      return parseFloat(process.env.TRAIL_STOP_SL_MULTIPLIER_OMEGA_SHORT ?? String(SHADOW_TRAIL_SL_R_SHORT));
+    }
+    if (dir === 'long') {
+      return parseFloat(process.env.TRAIL_STOP_SL_MULTIPLIER_OMEGA_LONG ?? String(SHADOW_TRAIL_SL_R_LONG));
+    }
+  }
+  return getSlMultiplier();
 }
 
 export function getSlMultiplier(): number {
@@ -95,8 +116,9 @@ export function computeTrailInsertFields(row: Record<string, unknown>): {
   const stopLoss = Number(row.stop_loss);
   const rSizeRaw = Math.abs(fillPrice - stopLoss);
   if (!Number.isFinite(rSizeRaw) || rSizeRaw <= 0) return null;
-  const slMultiplier = getSlMultiplier();
   const engineIdForTrail = row.engine_id != null ? String(row.engine_id) : undefined;
+  const directionForTrail = row.direction != null ? String(row.direction) : undefined;
+  const slMultiplier = getSlMultiplierForTrade(engineIdForTrail, directionForTrail);
   const trailDistanceR = getTrailDistanceMultiplier(engineIdForTrail);
   const activationR = getActivationR();
   return {
@@ -166,7 +188,8 @@ export function evaluateTrailExitDecision(
     }
   }
   if (nowActivated && adverse >= state.sl_distance) {
-    return { shouldClose: true, reason: 'trail_sl_hit', pnlR: -getSlMultiplier() };
+    const slR = state.sl_distance / state.r_size_raw;
+    return { shouldClose: true, reason: 'trail_sl_hit', pnlR: -slR };
   }
   return null;
 }

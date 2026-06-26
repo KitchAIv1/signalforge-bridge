@@ -7,7 +7,7 @@ export const SHADOW_EXECUTION_COST_PIPS = 1.2;
 export const PIP_SIZE = 0.0001;
 export const MAX_FORWARD_BARS = 576;
 
-export type SessionWindow = 'asian' | 'amd_distribution' | 'outside';
+export type SessionWindow = 'asian' | 'dist_loose' | 'outside';
 export type SequencedStatus = 'executed' | 'blocked' | 'skipped';
 
 export interface M5Bar {

@@ -48,7 +48,7 @@ export default function OmegaShadowTrailPage() {
           Omega Shadow Trail v1
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Live ratchet vs shadow trail lanes — baseline SL 1.5R vs optimized SHORT 2.0R / LONG 3.0R.
+          Live Trail v1 vs shadow lanes — optimized SL SHORT 2.0R / LONG 3.0R, trail 0.5R.
         </p>
       </div>
       <ShadowTrailSlLegend />

@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Side-by-side monitor: **live Omega ratchet PnL** vs **hypothetical Trail v1 exit** on the **same signals**. No OANDA orders — dashboard + Supabase only.
+Side-by-side monitor: **live Omega Trail v1 PnL** vs **shadow Trail v1 exit** on the **same signals**. No OANDA orders — dashboard + Supabase only.
 
 Ground-truth backtests: SIGNALFORGE `engine-omega/output/backtest_w5c0_trail_v1_jun16_jun23.txt`
 
@@ -33,7 +33,7 @@ Ground-truth backtests: SIGNALFORGE `engine-omega/output/backtest_w5c0_trail_v1_
 | Pattern | w5/c0 live signals (already filtered at emit) |
 | r floor | ≥ 4p (bridge validation) |
 | **Asian window** | **00:00–08:00 UTC** — direction = `bridge_config.omega_direction` during Asian session |
-| **AMD window** | **10:30–13:00 UTC** — direction = `amd_state.decision_auto_direction` for `trade_date` |
+| **Distribution window** | **10:31–16:00 UTC** — direction **ungated** (DTW as fired); `valid_until` **16:00 UTC** |
 
 Signals outside windows → `filter_passed=false`, no shadow PnL.
 
@@ -56,7 +56,7 @@ Baseline columns unchanged for backward compatibility.
 
 **Table:** `omega_shadow_trail_exit` (migrations `049` + `050`)
 
-**Source rows:** `bridge_trade_log` where `engine_id='omega'`, `leg_type='tp1'`, `status IN ('open','closed')`
+**Source rows:** `bridge_trade_log` where `engine_id='omega'`, primary leg (`leg_type` null / tp1 / primary), `status IN ('open','closed')`
 
 **Unique key:** `signal_id`
 
@@ -69,8 +69,8 @@ Baseline columns unchanged for backward compatibility.
 **Schedule:** Cron `*/5 * * * *` UTC in `src/index.ts`
 
 **Steps:**
-1. Load tp1 legs without shadow row
-2. Classify window (asian / amd_distribution)
+1. Load primary omega legs without shadow row
+2. Classify window (asian / dist_loose)
 3. Load expected direction (omega_direction or decision_auto_direction)
 4. Fetch M5 via `fetchCandleRange()` from entry → +48h
 5. Bar-walk trail v1 → `shadow_pips_net`
