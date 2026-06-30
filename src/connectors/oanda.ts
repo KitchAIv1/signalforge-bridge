@@ -63,8 +63,8 @@ export interface AccountSummary {
   openTradeCount: number;
 }
 
-export async function getAccountSummary(): Promise<AccountSummary> {
-  const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/summary`);
+export async function getAccountSummary(accountId?: string): Promise<AccountSummary> {
+  const res = await oandaFetch(`/v3/accounts/${accountId ?? OANDA_ACCOUNT_ID}/summary`);
   if (!res.ok) throw new Error(`OANDA account summary failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   const json = (await res.json()) as { account?: { balance?: string; NAV?: string; unrealizedPL?: string; marginUsed?: string; marginAvailable?: string; openTradeCount?: number } };
   const acc = json.account;
@@ -225,7 +225,7 @@ export interface PlaceOrderResult {
   orderCancelTransaction?: { reason?: string };
 }
 
-export async function placeMarketOrder(params: PlaceOrderParams, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<PlaceOrderResult> {
+export async function placeMarketOrder(params: PlaceOrderParams, timeoutMs: number = DEFAULT_TIMEOUT_MS, accountId?: string): Promise<PlaceOrderResult> {
   const body = {
     order: {
       type: 'MARKET',
@@ -245,7 +245,7 @@ export async function placeMarketOrder(params: PlaceOrderParams, timeoutMs: numb
     },
   };
   const res = await oandaFetch(
-    `/v3/accounts/${OANDA_ACCOUNT_ID}/orders`,
+    `/v3/accounts/${accountId ?? OANDA_ACCOUNT_ID}/orders`,
     { method: 'POST', body: JSON.stringify(body) },
     timeoutMs
   );
@@ -259,10 +259,10 @@ export interface CloseTradeResult {
   orderCancelTransaction?: { reason?: string };
 }
 
-export async function closeTrade(tradeId: string, units?: string): Promise<CloseTradeResult> {
+export async function closeTrade(tradeId: string, units?: string, accountId?: string): Promise<CloseTradeResult> {
   const body = units ? { units } : {};
   const res = await oandaFetch(
-    `/v3/accounts/${OANDA_ACCOUNT_ID}/trades/${tradeId}/close`,
+    `/v3/accounts/${accountId ?? OANDA_ACCOUNT_ID}/trades/${tradeId}/close`,
     { method: 'PUT', body: JSON.stringify(body) }
   );
   if (!res.ok) throw new Error(`OANDA close trade failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
@@ -374,10 +374,11 @@ export interface TradeByIdDetails {
  */
 export async function getTradeById(
   tradeId: string,
+  accountId?: string,
 ): Promise<TradeByIdDetails | null> {
   try {
     const res = await oandaFetch(
-      `/v3/accounts/${OANDA_ACCOUNT_ID}/trades/${tradeId}`,
+      `/v3/accounts/${accountId ?? OANDA_ACCOUNT_ID}/trades/${tradeId}`,
     );
     if (!res.ok) {
       console.warn(`[OANDA] getTradeById ${tradeId} failed: ${res.status}`);

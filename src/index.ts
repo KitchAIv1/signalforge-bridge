@@ -309,7 +309,12 @@ async function main(): Promise<void> {
     cron.schedule('0 22 * * 1-5', () => {
       void fadeHardClose().catch((e) => console.error('[AudFade] HardClose error:', e));
     }, { timezone: 'UTC' });
-    logInfo('[AudFade] Engine registered — AUDUSD_FADE_ENABLED=true');
+    const fadeAccount = process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID;
+    logInfo(
+      `[AudFade] Engine registered — AUDUSD_FADE_ENABLED=true | OANDA account=${
+        fadeAccount ?? 'SHARED (AUDUSD_FADE_OANDA_ACCOUNT_ID unset — risks cross-engine netting)'
+      }`,
+    );
   }
 
   // Skip AMD startup run if before 10:31 UTC — H1 fetch uses toISO=10:30Z, OANDA rejects future timestamps

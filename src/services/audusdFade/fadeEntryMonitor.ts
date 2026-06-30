@@ -77,7 +77,7 @@ async function openFadeTrade(
   setup: FadeSetup,
   tradeDate: string,
 ): Promise<void> {
-  const { equity } = await getAccountSummary();
+  const { equity } = await getAccountSummary(cfg.oandaAccountId);
   const units = calculateFadeUnits(equity, cfg.riskPct, cfg.stopPips);
   if (units <= 0) {
     fadeError('Calculated zero units — skipping entry', { equity, riskPct: cfg.riskPct });
@@ -87,12 +87,16 @@ async function openFadeTrade(
 
   let orderResult: Awaited<ReturnType<typeof placeMarketOrder>>;
   try {
-    orderResult = await placeMarketOrder({
-      instrument: cfg.pair,
-      units: signedUnits,
-      takeProfitPrice: setup.tp.toFixed(5),
-      stopLossPrice: setup.sl.toFixed(5),
-    });
+    orderResult = await placeMarketOrder(
+      {
+        instrument: cfg.pair,
+        units: signedUnits,
+        takeProfitPrice: setup.tp.toFixed(5),
+        stopLossPrice: setup.sl.toFixed(5),
+      },
+      undefined,
+      cfg.oandaAccountId,
+    );
   } catch (err) {
     fadeError('placeMarketOrder failed', { error: String(err), tradeDate });
     return;

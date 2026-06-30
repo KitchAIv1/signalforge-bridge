@@ -33,7 +33,7 @@ export async function runMonitors(): Promise<void> {
 async function hardCloseOne(trade: FadeTrade, cfg: FadeConfig): Promise<void> {
   if (!trade.oanda_trade_id) return;
   try {
-    const closeResult = await closeTrade(trade.oanda_trade_id);
+    const closeResult = await closeTrade(trade.oanda_trade_id, undefined, cfg.oandaAccountId);
     const fillPrice =
       closeResult.orderFillTransaction?.price != null
         ? Number(closeResult.orderFillTransaction.price)

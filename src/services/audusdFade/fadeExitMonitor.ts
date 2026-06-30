@@ -94,7 +94,7 @@ function isPastMaxHold(trade: FadeTrade, maxHoldHours: number): boolean {
 
 async function forceCloseMaxHold(trade: FadeTrade, cfg: FadeConfig): Promise<void> {
   try {
-    const closeResult = await closeTrade(trade.oanda_trade_id!);
+    const closeResult = await closeTrade(trade.oanda_trade_id!, undefined, cfg.oandaAccountId);
     const fillPrice =
       closeResult.orderFillTransaction?.price != null
         ? Number(closeResult.orderFillTransaction.price)
@@ -127,7 +127,7 @@ async function processOpenTrade(trade: FadeTrade, cfg: FadeConfig): Promise<void
 
   let details: Awaited<ReturnType<typeof getTradeById>>;
   try {
-    details = await getTradeById(trade.oanda_trade_id);
+    details = await getTradeById(trade.oanda_trade_id, cfg.oandaAccountId);
   } catch (err) {
     fadeWarn('getTradeById threw — skipping this cycle', {
       oandaTradeId: trade.oanda_trade_id,

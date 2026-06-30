@@ -49,6 +49,13 @@ export interface FadeConfig {
   riskPct: number;
   /** Max hold before force-close, in hours. Env: AUDUSD_FADE_MAX_HOLD_HOURS (default 4) */
   maxHoldHours: number;
+  /**
+   * Dedicated OANDA account for the fade so positions never net against other
+   * engines (omega/amd/etc.) sharing the main account. Env:
+   * AUDUSD_FADE_OANDA_ACCOUNT_ID. When unset, falls back to the global
+   * OANDA_ACCOUNT_ID (legacy behaviour — subject to cross-engine netting).
+   */
+  oandaAccountId: string | undefined;
 }
 
 export function loadFadeConfig(): FadeConfig {
@@ -64,6 +71,7 @@ export function loadFadeConfig(): FadeConfig {
     maxTradesDay: Number(process.env.AUDUSD_FADE_MAX_TRADES_DAY ?? '2'),
     riskPct: Number(process.env.AUDUSD_FADE_RISK_PCT ?? '2'),
     maxHoldHours: Number(process.env.AUDUSD_FADE_MAX_HOLD_HOURS ?? '4'),
+    oandaAccountId: process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID || undefined,
   };
 }
 
