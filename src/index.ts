@@ -36,6 +36,10 @@ import {
   initializeDayState as scalperInitDay,
   runMonitors as scalperRunMonitors,
 } from './services/scalper/ScalperEngine.js';
+import {
+  hardClose as fadeHardClose,
+  runMonitors as fadeRunMonitors,
+} from './services/audusdFade/FadeEngine.js';
 import { runPdlSweepDetection } from './services/pdlSweepDetector/pdlSweepDetectorService.js';
 import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeService.js';
 import { runShadowTrailExitResolver } from './services/shadowTrailExit/shadowTrailExitService.js';
@@ -293,6 +297,19 @@ async function main(): Promise<void> {
       void scalperHardClose().catch((e) => console.error('[Scalper] HardClose error:', e));
     }, { timezone: 'UTC' });
     logInfo('[Scalper] Engine registered — SCALPER_ENABLED=true');
+  }
+
+  // AUDUSD Fade engine — EURUSD-gated SMA50 mean-reversion fade on AUD_USD.
+  // Self-contained paper engine (OANDA practice); mirrors closed trades into Activity.
+  // Controlled by AUDUSD_FADE_ENABLED env var. Set to 'true' on Railway to activate.
+  if (process.env.AUDUSD_FADE_ENABLED === 'true') {
+    setInterval(() => {
+      void fadeRunMonitors().catch((e) => console.error('[AudFade] Monitor error:', e));
+    }, 30000);
+    cron.schedule('0 22 * * 1-5', () => {
+      void fadeHardClose().catch((e) => console.error('[AudFade] HardClose error:', e));
+    }, { timezone: 'UTC' });
+    logInfo('[AudFade] Engine registered — AUDUSD_FADE_ENABLED=true');
   }
 
   // Skip AMD startup run if before 10:31 UTC — H1 fetch uses toISO=10:30Z, OANDA rejects future timestamps
