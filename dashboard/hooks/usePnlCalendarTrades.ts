@@ -27,6 +27,7 @@ export function usePnlCalendarTrades() {
         'scalper',
         'engine_amd',
         'omega_inverse',
+        'audusd_fade',
       ])
       .eq('status', 'closed')
       .gte('created_at', PNL_CALENDAR_QUERY_START_ISO)

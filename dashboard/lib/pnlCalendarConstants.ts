@@ -12,4 +12,5 @@ export const ENGINE_COLORS: Record<string, string> = {
   scalper: '#1D9E75',
   engine_amd: '#f59e0b',
   omega_inverse: '#c026d3',
+  audusd_fade: '#0ea5e9',
 };
