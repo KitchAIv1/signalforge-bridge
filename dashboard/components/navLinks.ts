@@ -12,6 +12,7 @@ export const NAV_ROUTE_LINKS: NavRouteLink[] = [
   { href: '/omega-shadow-trail', label: 'Shadow Trail v1' },
   { href: '/pdl-sweep', label: 'PDL Sweep' },
   { href: '/asian-session', label: 'Asian Session' },
+  { href: '/audusd-fade', label: 'AUDUSD Fade' },
   { href: '/calendar', label: 'Calendar' },
   { href: '/health', label: 'Health' },
   { href: '/intelligence', label: 'Intelligence' },
