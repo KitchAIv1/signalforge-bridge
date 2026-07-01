@@ -43,6 +43,7 @@ import {
 import { runPdlSweepDetection } from './services/pdlSweepDetector/pdlSweepDetectorService.js';
 import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeService.js';
 import { runShadowTrailExitResolver } from './services/shadowTrailExit/shadowTrailExitService.js';
+import { runMt5StartupDiagnostics } from './services/broker/mt5StartupDiagnostics.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -88,6 +89,15 @@ async function main(): Promise<void> {
   await runStartupReconciliation(supabase);
   const tableName = getSignalTableName();
   logInfo('Bridge starting', { table: tableName, engines: engines.map((e) => e.engine_id), mode: process.env.OANDA_ENVIRONMENT ?? 'practice' });
+
+  try {
+    await runMt5StartupDiagnostics(
+      supabase,
+      engines.map((engineRow) => engineRow.engine_id),
+    );
+  } catch (mt5StartupErr) {
+    logWarn('[MT5] Startup diagnostics failed — bridge continues', { error: String(mt5StartupErr) });
+  }
 
   const heartbeatIntervalMs = config.heartbeatIntervalMs ?? 30000;
   setInterval(() => runHeartbeat(supabase), heartbeatIntervalMs);
