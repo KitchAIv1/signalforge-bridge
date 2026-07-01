@@ -22,6 +22,13 @@ function num(value: unknown, fallback = 0): number {
  * Volume-weighted average close price and total realized P&L across every
  * DEAL_ENTRY_OUT (and DEAL_ENTRY_OUT_BY, for hedge closes) deal on the position.
  */
+/** Exit price, close time, and realized P&L from position deal history. */
+export function extractCloseFillFromDeals(
+  deals: Deal[],
+): { price: number; time: string; realizedPL: number } | null {
+  return summarizeCloseDeals(deals);
+}
+
 function summarizeCloseDeals(deals: Deal[]): { price: number; time: string; realizedPL: number } | null {
   const outDeals = deals.filter((d) => {
     const entryType = String(d.entryType ?? '');

@@ -7,7 +7,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildClosedTradeDetailsFromDeals } from './mt5DealHistory.js';
+import { extractCloseFillFromDeals, buildClosedTradeDetailsFromDeals } from './mt5DealHistory.js';
 
 const REAL_CLOSED_POSITION_DEALS = [
   {
@@ -86,5 +86,15 @@ describe('buildClosedTradeDetailsFromDeals', () => {
     assert.ok(Math.abs(details!.averageClosePrice! - 0.6905) < 1e-9);
     assert.equal(details!.realizedPL, 50 + 60 - 1);
     assert.equal(details!.closeTime, '2026-07-01T14:00:00.000Z');
+  });
+});
+
+describe('extractCloseFillFromDeals', () => {
+  it('returns exit price and profit for bridge-initiated close', () => {
+    const fill = extractCloseFillFromDeals(REAL_CLOSED_POSITION_DEALS);
+    assert.ok(fill);
+    assert.equal(fill!.price, 0.69012);
+    assert.equal(fill!.realizedPL, 142.04);
+    assert.equal(fill!.time, '2026-07-01T13:32:10.079Z');
   });
 });

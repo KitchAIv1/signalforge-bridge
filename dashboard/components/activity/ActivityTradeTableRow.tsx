@@ -6,6 +6,7 @@ import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
 import { CloseTagButton } from '@/components/activity/CloseTagButton';
 import { OmegaLegTypeBadge } from '@/components/shared/OmegaLegTypeBadge';
+import { BrokerVenueBadge } from '@/components/shared/BrokerVenueBadge';
 import { formatCloseReason } from '@/lib/formatCloseReason';
 
 export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
@@ -35,8 +36,11 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
     <tr className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50">
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{formatActivityIsoTimestamp(row.created_at)}</td>
       <td className="px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100">
-        {row.engine_id}
-        <OmegaLegTypeBadge legType={row.leg_type} />
+        <div className="flex flex-wrap items-center gap-1">
+          {row.engine_id}
+          <OmegaLegTypeBadge legType={row.leg_type} />
+          <BrokerVenueBadge brokerId={row.broker_id} />
+        </div>
       </td>
       <td className="px-3 py-2 text-xs text-slate-800 dark:text-slate-300">{row.pair}</td>
       <td className="px-3 py-2 text-xs font-medium">

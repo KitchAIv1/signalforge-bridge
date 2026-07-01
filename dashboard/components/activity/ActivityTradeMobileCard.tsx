@@ -5,6 +5,7 @@ import { amdTagLabel, amdTagColor } from '@/lib/amdPanelFormatters';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
 import { OmegaLegTypeBadge } from '@/components/shared/OmegaLegTypeBadge';
+import { BrokerVenueBadge } from '@/components/shared/BrokerVenueBadge';
 
 interface ActivityTradeMobileCardProps {
   row: BridgeTradeLogRow;
@@ -46,6 +47,7 @@ export function ActivityTradeMobileCard({ row }: ActivityTradeMobileCardProps) {
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-900 dark:text-slate-100">
             <span className="font-semibold">{row.engine_id}</span>
             <OmegaLegTypeBadge legType={row.leg_type} />
+            <BrokerVenueBadge brokerId={row.broker_id} />
             <span className="text-slate-700 dark:text-slate-400">{row.pair}</span>
           </div>
         </div>

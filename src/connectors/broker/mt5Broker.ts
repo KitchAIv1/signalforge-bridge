@@ -6,7 +6,7 @@ import { getMt5Session } from './mt5RpcPool.js';
 import { placeMt5MarketOrder } from './mt5OrderHelpers.js';
 import { bridgeInstrumentToMt5, mt5SymbolToBridgeInstrument } from './symbolMapping.js';
 import { clampMt5Lots, mt5LotsToUnits, unitsToMt5Lots } from './lotConverter.js';
-import { buildClosedTradeDetailsFromDeals } from './mt5DealHistory.js';
+import { buildClosedTradeDetailsFromDeals, extractCloseFillFromDeals } from './mt5DealHistory.js';
 import type {
   AccountSummary,
   BrokerClient,
@@ -88,14 +88,24 @@ export function createMt5Broker(config: BrokerClientConfig): BrokerClient {
 
     async closeTrade(tradeId: string): Promise<CloseTradeResult> {
       const { rpc } = await session();
-      const result = await rpc.closePosition(tradeId);
-      return {
-        orderFillTransaction: {
-          price: result.price != null ? String(result.price) : undefined,
-          pl: result.profit != null ? String(result.profit) : undefined,
-          time: result.time != null ? String(result.time) : undefined,
-        },
-      };
+      await rpc.closePosition(tradeId);
+      // MetaApi closePosition() response omits fill price/profit — read from deal history.
+      try {
+        const dealsResult = await rpc.getDealsByPosition(tradeId);
+        const closeFill = extractCloseFillFromDeals(dealsResult.deals ?? []);
+        if (closeFill) {
+          return {
+            orderFillTransaction: {
+              price: String(closeFill.price),
+              pl: String(closeFill.realizedPL),
+              time: closeFill.time,
+            },
+          };
+        }
+      } catch {
+        // Fall through to empty fill if deal history is not yet visible.
+      }
+      return { orderFillTransaction: {} };
     },
 
     async getTradeById(tradeId: string): Promise<TradeByIdDetails | null> {
