@@ -4,6 +4,7 @@
 
 import type { PlaceOrderParams, PlaceOrderResult } from './types.js';
 import { clampMt5Lots } from './lotConverter.js';
+import { fetchMt5OpenPriceWithRetry } from './mt5FillPrice.js';
 
 const MIN_LOT = 0.01;
 const LOT_STEP = 0.01;
@@ -15,13 +16,6 @@ type RpcConnection = Awaited<
 function isTradeDone(result: Record<string, unknown>): boolean {
   const code = String(result.stringCode ?? result.description ?? '');
   return code === 'TRADE_RETCODE_DONE' || code.includes('DONE');
-}
-
-function parseFillPrice(result: Record<string, unknown>): number | null {
-  const price = result.price ?? result.openPrice;
-  if (price == null) return null;
-  const num = Number(price);
-  return Number.isFinite(num) ? num : null;
 }
 
 export async function placeMt5MarketOrder(
@@ -51,7 +45,9 @@ export async function placeMt5MarketOrder(
   }
 
   const positionId = String(rawResult.positionId ?? rawResult.orderId ?? rawResult.id ?? '');
-  const fillPrice = parseFillPrice(rawResult);
+  // MetaApi's trade() response never includes a fill price (see mt5FillPrice.ts) —
+  // fetch it from the live position right after the order confirms.
+  const fillPrice = positionId ? await fetchMt5OpenPriceWithRetry(rpc, positionId) : null;
   return {
     orderFillTransaction: {
       id: positionId,

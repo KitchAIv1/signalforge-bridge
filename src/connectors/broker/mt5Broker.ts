@@ -6,6 +6,7 @@ import { getMt5Session } from './mt5RpcPool.js';
 import { placeMt5MarketOrder } from './mt5OrderHelpers.js';
 import { bridgeInstrumentToMt5, mt5SymbolToBridgeInstrument } from './symbolMapping.js';
 import { clampMt5Lots, mt5LotsToUnits, unitsToMt5Lots } from './lotConverter.js';
+import { buildClosedTradeDetailsFromDeals } from './mt5DealHistory.js';
 import type {
   AccountSummary,
   BrokerClient,
@@ -98,25 +99,39 @@ export function createMt5Broker(config: BrokerClientConfig): BrokerClient {
     },
 
     async getTradeById(tradeId: string): Promise<TradeByIdDetails | null> {
+      const { rpc } = await session();
       try {
-        const { rpc } = await session();
         const pos = await rpc.getPosition(tradeId);
-        if (!pos) return null;
-        const volume = Number(pos.volume ?? 0);
-        const type = String(pos.type ?? '');
-        const signedUnits = type.includes('BUY') ? mt5LotsToUnits(volume) : -mt5LotsToUnits(volume);
-        return {
-          tradeId,
-          state: 'OPEN',
-          instrument: mt5SymbolToBridgeInstrument(String(pos.symbol ?? '')),
-          units: String(signedUnits),
-          currentUnits: String(signedUnits),
-          openTime: String(pos.time ?? ''),
-          closeTime: null,
-          averageClosePrice: null,
-          realizedPL: null,
-          unrealizedPL: pos.profit != null ? Number(pos.profit) : null,
-        };
+        if (pos) {
+          const volume = Number(pos.volume ?? 0);
+          const type = String(pos.type ?? '');
+          const signedUnits = type.includes('BUY') ? mt5LotsToUnits(volume) : -mt5LotsToUnits(volume);
+          return {
+            tradeId,
+            state: 'OPEN',
+            instrument: mt5SymbolToBridgeInstrument(String(pos.symbol ?? '')),
+            units: String(signedUnits),
+            currentUnits: String(signedUnits),
+            openTime: String(pos.time ?? ''),
+            closeTime: null,
+            averageClosePrice: null,
+            realizedPL: null,
+            unrealizedPL: pos.profit != null ? Number(pos.profit) : null,
+          };
+        }
+      } catch {
+        // Not found among live positions — likely closed. Fall through to deal history.
+      }
+
+      // rpc.getPosition only sees LIVE positions; once closed (manual close, broker
+      // SL/TP, liquidation) it 404s. Reconstruct the close from deal history instead
+      // of returning null, which would leave the trade stuck "open" forever.
+      try {
+        const dealsResult = await rpc.getDealsByPosition(tradeId);
+        const details = buildClosedTradeDetailsFromDeals(tradeId, dealsResult.deals ?? []);
+        return details
+          ? { ...details, instrument: mt5SymbolToBridgeInstrument(details.instrument) }
+          : null;
       } catch {
         return null;
       }

@@ -8,6 +8,7 @@ type RpcConnection = {
   getAccountInformation(): Promise<Record<string, unknown>>;
   getPositions(): Promise<Array<Record<string, unknown>>>;
   getPosition(positionId: string): Promise<Record<string, unknown>>;
+  getDealsByPosition(positionId: string): Promise<{ deals?: Array<Record<string, unknown>> }>;
   createMarketBuyOrder(
     symbol: string,
     volume: number,
