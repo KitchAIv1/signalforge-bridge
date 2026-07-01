@@ -11,6 +11,11 @@ import type { BrokerClient } from '../connectors/broker/types.js';
 import { placeMarketOrderViaBroker } from '../services/broker/brokerMarketOrder.js';
 import { computeTrailInsertFields } from '../monitoring/trailingStopSupport.js';
 import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
+import {
+  applyOmegaFillUpdate,
+  insertPendingOmegaRow,
+  markOmegaRowCancelled,
+} from './omegaTrailV1PendingRow.js';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
 import type { ValidationResult } from './signalValidation.js';
 import type { DecisionType } from '../types/signals.js';
@@ -106,6 +111,23 @@ async function registerTrailState(
   logInfo('[Omega TrailV1] Trail state registered in-loop', { tradeId, signalId });
 }
 
+async function bumpOmegaTradesToday(
+  supabase: SupabaseClient,
+  engineId: string,
+  fallbackCount: number,
+): Promise<void> {
+  const { data: eng } = await supabase
+    .from('bridge_engines')
+    .select('trades_today')
+    .eq('engine_id', engineId)
+    .single();
+  const newCount = ((eng as { trades_today?: number } | null)?.trades_today ?? fallbackCount) + 1;
+  await supabase
+    .from('bridge_engines')
+    .update({ trades_today: newCount, updated_at: new Date().toISOString() })
+    .eq('engine_id', engineId);
+}
+
 export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps): Promise<void> {
   const {
     supabase,
@@ -128,37 +150,8 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
     brokerId,
   } = deps;
 
-  const { orderResult } = await placeMarketOrderViaBroker({
-    broker,
-    norm,
-    finalUnits,
-    useTrailStop: true,
-    maxOrderTimeoutMs: config.maxOrderTimeoutMs,
-    rebuildBoundsRetryEnabled: false,
-  });
-
-  if (orderResult.orderCancelTransaction) {
-    const cancelReason = orderResult.orderCancelTransaction.reason ?? 'Order cancelled';
-    await supabase.from('bridge_trade_log').insert({
-      ...buildTradeLogRow(
-        payload,
-        'BLOCKED',
-        cancelReason,
-        decisionLatencyMs,
-        cachedAccountEquity,
-        openTradeCount,
-        norm.oandaInstrument,
-      ),
-      units: finalUnits,
-    });
-    return;
-  }
-
-  const fillTx = orderResult.orderFillTransaction;
-  const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id;
-  const filledUnits = fillTx?.units != null ? Number(fillTx.units) : finalUnits;
-  const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
-
+  // Pre-insert BEFORE placing the order: if this fails, the order is never
+  // placed, so no broker-side capital can ever be left untracked.
   const row = buildTradeLogRow(
     payload,
     'EXECUTED',
@@ -170,29 +163,58 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
     norm.direction,
   );
   const rowRecord = row as Record<string, unknown>;
+  rowRecord.broker_id = brokerId;
+  rowRecord.units = finalUnits;
+  attachOmegaAuditFields(rowRecord, regimeState, regimeSizeMultiplier, amdState, directionMode);
+
+  const pending = await insertPendingOmegaRow(supabase, rowRecord, { signalId, brokerId });
+  if (!pending) return;
+
+  const { orderResult } = await placeMarketOrderViaBroker({
+    broker,
+    norm,
+    finalUnits,
+    useTrailStop: true,
+    maxOrderTimeoutMs: config.maxOrderTimeoutMs,
+    rebuildBoundsRetryEnabled: false,
+  });
+
+  if (orderResult.orderCancelTransaction) {
+    await markOmegaRowCancelled(
+      supabase,
+      pending.rowId,
+      orderResult.orderCancelTransaction.reason ?? 'Order cancelled',
+    );
+    return;
+  }
+
+  const fillTx = orderResult.orderFillTransaction;
+  const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id;
+  const filledUnits = fillTx?.units != null ? Number(fillTx.units) : finalUnits;
+  const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
+  const mirroredStop =
+    fillPrice != null
+      ? mirrorStructureStop(fillPrice, norm.entryPrice, norm.stopLoss, norm.direction)
+      : undefined;
+
+  await applyOmegaFillUpdate(
+    supabase,
+    pending.rowId,
+    {
+      oanda_order_id: fillTx?.id,
+      oanda_trade_id: tradeId,
+      units: filledUnits,
+      ...(fillPrice != null ? { fill_price: fillPrice, stop_loss: mirroredStop } : {}),
+    },
+    { signalId, brokerId },
+  );
+
   rowRecord.oanda_order_id = fillTx?.id;
   rowRecord.oanda_trade_id = tradeId;
-  rowRecord.broker_id = brokerId;
   rowRecord.units = filledUnits;
   if (fillPrice != null) {
     rowRecord.fill_price = fillPrice;
-    rowRecord.stop_loss = mirrorStructureStop(
-      fillPrice,
-      norm.entryPrice,
-      norm.stopLoss,
-      norm.direction,
-    );
-  }
-
-  attachOmegaAuditFields(rowRecord, regimeState, regimeSizeMultiplier, amdState, directionMode);
-
-  const { error: insertError } = await supabase.from('bridge_trade_log').insert(row);
-  if (insertError) {
-    logError('[Omega TrailV1] bridge_trade_log insert failed', {
-      tradeId,
-      error: insertError.message,
-    });
-    return;
+    rowRecord.stop_loss = mirroredStop;
   }
 
   if (tradeId && fillPrice != null) {
@@ -202,17 +224,7 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
     await registerTrailState(supabase, rowRecord, tradeId, fillPrice, signalId);
   }
 
-  const { data: eng } = await supabase
-    .from('bridge_engines')
-    .select('trades_today')
-    .eq('engine_id', norm.engineId)
-    .single();
-  const newCount =
-    ((eng as { trades_today?: number } | null)?.trades_today ?? engine.trades_today) + 1;
-  await supabase
-    .from('bridge_engines')
-    .update({ trades_today: newCount, updated_at: new Date().toISOString() })
-    .eq('engine_id', norm.engineId);
+  await bumpOmegaTradesToday(supabase, norm.engineId, engine.trades_today);
 
   logInfo('Omega Trail v1 trade executed', {
     signalId,
