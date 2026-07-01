@@ -24,7 +24,7 @@ import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution
 import {
   evaluateHybridEntryGate,
 } from './omegaHybridEntryGate.js';
-import { checkOmegaOpenTradeBlock } from './omegaOpenTradeSequencer.js';
+import { checkOmegaBrokerSequencingBlock } from './omegaOpenTradeSequencer.js';
 import { executeOmegaOnAllBrokers } from '../services/broker/omegaMultiBrokerExecution.js';
 import {
   parseOmegaRawModeFlag,
@@ -686,9 +686,10 @@ export async function processSignal(
     }
   }
 
-  // One-trade-at-a-time: block if any omega trade is currently open.
+  // One-trade-at-a-time PER BROKER: only fully block when every active omega
+  // broker is occupied; otherwise fan-out skips busy brokers and executes free ones.
   if (norm.engineId === 'omega') {
-    const openTradeBlock = await checkOmegaOpenTradeBlock(supabase);
+    const openTradeBlock = await checkOmegaBrokerSequencingBlock(supabase);
     if (openTradeBlock.blocked) {
       logInfo('[Omega] Blocked — open trade still active', {
         signalId,
