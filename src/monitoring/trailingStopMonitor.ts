@@ -4,8 +4,10 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { closeTrade, fetchLatestM5Candle, getPricing } from '../connectors/oanda.js';
+import { fetchLatestM5Candle, getPricing } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
+import { resolveBrokerForLogRow } from '../services/broker/resolveBrokerForLogRow.js';
+import { closeTradeViaBroker } from './brokerTradeLifecycle.js';
 import { computeDerivedFields, resultFromPnl } from './tradeMonitorHelpers.js';
 import { fetchCloseCandles } from './closeCandleCapture.js';
 import {
@@ -225,12 +227,11 @@ export async function closeTrailStop(
   logRow: Record<string, unknown>,
   reason: string
 ): Promise<void> {
+  const engineId = String(logRow.engine_id ?? 'omega');
+  const brokerId = logRow.broker_id as string | null | undefined;
   try {
-    const closeResult = await closeTrade(oandaTradeId);
-    const fillTx = closeResult.orderFillTransaction;
-    const closedAt = fillTx?.time ?? new Date().toISOString();
-    const pnlDollars = fillTx?.pl != null ? parseFloat(String(fillTx.pl)) : null;
-    const exitPriceNum = fillTx?.price != null ? parseFloat(String(fillTx.price)) : null;
+    const broker = await resolveBrokerForLogRow(supabase, brokerId, engineId);
+    const { closedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(broker, oandaTradeId);
     await persistBridgeLogAfterTrailClose(
       supabase,
       oandaTradeId,
@@ -245,6 +246,8 @@ export async function closeTrailStop(
     console.log(
       '[TrailStop] Closed trade',
       oandaTradeId,
+      'broker=',
+      broker.brokerId,
       'engine=',
       logRow.engine_id,
       'pair=',

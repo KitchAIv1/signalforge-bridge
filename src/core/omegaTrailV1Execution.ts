@@ -7,7 +7,8 @@ import type { SignalInsertPayload } from '../connectors/supabase.js';
 import type { BridgeConfig, BridgeEngineRow } from '../types/config.js';
 import type { ActiveRegimeState } from '../services/RegimeStateService.js';
 import type { ActiveAmdState } from '../services/amdDetector/amdStateService.js';
-import { placeMarketOrderWithRebuildBoundsRetry } from './rebuildBoundsRetryOrder.js';
+import type { BrokerClient } from '../connectors/broker/types.js';
+import { placeMarketOrderViaBroker } from '../services/broker/brokerMarketOrder.js';
 import { computeTrailInsertFields } from '../monitoring/trailingStopSupport.js';
 import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
 import { logError, logInfo, logWarn } from '../utils/logger.js';
@@ -52,6 +53,8 @@ export interface OmegaTrailV1ExecutionDeps {
   directionMode: string;
   buildTradeLogRow: TradeLogBuilder;
   attachOmegaAuditFields: AuditAttacher;
+  broker: BrokerClient;
+  brokerId: string;
 }
 
 function mirrorStructureStop(
@@ -121,9 +124,12 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
     directionMode,
     buildTradeLogRow,
     attachOmegaAuditFields,
+    broker,
+    brokerId,
   } = deps;
 
-  const { orderResult } = await placeMarketOrderWithRebuildBoundsRetry({
+  const { orderResult } = await placeMarketOrderViaBroker({
+    broker,
     norm,
     finalUnits,
     useTrailStop: true,
@@ -166,6 +172,7 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
   const rowRecord = row as Record<string, unknown>;
   rowRecord.oanda_order_id = fillTx?.id;
   rowRecord.oanda_trade_id = tradeId;
+  rowRecord.broker_id = brokerId;
   rowRecord.units = filledUnits;
   if (fillPrice != null) {
     rowRecord.fill_price = fillPrice;

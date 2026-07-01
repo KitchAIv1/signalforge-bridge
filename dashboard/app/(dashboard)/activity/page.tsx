@@ -15,12 +15,13 @@ import { DirectionDecisionPanel } from '@/components/directionDecision/Direction
 import { AUDUSDChart } from '@/components/AUDUSDChart';
 import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
+import { useBrokerFilterOptions } from '@/hooks/useBrokerFilterOptions';
 import { OandaConnectionStatus } from '@/components/OandaConnectionStatus';
 
 const PAGE_SIZE = 50;
 
 const EXPANDED_TRADE_LOG_SELECT =
-  'id, signal_id, engine_id, pair, direction, decision, block_reason, status, result, ' +
+  'id, signal_id, engine_id, broker_id, pair, direction, decision, block_reason, status, result, ' +
   'confluence_score, units, risk_amount, pnl_dollars, fill_price, exit_price, stop_loss, ' +
   'take_profit, pnl_pips, pnl_r, lot_size, close_reason, duration_minutes, ' +
   'signal_received_at, created_at, regime_direction, regime_confidence, regime_evaluated_at, ' +
@@ -91,7 +92,9 @@ export default function ActivityPage() {
   const [page, setPage] = useState(0);
   const [decision, setDecision] = useState('EXECUTED');
   const [engine, setEngine] = useState('');
+  const [broker, setBroker] = useState('');
   const [engines, setEngines] = useState<string[]>([]);
+  const { brokerOptions } = useBrokerFilterOptions();
   const rebuildHourGateCtrl = useRebuildHourGate();
   const { omegaRawMode } = useEngineControlsState();
   usePresencePing(); // 60s heartbeat — bridge can treat as watching for omega sizing
@@ -112,6 +115,7 @@ export default function ActivityPage() {
         .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
       if (decision) q = q.eq('decision', decision as DecisionType);
       if (engine) q = q.eq('engine_id', engine);
+      if (broker) q = q.eq('broker_id', broker);
       const { data, error } = await q;
       if (error) {
         setLoading(false);
@@ -122,7 +126,7 @@ export default function ActivityPage() {
       setHasMore(list.length === PAGE_SIZE);
       setLoading(false);
     },
-    [decision, engine]
+    [decision, engine, broker]
   );
 
   useEffect(() => {
@@ -133,7 +137,7 @@ export default function ActivityPage() {
     setLoading(true);
     setPage(0);
     fetchPage(0, false);
-  }, [decision, engine, fetchPage]);
+  }, [decision, engine, broker, fetchPage]);
 
   const loadMore = useCallback(() => {
     const next = page + 1;
@@ -152,6 +156,7 @@ export default function ActivityPage() {
         .limit(5000);
       if (decision) q = q.eq('decision', decision as DecisionType);
       if (engine) q = q.eq('engine_id', engine);
+      if (broker) q = q.eq('broker_id', broker);
       const { data } = await q;
       const list = (data ?? []) as unknown as BridgeTradeLogRow[];
       const csv = toCSV(list);
@@ -162,7 +167,7 @@ export default function ActivityPage() {
       anchor.click();
       URL.revokeObjectURL(anchor.href);
     })();
-  }, [decision, engine]);
+  }, [decision, engine, broker]);
 
   return (
     <div className="space-y-6">
@@ -189,6 +194,17 @@ export default function ActivityPage() {
           {engines.map((id) => (
             <option key={id} value={id}>
               {id}
+            </option>
+          ))}
+        </select>
+        <select
+          value={broker}
+          onChange={(e) => setBroker(e.target.value)}
+          className="min-w-0 max-w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        >
+          {brokerOptions.map((option) => (
+            <option key={option.value || 'all'} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>

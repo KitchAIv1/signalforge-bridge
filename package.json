@@ -19,7 +19,11 @@
     "regime-vs-amd-backtest": "tsx scripts/regimeVsAmdDirectionBacktest.ts",
     "amd-conflicted-weak-d1": "tsx scripts/amdConflictedWeakD1Backtest.ts",
     "amd-conflicted-shifted-audit": "tsx scripts/amdConflictedWeakD1/shiftedContaminationAudit.ts",
-    "test": "node --import tsx --test src/services/amdDetector/amdDetectionLock.test.ts",
+    "test": "node --import tsx --test src/services/amdDetector/amdDetectionLock.test.ts src/connectors/broker/brokerClient.test.ts",
+    "mt5:list-symbols": "tsx scripts/mt5ListSymbols.ts",
+    "mt5:sizing-study": "tsx scripts/mt5SizingStudy.ts",
+    "mt5:fade-basis-report": "tsx scripts/mt5FadeBasisReport.ts",
+    "test:mt5-connection": "tsx scripts/testMt5Connection.ts",
     "amd-judas-window-backtest": "tsx scripts/amdJudasWindowBacktest.ts",
     "amd-outcome-backfill": "tsx scripts/amdOutcomeBackfillFromChartData.ts",
     "amd-multi-signal-backtest": "tsx scripts/amdMultiSignalDirectionBacktest.ts",
@@ -32,6 +36,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "dotenv": "^16.4.0",
+    "metaapi.cloud-sdk": "^29.3.3",
     "node-cron": "^4.2.1"
   },
   "devDependencies": {

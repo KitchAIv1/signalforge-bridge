@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeBrokerRow, BridgeHealthLogRow } from '@/lib/types';
+import { Mt5BrokerHealthSection } from '@/components/broker/Mt5BrokerHealthSection';
 
 const HEALTH_HISTORY_SIZE = 50;
 
@@ -27,7 +28,7 @@ export default function HealthPage() {
   const fetchData = useCallback(async () => {
     const supabase = getSupabase();
     const [brokersRes, healthRes] = await Promise.all([
-      supabase.from('bridge_brokers').select('broker_id, connection_status, last_heartbeat_at, display_name'),
+      supabase.from('bridge_brokers').select('broker_id, connection_status, last_heartbeat_at, display_name, broker_type, is_active'),
       supabase
         .from('bridge_health_log')
         .select('id, checked_at, oanda_ok, supabase_ok, broker_connection_status')
@@ -126,6 +127,8 @@ export default function HealthPage() {
           </p>
         )}
       </section>
+
+      <Mt5BrokerHealthSection brokers={brokers} />
 
       {timelineRows.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">

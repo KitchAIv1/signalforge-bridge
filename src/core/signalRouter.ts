@@ -25,7 +25,7 @@ import {
   evaluateHybridEntryGate,
 } from './omegaHybridEntryGate.js';
 import { checkOmegaOpenTradeBlock } from './omegaOpenTradeSequencer.js';
-import { executeOmegaTrailV1Order } from './omegaTrailV1Execution.js';
+import { executeOmegaOnAllBrokers } from '../services/broker/omegaMultiBrokerExecution.js';
 import {
   parseOmegaRawModeFlag,
   shouldBypassDirectionFlip,
@@ -976,7 +976,7 @@ export async function processSignal(
     const useTrailStop = TRAIL_STOP_ENGINES.includes(norm.engineId);
 
     if (norm.engineId === 'omega') {
-      await executeOmegaTrailV1Order({
+      await executeOmegaOnAllBrokers({
         supabase,
         payload,
         norm,

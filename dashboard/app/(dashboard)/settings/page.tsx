@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
+import { BrokerRoutePanel } from '@/components/broker/BrokerRoutePanel';
 import { BridgeToggle } from '@/components/BridgeToggle';
 
 interface ConfigRow {
@@ -122,6 +123,8 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <BrokerRoutePanel />
     </div>
   );
 }

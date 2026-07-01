@@ -8,9 +8,15 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getOpenTrades, closeTrade, getClosedTradeDetails } from '../connectors/oanda.js';
+import { getOpenTrades } from '../connectors/oanda.js';
 import { recordClosedTrade } from '../core/circuitBreaker.js';
 import type { BridgeEngineRow } from '../types/config.js';
+import { resolveBrokerForLogRow } from '../services/broker/resolveBrokerForLogRow.js';
+import { buildBrokerOpenTradeIndex, openIdsForLogRow } from './brokerOpenTradeIndex.js';
+import {
+  closeTradeViaBroker,
+  fetchClosedTradeSnapshotViaBroker,
+} from './brokerTradeLifecycle.js';
 import { computeDerivedFields, resultFromPnl } from './tradeMonitorHelpers.js';
 import {
   cleanupOrphanedTrailStates,
@@ -78,7 +84,6 @@ export async function runTradeMonitor(
     }
     return;
   }
-  const oandaIds = new Set(oandaTrades.map((t) => t.id));
 
   if (getTrailEnabled()) {
     await cleanupOrphanedTrailStates(supabase);
@@ -90,10 +95,12 @@ export async function runTradeMonitor(
   const { data: logOpen } = await supabase
     .from('bridge_trade_log')
     .select(
-      'id, oanda_trade_id, engine_id, signal_received_at, pair, direction, fill_price, stop_loss, units, entry_price, leg_type, take_profit'
+      'id, oanda_trade_id, engine_id, broker_id, signal_received_at, pair, direction, fill_price, stop_loss, units, entry_price, leg_type, take_profit'
     )
     .eq('status', 'open')
     .not('oanda_trade_id', 'is', null);
+
+  const openTradeIndex = await buildBrokerOpenTradeIndex(supabase, logOpen ?? []);
 
   const engineById = new Map(engines.map((e) => [e.engine_id, e]));
 
@@ -102,16 +109,24 @@ export async function runTradeMonitor(
       continue;
     }
     const tid = row.oanda_trade_id as string;
+    const brokerId = row.broker_id as string | null | undefined;
+    const venueOpenIds = openIdsForLogRow(openTradeIndex, brokerId);
     const openTime = row.signal_received_at as string;
     const engine = engineById.get(row.engine_id as string);
     const maxHold = (engine?.max_hold_hours ?? maxHoldHours) * 60 * 60 * 1000;
     const elapsed = Date.now() - new Date(openTime).getTime();
 
-    if (!oandaIds.has(tid)) {
+    if (!venueOpenIds.has(tid)) {
       if (elapsed < MIN_OPEN_AGE_MS) continue;
-      const details = await getClosedTradeDetails(tid, openTime);
+      const broker = await resolveBrokerForLogRow(
+        supabase,
+        brokerId,
+        row.engine_id as string,
+      );
+      const details = await fetchClosedTradeSnapshotViaBroker(broker, tid, openTime);
+      if (!details.closedTime && broker.brokerType !== 'oanda') continue;
       const closedAt = details.closedTime ?? new Date().toISOString();
-      const exitPriceNum = details.exitPrice != null ? parseFloat(String(details.exitPrice)) : null;
+      const exitPriceNum = details.exitPrice;
       const derived = computeDerivedFields(row, exitPriceNum, details.pnlDollars);
       const legType = row.leg_type as string | null;
       const storedTakeProfit = row.take_profit as number | null;
@@ -141,7 +156,7 @@ export async function runTradeMonitor(
       const update: Record<string, unknown> = {
         status: 'closed',
         closed_at: closedAt,
-        exit_price: details.exitPrice,
+        exit_price: exitPriceNum,
         pnl_dollars: details.pnlDollars,
         result: resultFromPnl(details.pnlDollars),
         duration_minutes: durationMinutes(openTime, closedAt),
@@ -173,11 +188,12 @@ export async function runTradeMonitor(
       continue;
     }
     if (elapsed >= maxHold) {
-      const closeResult = await closeTrade(tid);
-      const fillTx = closeResult.orderFillTransaction;
-      const closedAt = fillTx?.time ?? new Date().toISOString();
-      const pnlDollars = fillTx?.pl != null ? parseFloat(fillTx.pl) : null;
-      const exitPriceNum = fillTx?.price != null ? parseFloat(fillTx.price) : null;
+      const broker = await resolveBrokerForLogRow(
+        supabase,
+        brokerId,
+        row.engine_id as string,
+      );
+      const { closedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(broker, tid);
       const derived = computeDerivedFields(row, exitPriceNum, pnlDollars);
       const update: Record<string, unknown> = {
         status: 'closed',
@@ -218,7 +234,7 @@ export async function runTradeMonitor(
     }
 
     const legType = row.leg_type as string | null;
-    if (isOmegaTp2FloorLeg(row.engine_id as string, legType) && oandaIds.has(tid)) {
+    if (isOmegaTp2FloorLeg(row.engine_id as string, legType) && venueOpenIds.has(tid)) {
       const logRow = row as Record<string, unknown>;
       await ensureTp2FloorState(supabase, logRow);
       const floorDecision = await runTp2FloorCheck(supabase, logRow, tid);
@@ -229,7 +245,7 @@ export async function runTradeMonitor(
     }
 
     const isTrailEligibleLeg = legType === null || legType === 'trail';
-    if (isTrailStopEngine(row.engine_id as string) && isTrailEligibleLeg && oandaIds.has(tid)) {
+    if (isTrailStopEngine(row.engine_id as string) && isTrailEligibleLeg && venueOpenIds.has(tid)) {
       const logRow = row as Record<string, unknown>;
       await ensureTrailStopState(supabase, logRow);
       const trail = await runTrailingStopCheck(supabase, logRow, tid);

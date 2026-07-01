@@ -10,6 +10,8 @@ export interface BridgeBrokerRow {
   connection_status: string | null;
   last_heartbeat_at: string | null;
   display_name: string;
+  broker_type?: string | null;
+  is_active?: boolean | null;
 }
 
 export interface BridgeEngineRow {
@@ -34,6 +36,7 @@ export interface BridgeTradeLogRow {
   id: string;
   signal_id: string;
   engine_id: string;
+  broker_id?: string | null;
   pair: string;
   direction: string;
   decision: DecisionType;

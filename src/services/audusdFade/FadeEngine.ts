@@ -9,9 +9,10 @@
  *   22:00 UTC     → hardClose()    (daily safety flatten)
  */
 
-import { closeTrade } from '../../connectors/oanda.js';
+import { getSupabaseClient } from '../../connectors/supabase.js';
 import { loadAllOpenTrades, updateTrade } from './fadeDayState.js';
 import { syncFadeTradeToBridgeLog } from './fadeBridgeSync.js';
+import { resolveBrokerForFadeTrade } from './fadeBrokerResolver.js';
 import { runEntryMonitor } from './fadeEntryMonitor.js';
 import { runExitMonitor } from './fadeExitMonitor.js';
 import { fadeError, fadeLog } from './fadeLogger.js';
@@ -33,7 +34,8 @@ export async function runMonitors(): Promise<void> {
 async function hardCloseOne(trade: FadeTrade, cfg: FadeConfig): Promise<void> {
   if (!trade.oanda_trade_id) return;
   try {
-    const closeResult = await closeTrade(trade.oanda_trade_id, undefined, cfg.oandaAccountId);
+    const broker = await resolveBrokerForFadeTrade(getSupabaseClient(), trade.broker_id);
+    const closeResult = await broker.closeTrade(trade.oanda_trade_id);
     const fillPrice =
       closeResult.orderFillTransaction?.price != null
         ? Number(closeResult.orderFillTransaction.price)

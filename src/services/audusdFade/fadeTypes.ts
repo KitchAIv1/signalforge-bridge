@@ -8,6 +8,7 @@ export interface FadeTrade {
   id: number;
   trade_date: string;
   pair: string;
+  broker_id?: string | null;
   oanda_trade_id: string | null;
   units: number | null;
   direction: FadeDirection;

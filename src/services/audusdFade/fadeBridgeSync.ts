@@ -74,7 +74,7 @@ function buildMirrorRow(trade: FadeTrade): Record<string, unknown> {
     closed_at: trade.closed_at ?? new Date().toISOString(),
     units: trade.units,
     oanda_trade_id: trade.oanda_trade_id,
-    broker_id: 'oanda_practice',
+    broker_id: trade.broker_id ?? 'oanda_practice',
   };
 }
 

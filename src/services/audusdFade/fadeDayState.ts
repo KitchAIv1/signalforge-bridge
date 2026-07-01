@@ -22,13 +22,16 @@ export async function loadTradeById(id: number): Promise<FadeTrade | null> {
 export async function loadOpenTrades(
   tradeDate: string,
   pair = 'AUD_USD',
+  brokerId?: string,
 ): Promise<FadeTrade[]> {
-  const { data, error } = await db()
+  let query = db()
     .from(TABLE)
     .select('*')
     .eq('trade_date', tradeDate)
     .eq('pair', pair)
     .is('result', null);
+  if (brokerId) query = query.eq('broker_id', brokerId);
+  const { data, error } = await query;
   if (error) throw new Error(`loadOpenTrades: ${error.message}`);
   return (data ?? []) as FadeTrade[];
 }
@@ -47,12 +50,15 @@ export async function loadAllOpenTrades(pair = 'AUD_USD'): Promise<FadeTrade[]> 
 export async function countTradesToday(
   tradeDate: string,
   pair = 'AUD_USD',
+  brokerId?: string,
 ): Promise<number> {
-  const { count, error } = await db()
+  let query = db()
     .from(TABLE)
     .select('id', { count: 'exact', head: true })
     .eq('trade_date', tradeDate)
     .eq('pair', pair);
+  if (brokerId) query = query.eq('broker_id', brokerId);
+  const { count, error } = await query;
   if (error) throw new Error(`countTradesToday: ${error.message}`);
   return count ?? 0;
 }
@@ -61,14 +67,17 @@ export async function countTradesToday(
 export async function recentTradeOpened(
   tradeDate: string,
   pair = 'AUD_USD',
+  brokerId?: string,
 ): Promise<boolean> {
   const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const { count, error } = await db()
+  let query = db()
     .from(TABLE)
     .select('id', { count: 'exact', head: true })
     .eq('trade_date', tradeDate)
     .eq('pair', pair)
     .gte('opened_at', since);
+  if (brokerId) query = query.eq('broker_id', brokerId);
+  const { count, error } = await query;
   if (error) throw new Error(`recentTradeOpened: ${error.message}`);
   return (count ?? 0) > 0;
 }
@@ -76,6 +85,7 @@ export async function recentTradeOpened(
 export type FadeTradeInsertFields = {
   trade_date: string;
   pair?: string;
+  broker_id?: string;
   oanda_trade_id: string | null;
   units: number;
   direction: string;
