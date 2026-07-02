@@ -170,14 +170,30 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
   const pending = await insertPendingOmegaRow(supabase, rowRecord, { signalId, brokerId });
   if (!pending) return;
 
-  const { orderResult } = await placeMarketOrderViaBroker({
-    broker,
-    norm,
-    finalUnits,
-    useTrailStop: true,
-    maxOrderTimeoutMs: config.maxOrderTimeoutMs,
-    rebuildBoundsRetryEnabled: false,
-  });
+  let orderResult: Awaited<ReturnType<typeof placeMarketOrderViaBroker>>['orderResult'];
+  try {
+    ({ orderResult } = await placeMarketOrderViaBroker({
+      broker,
+      norm,
+      finalUnits,
+      useTrailStop: true,
+      maxOrderTimeoutMs: config.maxOrderTimeoutMs,
+      rebuildBoundsRetryEnabled: false,
+    }));
+  } catch (orderErr) {
+    const orderError = orderErr instanceof Error ? orderErr.message : String(orderErr);
+    logError('[Omega TrailV1] Broker order threw after pre-insert — row marked BLOCKED', {
+      signalId,
+      brokerId,
+      error: orderError,
+    });
+    await markOmegaRowCancelled(
+      supabase,
+      pending.rowId,
+      `${broker.brokerType === 'mt5' ? 'MT5' : 'BROKER'}_ORDER_ERROR: ${orderError}`,
+    );
+    return;
+  }
 
   if (orderResult.orderCancelTransaction) {
     await markOmegaRowCancelled(

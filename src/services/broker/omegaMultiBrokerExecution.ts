@@ -8,7 +8,7 @@ import type { BridgeConfig, BridgeEngineRow } from '../../types/config.js';
 import type { ActiveRegimeState } from '../RegimeStateService.js';
 import type { ActiveAmdState } from '../amdDetector/amdStateService.js';
 import { executeOmegaTrailV1Order } from '../../core/omegaTrailV1Execution.js';
-import { logInfo, logWarn } from '../../utils/logger.js';
+import { logError, logInfo, logWarn } from '../../utils/logger.js';
 import type { ValidationResult } from '../../core/signalValidation.js';
 import type { DecisionType } from '../../types/signals.js';
 import { loadExecutionRoutes } from './brokerLinkService.js';
@@ -101,12 +101,20 @@ export async function executeOmegaOnAllBrokers(params: OmegaFanOutParams): Promi
       engineWeight: params.engine.weight,
     });
 
-    await executeOmegaTrailV1Order({
-      ...params,
-      finalUnits: routeUnits,
-      cachedAccountEquity: routeEquity,
-      broker: route.broker,
-      brokerId: route.brokerId,
-    });
+    try {
+      await executeOmegaTrailV1Order({
+        ...params,
+        finalUnits: routeUnits,
+        cachedAccountEquity: routeEquity,
+        broker: route.broker,
+        brokerId: route.brokerId,
+      });
+    } catch (routeErr) {
+      logError('[Omega] Broker route failed — continuing other routes', {
+        brokerId: route.brokerId,
+        signalId: params.signalId,
+        error: routeErr instanceof Error ? routeErr.message : String(routeErr),
+      });
+    }
   }
 }

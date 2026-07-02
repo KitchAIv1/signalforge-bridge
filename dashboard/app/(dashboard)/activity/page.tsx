@@ -5,7 +5,6 @@ import { EngineControls } from '@/components/EngineControls';
 import { AccountSnapshotBar } from '@/components/AccountSnapshotBar';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
-import type { DecisionType } from '@/lib/types';
 import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
 import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import { usePresencePing } from '@/hooks/usePresencePing';
@@ -36,6 +35,20 @@ const DECISIONS: { value: string; label: string }[] = [
   { value: 'SKIPPED', label: 'SKIPPED' },
   { value: 'DEDUPLICATED', label: 'DEDUPLICATED' },
 ];
+
+/** EXECUTED view = broker-confirmed fills only (excludes pre-insert pending placeholders). */
+function applyActivityDecisionFilter<T extends { eq: Function; in: Function }>(
+  query: T,
+  decisionFilter: string,
+): T {
+  if (decisionFilter) {
+    query = query.eq('decision', decisionFilter) as T;
+  }
+  if (decisionFilter === 'EXECUTED') {
+    query = query.in('status', ['open', 'closed']) as T;
+  }
+  return query;
+}
 
 function toCSV(rows: BridgeTradeLogRow[]): string {
   const headers = [
@@ -113,7 +126,7 @@ export default function ActivityPage() {
         .select(EXPANDED_TRADE_LOG_SELECT)
         .order('created_at', { ascending: false })
         .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
-      if (decision) q = q.eq('decision', decision as DecisionType);
+      q = applyActivityDecisionFilter(q, decision);
       if (engine) q = q.eq('engine_id', engine);
       if (broker) q = q.eq('broker_id', broker);
       const { data, error } = await q;
@@ -154,7 +167,7 @@ export default function ActivityPage() {
         .select(EXPANDED_TRADE_LOG_SELECT)
         .order('created_at', { ascending: false })
         .limit(5000);
-      if (decision) q = q.eq('decision', decision as DecisionType);
+      q = applyActivityDecisionFilter(q, decision);
       if (engine) q = q.eq('engine_id', engine);
       if (broker) q = q.eq('broker_id', broker);
       const { data } = await q;

@@ -24,7 +24,9 @@ export async function placeMt5MarketOrder(
   brokerSymbol: string,
   volumeLots: number,
 ): Promise<PlaceOrderResult> {
-  const lots = clampMt5Lots(volumeLots, MIN_LOT, LOT_STEP);
+  const signedLots = clampMt5Lots(volumeLots, MIN_LOT, LOT_STEP);
+  // MetaApi expects positive volume; direction is implied by buy vs sell RPC.
+  const lots = Math.abs(signedLots);
   const sl = params.stopLossPrice != null ? Number(params.stopLossPrice) : undefined;
   const tp = params.takeProfitPrice != null ? Number(params.takeProfitPrice) : undefined;
   const options = {
