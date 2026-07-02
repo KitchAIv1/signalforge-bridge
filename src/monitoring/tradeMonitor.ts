@@ -41,7 +41,8 @@ import {
 import { runNewsAutoDetect } from '../utils/newsAutoDetect.js';
 import { fetchCloseCandles } from './closeCandleCapture.js';
 import { runPipThresholdMonitor } from './pipThresholdMonitor.js';
-import { sendTradeClosedAlert } from '../services/telegram/alertTradeClose.js';
+import { finalizeOpenLogRowClose } from './tradeMonitorFinalizeClose.js';
+import { normalizeBrokerTimestamp } from '../connectors/broker/normalizeBrokerTimestamp.js';
 
 /** Do not infer "closed" from absent open list if trade age < this (OANDA propagation lag). */
 const MIN_OPEN_AGE_MS = 60_000;
@@ -125,7 +126,7 @@ export async function runTradeMonitor(
       );
       const details = await fetchClosedTradeSnapshotViaBroker(broker, tid, openTime);
       if (!details.closedTime && broker.brokerType !== 'oanda') continue;
-      const closedAt = details.closedTime ?? new Date().toISOString();
+      const closedAt = normalizeBrokerTimestamp(details.closedTime ?? new Date());
       const exitPriceNum = details.exitPrice;
       const derived = computeDerivedFields(row, exitPriceNum, details.pnlDollars);
       const legType = row.leg_type as string | null;
@@ -172,19 +173,23 @@ export async function runTradeMonitor(
         if (intraTradeCandles.length > 0) update.intra_trade_candles = intraTradeCandles;
         if (postExitCandles.length > 0)   update.post_exit_candles   = postExitCandles;
       }
-      await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
-      recordClosedTrade(resultFromPnl(details.pnlDollars));
-      void sendTradeClosedAlert({
-        engineId: (row.engine_id as string) ?? 'unknown',
-        instrument: (row.pair as string) ?? 'AUD_USD',
-        direction: (row.direction as string) ?? 'unknown',
-        entryPrice: typeof row.fill_price === 'number' ? row.fill_price : 0,
-        exitPrice: exitPriceNum ?? 0,
-        pnlPips: typeof derived.pnl_pips === 'number' ? derived.pnl_pips : 0,
-        pnlDollars: details.pnlDollars ?? 0,
-        closeReason: closeReason ?? 'external_close',
-        durationMinutes: durationMinutes(openTime, closedAt) ?? 0,
-      }).catch(() => {});
+      await finalizeOpenLogRowClose(
+        supabase,
+        row.id as string,
+        update,
+        {
+          engineId: (row.engine_id as string) ?? 'unknown',
+          instrument: (row.pair as string) ?? 'AUD_USD',
+          direction: (row.direction as string) ?? 'unknown',
+          entryPrice: typeof row.fill_price === 'number' ? row.fill_price : 0,
+          exitPrice: exitPriceNum ?? 0,
+          pnlPips: typeof derived.pnl_pips === 'number' ? derived.pnl_pips : 0,
+          pnlDollars: details.pnlDollars ?? 0,
+          closeReason: closeReason ?? 'external_close',
+          durationMinutes: durationMinutes(openTime, closedAt) ?? 0,
+        },
+        details.pnlDollars,
+      );
       continue;
     }
     if (elapsed >= maxHold) {
@@ -193,7 +198,8 @@ export async function runTradeMonitor(
         brokerId,
         row.engine_id as string,
       );
-      const { closedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(broker, tid);
+      const { closedAt: rawClosedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(broker, tid);
+      const closedAt = normalizeBrokerTimestamp(rawClosedAt);
       const derived = computeDerivedFields(row, exitPriceNum, pnlDollars);
       const update: Record<string, unknown> = {
         status: 'closed',
@@ -214,22 +220,26 @@ export async function runTradeMonitor(
         if (intraTradeCandles.length > 0) update.intra_trade_candles = intraTradeCandles;
         if (postExitCandles.length > 0)   update.post_exit_candles   = postExitCandles;
       }
-      await supabase.from('bridge_trade_log').update(update).eq('id', row.id);
       if ((row.leg_type as string | null) === 'tp2') {
         await deleteTp2FloorState(supabase, tid);
       }
-      recordClosedTrade(resultFromPnl(pnlDollars));
-      void sendTradeClosedAlert({
-        engineId: (row.engine_id as string) ?? 'unknown',
-        instrument: (row.pair as string) ?? 'AUD_USD',
-        direction: (row.direction as string) ?? 'unknown',
-        entryPrice: typeof row.fill_price === 'number' ? row.fill_price : 0,
-        exitPrice: exitPriceNum ?? 0,
-        pnlPips: typeof derived.pnl_pips === 'number' ? derived.pnl_pips : 0,
-        pnlDollars: pnlDollars ?? 0,
-        closeReason: 'max_hold',
-        durationMinutes: durationMinutes(openTime, closedAt) ?? 0,
-      }).catch(() => {});
+      await finalizeOpenLogRowClose(
+        supabase,
+        row.id as string,
+        update,
+        {
+          engineId: (row.engine_id as string) ?? 'unknown',
+          instrument: (row.pair as string) ?? 'AUD_USD',
+          direction: (row.direction as string) ?? 'unknown',
+          entryPrice: typeof row.fill_price === 'number' ? row.fill_price : 0,
+          exitPrice: exitPriceNum ?? 0,
+          pnlPips: typeof derived.pnl_pips === 'number' ? derived.pnl_pips : 0,
+          pnlDollars: pnlDollars ?? 0,
+          closeReason: 'max_hold',
+          durationMinutes: durationMinutes(openTime, closedAt) ?? 0,
+        },
+        pnlDollars,
+      );
       continue;
     }
 

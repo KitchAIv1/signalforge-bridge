@@ -9,6 +9,7 @@
  */
 
 import type { TradeByIdDetails } from './types.js';
+import { normalizeBrokerTimestamp } from '../../connectors/broker/normalizeBrokerTimestamp.js';
 import { mt5LotsToUnits } from './lotConverter.js';
 
 type Deal = Record<string, unknown>;
@@ -57,7 +58,7 @@ function summarizeCloseDeals(deals: Deal[]): { price: number; time: string; real
 
   return {
     price: weightedPrice,
-    time: lastCloseTime ?? new Date().toISOString(),
+    time: normalizeBrokerTimestamp(lastCloseTime ?? new Date()),
     realizedPL,
   };
 }
