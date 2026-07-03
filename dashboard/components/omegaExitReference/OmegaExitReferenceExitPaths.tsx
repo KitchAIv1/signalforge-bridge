@@ -33,9 +33,9 @@ const EXIT_PATH_ROWS = [
   {
     closeReason: 'trail_sl_hit',
     tone: 'red' as const,
-    trigger: 'Adverse ≥ 1.5R (pre- or post-activation)',
+    trigger: 'Adverse ≥ 2.0R short / 3.0R long (pre- or post-activation)',
     source: 'trailingStopSupport.ts',
-    meaning: 'Stop-out on mirrored R distance; may fire quickly if SL mirror was wrong.',
+    meaning: 'Stop-out on direction-specific R distance; may fire quickly if SL mirror was wrong.',
   },
   {
     closeReason: 'direction_flip_auto_close',
@@ -49,7 +49,7 @@ const EXIT_PATH_ROWS = [
     tone: 'slate' as const,
     trigger: 'Trade age ≥ bridge_engines.max_hold_hours',
     source: 'tradeMonitor.ts',
-    meaning: 'Force-close safety net (default 4h for seeded engines).',
+    meaning: 'Force-close safety net (omega: 3h / 180m via bridge_engines.max_hold_hours).',
   },
   {
     closeReason: '(external)',

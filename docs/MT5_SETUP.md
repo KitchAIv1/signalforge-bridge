@@ -53,6 +53,8 @@ Rollback to OANDA-only:
 UPDATE bridge_links SET is_active = false WHERE broker_id LIKE 'vtmarkets_%';
 ```
 
+**OMEGA max hold:** VT omega shares the engine-level cap with OANDA via `bridge_engines.max_hold_hours` (currently **3h / 180m** after migration 054). Both brokers force-close at the same wall-clock age from `signal_received_at`.
+
 ## 5. Confirm OMEGA signals
 
 On the **engine-omega** Railway service: `OMEGA_PHASE4_ENABLED=true`.

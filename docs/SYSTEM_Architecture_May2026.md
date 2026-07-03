@@ -9,6 +9,7 @@
 
 | Date | Change |
 |------|--------|
+| 2026-07-03 | OMEGA max_hold reduced 6h → 3h (180m best setup); migration 054 |
 | 2026-05-31 | Initial May 2026 architecture snapshot |
 
 ---
@@ -82,7 +83,7 @@ From `bridge_engines` query (2026-05-31). `paused_engines` in `bridge_config`: `
 
 | engine_id | display_name | is_active | paused | max_hold_h | Entry trigger | Exit | Primary tables |
 |-----------|--------------|-----------|--------|------------|---------------|------|----------------|
-| **omega** | Engine Omega — AUDUSD M5 DTW Pattern | true | no | 6 | External signal insert → Realtime | SL/TP from signal, trail stop optional, Asian close 08:00 | `signals`, `bridge_trade_log` |
+| **omega** | Engine Omega — AUDUSD M5 DTW Pattern | true | no | 3 | External signal insert → Realtime | Trail v1 (2R/3R/0.5R), max_hold 3h, RAW mode | `signals`, `bridge_trade_log` |
 | **engine_amd** | AMD Distribution | true | no | 6 | Tag entry hour + AMD state (`AmdDistributionEngine`, every 5 min) | Pip trail + tag hard exit hour | `amd_state`, `bridge_trade_log` |
 | **engine_rebuild** | Engine Rebuild | true | **yes (decommissioning)** | 0.5 | External signal (paused) | M15 max hold | `signals`, `bridge_trade_log`, shadow tables |
 | **falcon** | Falcon | true | **yes** | 2 | External signal | max hold | `signals`, `bridge_trade_log` |

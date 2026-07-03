@@ -10,9 +10,14 @@ import {
 
 const TRAIL_PARAM_ROWS = [
   {
-    parameter: 'TRAIL_STOP_SL_MULTIPLIER',
-    defaultValue: '1.5',
-    meaning: 'Adverse cap = 1.5 × R. Pre-activation hit → trail_sl_hit.',
+    parameter: 'TRAIL_STOP_SL_MULTIPLIER_OMEGA_SHORT',
+    defaultValue: '2.0',
+    meaning: 'Adverse cap = 2.0 × R on short legs → trail_sl_hit.',
+  },
+  {
+    parameter: 'TRAIL_STOP_SL_MULTIPLIER_OMEGA_LONG',
+    defaultValue: '3.0',
+    meaning: 'Adverse cap = 3.0 × R on long legs → trail_sl_hit.',
   },
   {
     parameter: 'TRAIL_STOP_TRAIL_DISTANCE_OMEGA',
@@ -28,6 +33,11 @@ const TRAIL_PARAM_ROWS = [
     parameter: 'TRAIL_STOP_ENABLED',
     defaultValue: 'true',
     meaning: 'Master switch; omega must also appear in TRAIL_STOP_ENGINE_IDS.',
+  },
+  {
+    parameter: 'bridge_engines.max_hold_hours (omega)',
+    defaultValue: '3',
+    meaning: 'Force-close at 180m wall-clock from signal_received_at (OANDA + VT).',
   },
 ] as const;
 
@@ -108,8 +118,8 @@ export function OmegaExitReferenceTrailTable() {
 
       <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
         Exit fires when favorable retraces to peak_favorable − trail_distance (0.5R). Post-activation
-        adverse ≥ 1.5R also closes as trail_sl_hit. On close, intra_trade_candles and post_exit_candles
-        are captured for omega rows only.
+        adverse ≥ 2.0R (short) or 3.0R (long) closes as trail_sl_hit. Max hold force-close at 3h.
+        On close, intra_trade_candles and post_exit_candles are captured for omega rows only.
       </p>
     </section>
   );
