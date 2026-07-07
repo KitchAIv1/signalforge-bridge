@@ -6,7 +6,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { OpenTrade } from '../connectors/broker/types.js';
 import { createOandaBroker } from '../connectors/broker/oandaBroker.js';
 import { createBrokerClient } from '../connectors/broker/brokerFactory.js';
-import { isMt5GloballyEnabled } from '../connectors/broker/brokerFactory.js';
 import { getOpenTrades as getOandaOpenTrades } from '../connectors/oanda.js';
 
 const OANDA_DEFAULT = 'oanda_practice';
@@ -31,7 +30,7 @@ async function fetchBrokerOpenIds(
     .eq('broker_id', brokerId)
     .maybeSingle();
 
-  if (!data || !isMt5GloballyEnabled()) return new Set();
+  if (!data) return new Set();
 
   const client = createBrokerClient(
     data as { broker_id: string; broker_type: string; account_id: string | null; is_active: boolean },

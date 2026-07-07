@@ -126,6 +126,9 @@ export async function runTradeMonitor(
       );
       const details = await fetchClosedTradeSnapshotViaBroker(broker, tid, openTime);
       if (!details.closedTime && broker.brokerType !== 'oanda') continue;
+      if (broker.brokerType === 'oanda' && details.closedTime == null && details.exitPrice == null) {
+        continue;
+      }
       const closedAt = normalizeBrokerTimestamp(details.closedTime ?? new Date());
       const exitPriceNum = details.exitPrice;
       const derived = computeDerivedFields(row, exitPriceNum, details.pnlDollars);

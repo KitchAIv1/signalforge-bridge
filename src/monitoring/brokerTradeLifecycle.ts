@@ -3,7 +3,6 @@
  */
 
 import type { BrokerClient } from '../connectors/broker/types.js';
-import { getClosedTradeDetails } from '../connectors/oanda.js';
 import { normalizeBrokerTimestamp } from '../connectors/broker/normalizeBrokerTimestamp.js';
 
 export interface ClosedTradeSnapshot {
@@ -28,19 +27,10 @@ export async function closeTradeViaBroker(
 export async function fetchClosedTradeSnapshotViaBroker(
   broker: BrokerClient,
   tradeId: string,
-  openTime: string,
+  _openTime: string,
 ): Promise<ClosedTradeSnapshot> {
-  if (broker.brokerType === 'oanda') {
-    const details = await getClosedTradeDetails(tradeId, openTime);
-    return {
-      closedTime: normalizeBrokerTimestamp(details.closedTime ?? new Date()),
-      exitPrice: details.exitPrice != null ? parseFloat(String(details.exitPrice)) : null,
-      pnlDollars: details.pnlDollars,
-    };
-  }
-
   const trade = await broker.getTradeById(tradeId);
-  if (!trade || trade.state === 'OPEN') {
+  if (!trade || trade.state !== 'CLOSED') {
     return { closedTime: null, exitPrice: null, pnlDollars: null };
   }
   return {
