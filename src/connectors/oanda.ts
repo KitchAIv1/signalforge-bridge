@@ -89,9 +89,10 @@ export interface OpenTrade {
   unrealizedPL?: string;
 }
 
-export async function getOpenTrades(): Promise<OpenTrade[]> {
+export async function getOpenTrades(accountId?: string): Promise<OpenTrade[]> {
   const startedAt = performance.now();
-  const openTradesPath = `/v3/accounts/${OANDA_ACCOUNT_ID}/openTrades`;
+  const resolvedAccountId = accountId ?? OANDA_ACCOUNT_ID;
+  const openTradesPath = `/v3/accounts/${resolvedAccountId}/openTrades`;
   try {
     const res = await oandaFetch(openTradesPath, {}, OPEN_TRADES_TIMEOUT_MS);
     if (!res.ok) {

@@ -29,7 +29,7 @@ export function createOandaBroker(config: BrokerClientConfig): BrokerClient {
     },
 
     getOpenTrades(): Promise<OpenTrade[]> {
-      return oanda.getOpenTrades();
+      return oanda.getOpenTrades(accountId);
     },
 
     placeMarketOrder(params: PlaceOrderParams, timeoutMs?: number): Promise<PlaceOrderResult> {
