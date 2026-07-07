@@ -7,6 +7,7 @@ import { OverridePositionCard } from '@/components/override/OverridePositionCard
 import { OverrideSignalLegGroup } from '@/components/override/OverrideSignalLegGroup';
 import type { EnrichedLiveTrade } from '@/lib/overrideTradeLogEnrichment';
 import { groupEnrichedTradesBySignal } from '@/lib/overrideTradeLogEnrichment';
+import { parseOverrideApiError } from '@/lib/parseOverrideApiError';
 
 function buildTradeLines(trades: EnrichedLiveTrade[]): Array<{ price: number; label: string; color: string }> {
   const lines: Array<{ price: number; label: string; color: string }> = [];
@@ -37,7 +38,7 @@ export function OverrideTerminal() {
   const fetchTrades = useCallback(async () => {
     try {
       const res = await fetch('/api/override/positions');
-      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+      if (!res.ok) throw new Error(await parseOverrideApiError(res, 'Positions fetch'));
       const data = await res.json() as { trades: EnrichedLiveTrade[] };
       setTrades(data.trades);
       setError(null);

@@ -7,9 +7,14 @@ export function hasSupabaseEnv(): boolean {
   return Boolean(supabaseUrl && supabaseAnonKey);
 }
 
+let supabaseBrowserClient: SupabaseClient | null = null;
+
 export function getSupabase(): SupabaseClient {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
-  return createClient(supabaseUrl, supabaseAnonKey);
+  if (!supabaseBrowserClient) {
+    supabaseBrowserClient = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return supabaseBrowserClient;
 }

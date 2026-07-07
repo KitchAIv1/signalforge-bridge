@@ -9,6 +9,7 @@ import {
   type IPriceLine,
   ColorType,
 } from 'lightweight-charts';
+import { parseOverrideApiError } from '@/lib/parseOverrideApiError';
 
 interface OandaCandle {
   time: number;
@@ -43,7 +44,7 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
   const fetchAndRender = useCallback(async (tf: Timeframe) => {
     try {
       const res = await fetch(`/api/override/candles?granularity=${tf}`);
-      if (!res.ok) throw new Error(`Candles fetch failed: ${res.status}`);
+      if (!res.ok) throw new Error(await parseOverrideApiError(res, 'Candles fetch'));
       const data = await res.json() as { candles: OandaCandle[] };
       if (seriesRef.current) {
         seriesRef.current.setData(
