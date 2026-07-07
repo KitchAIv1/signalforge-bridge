@@ -26,14 +26,15 @@ export function applyActivityDecisionFilter<T extends { eq: Function; in: Functi
 }
 
 /** Baseline Activity excludes Lane B; /omega-phase2 passes brokerId explicitly. */
-export function applyActivityBrokerScope<T extends { eq: Function; neq: Function }>(
+export function applyActivityBrokerScope<T extends { eq: Function; or: Function }>(
   query: T,
   brokerIdFilter: string,
 ): T {
   if (brokerIdFilter) {
     return query.eq('broker_id', brokerIdFilter) as T;
   }
-  return query.neq('broker_id', OMEGA_LANE_B_BROKER_ID) as T;
+  // Pre-execution rows (BLOCKED/SKIPPED/DEDUPLICATED) store broker_id NULL — neq alone drops them.
+  return query.or(`broker_id.is.null,broker_id.neq.${OMEGA_LANE_B_BROKER_ID}`) as T;
 }
 
 export interface ActivityTradeLogFilters {
