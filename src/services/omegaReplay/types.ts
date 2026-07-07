@@ -8,7 +8,8 @@ export type ReplayExitReason =
   | 'trail_stop'
   | 'trail_sl_hit'
   | 'max_hold'
-  | 'insufficient_bars';
+  | 'insufficient_bars'
+  | 'progress_time_stop';
 
 export interface TimestampedBar {
   timeMs: number;
@@ -49,6 +50,10 @@ export interface ReplayConfig {
   maxHoldMinutes: number;
   executionCostPips: number;
   omegaDirectionByDate: Map<string, string>;
+  /** Trail lock distance in R units (default 0.5). */
+  trailDistR?: number;
+  /** legacy_bar = M5 OHLC wick; live_faithful = peak from bar wick, exit from bar close mid. */
+  exitModel?: 'legacy_bar' | 'live_faithful';
 }
 
 export interface ReplayTradeRow {

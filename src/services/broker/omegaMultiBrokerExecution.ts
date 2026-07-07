@@ -13,6 +13,11 @@ import type { ValidationResult } from '../../core/signalValidation.js';
 import type { DecisionType } from '../../types/signals.js';
 import { loadExecutionRoutes } from './brokerLinkService.js';
 import { scaleUnitsForBrokerRoute } from './routePositionSizer.js';
+import {
+  evaluateLaneBEntryGate,
+  isOmegaLaneBBroker,
+} from '../../core/omegaLaneB/omegaPhase2EntryGate.js';
+import { insertLaneBBlockedRow } from '../../core/omegaLaneB/omegaLaneBBlockedRow.js';
 
 type RouterNormalizedSignal = NonNullable<ValidationResult['normalized']>;
 
@@ -101,6 +106,41 @@ export async function executeOmegaOnAllBrokers(params: OmegaFanOutParams): Promi
       engineWeight: params.engine.weight,
     });
 
+    let laneAdvisory: string | null = null;
+    if (isOmegaLaneBBroker(route.brokerId)) {
+      const signalFiredAt =
+        String(params.payload.created_at ?? new Date().toISOString());
+      const gate = await evaluateLaneBEntryGate({
+        supabase: params.supabase,
+        signalReceivedAt: signalFiredAt,
+        direction: params.norm.direction,
+        brokerId: route.brokerId,
+      });
+      if (gate.blocked && gate.blockReason) {
+        await insertLaneBBlockedRow({
+          supabase: params.supabase,
+          payload: params.payload,
+          signalId: params.signalId,
+          brokerId: route.brokerId,
+          blockReason: gate.blockReason,
+          decisionLatencyMs: params.decisionLatencyMs,
+          routeEquity,
+          openTradeCount: params.openTradeCount,
+          instrument: params.norm.oandaInstrument,
+          direction: params.norm.direction,
+          regimeState: params.regimeState,
+          regimeSizeMultiplier: params.regimeSizeMultiplier,
+          amdState: params.amdState,
+          directionMode: params.directionMode,
+          buildTradeLogRow: params.buildTradeLogRow,
+          attachOmegaAuditFields: params.attachOmegaAuditFields,
+          shadowAdvisory: gate.shadowAdvisory,
+        });
+        continue;
+      }
+      laneAdvisory = gate.shadowAdvisory;
+    }
+
     try {
       await executeOmegaTrailV1Order({
         ...params,
@@ -108,6 +148,7 @@ export async function executeOmegaOnAllBrokers(params: OmegaFanOutParams): Promi
         cachedAccountEquity: routeEquity,
         broker: route.broker,
         brokerId: route.brokerId,
+        laneAdvisory,
       });
     } catch (routeErr) {
       logError('[Omega] Broker route failed — continuing other routes', {

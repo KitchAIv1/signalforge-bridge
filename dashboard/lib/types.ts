@@ -88,6 +88,7 @@ export interface BridgeTradeLogRow {
   reversal_confirmed?: boolean | null;
   auto_direction_reason?: string | null;
   leg_type?: string | null;
+  lane_advisory?: string | null;
 }
 
 export interface OmegaShadowSignalRow {

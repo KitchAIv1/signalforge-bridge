@@ -23,7 +23,10 @@ const ENGINE_MAGIC: Record<string, number> = {
   audusd_fade: 88002,
 };
 
-function resolveOandaAccountId(engineId: string): string | undefined {
+function resolveOandaAccountId(engineId: string, brokerId?: string): string | undefined {
+  if (brokerId === 'oanda_phase2_demo') {
+    return process.env.OANDA_PHASE2_ACCOUNT_ID?.trim() || undefined;
+  }
   if (engineId === 'audusd_fade') {
     return process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID ?? process.env.OANDA_ACCOUNT_ID;
   }
@@ -63,7 +66,7 @@ export function createBrokerClient(
   const config: BrokerClientConfig = {
     brokerId: brokerRow.broker_id,
     brokerType: 'oanda',
-    accountId: resolveOandaAccountId(engineId),
+    accountId: resolveOandaAccountId(engineId, brokerRow.broker_id),
   };
   return createOandaBroker(config);
 }

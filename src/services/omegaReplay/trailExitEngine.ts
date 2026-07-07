@@ -88,6 +88,7 @@ export function simulateOmegaTrailExit(params: {
   bars: readonly TimestampedBar[];
   maxHoldMinutes: number;
   executionCostPips: number;
+  trailDistR?: number;
 }): TrailExitResult {
   const {
     direction,
@@ -97,6 +98,7 @@ export function simulateOmegaTrailExit(params: {
     bars,
     maxHoldMinutes,
     executionCostPips,
+    trailDistR = OMEGA_TRAIL_DIST_R,
   } = params;
 
   const rSizeRaw = Math.abs(entryPrice - structureStop);
@@ -115,7 +117,7 @@ export function simulateOmegaTrailExit(params: {
   }
 
   const slDist = rSizeRaw * slMultiplierForDirection(direction);
-  const trailDist = rSizeRaw * OMEGA_TRAIL_DIST_R;
+  const trailDist = rSizeRaw * trailDistR;
   const actNeed = OMEGA_TRAIL_ACTIVATION_R * rSizeRaw;
   const maxHoldDeadlineMs = entryTimeMs + maxHoldMinutes * 60_000;
 

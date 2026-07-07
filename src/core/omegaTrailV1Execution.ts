@@ -60,6 +60,8 @@ export interface OmegaTrailV1ExecutionDeps {
   attachOmegaAuditFields: AuditAttacher;
   broker: BrokerClient;
   brokerId: string;
+  /** Lane B shadow-tier advisory (nullable). */
+  laneAdvisory?: string | null;
 }
 
 function mirrorStructureStop(
@@ -148,6 +150,7 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
     attachOmegaAuditFields,
     broker,
     brokerId,
+    laneAdvisory,
   } = deps;
 
   // Pre-insert BEFORE placing the order: if this fails, the order is never
@@ -165,6 +168,9 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
   const rowRecord = row as Record<string, unknown>;
   rowRecord.broker_id = brokerId;
   rowRecord.units = finalUnits;
+  if (laneAdvisory) {
+    rowRecord.lane_advisory = laneAdvisory;
+  }
   attachOmegaAuditFields(rowRecord, regimeState, regimeSizeMultiplier, amdState, directionMode);
 
   const pending = await insertPendingOmegaRow(supabase, rowRecord, { signalId, brokerId });
