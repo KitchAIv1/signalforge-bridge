@@ -56,7 +56,7 @@ export function Phase2FlagSummary() {
         <li>Phase2 dist skip: {laneConfig.phase2Enforce ? 'LIVE' : laneConfig.phase2Shadow ? 'shadow' : 'off'}</li>
       </ul>
       <p className="mt-2 text-xs text-slate-500">
-        Lane A Activity unchanged. Shadow advisories appear in lane_advisory column.
+        Lane A Activity unchanged. Shadow advisories appear in the Gate signal column on this page.
       </p>
     </div>
   );

@@ -1,17 +1,17 @@
 'use client';
 
-import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDesktopTable';
-import { ActivityTradeMobileList } from '@/components/activity/ActivityTradeMobileList';
+import { useState } from 'react';
 import { Phase2FlagSummary } from '@/components/omegaPhase2/Phase2FlagSummary';
-import { useActivityTradeLog } from '@/hooks/useActivityTradeLog';
+import { Phase2ShadowStatsBar } from '@/components/omegaPhase2/Phase2ShadowStatsBar';
+import { Phase2ShadowTradeDesktopTable } from '@/components/omegaPhase2/Phase2ShadowTradeDesktopTable';
+import { Phase2ShadowTradeMobileList } from '@/components/omegaPhase2/Phase2ShadowTradeMobileList';
+import { Phase2ViewFilterBar, type Phase2ViewFilter } from '@/components/omegaPhase2/Phase2ViewFilterBar';
+import { usePhase2TradeLog } from '@/hooks/usePhase2TradeLog';
 import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
 
 export default function OmegaPhase2ActivityPage() {
-  const { rows, loading, hasMore, loadMore } = useActivityTradeLog({
-    decision: 'EXECUTED',
-    engineId: 'omega',
-    brokerId: OMEGA_LANE_B_BROKER_ID,
-  });
+  const [viewFilter, setViewFilter] = useState<Phase2ViewFilter>('all');
+  const { rows, rawRows, loading, hasMore, loadMore } = usePhase2TradeLog(viewFilter);
 
   return (
     <div className="space-y-6">
@@ -19,16 +19,18 @@ export default function OmegaPhase2ActivityPage() {
         Omega Phase 2 (Lane B)
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Experiment lane only — broker {OMEGA_LANE_B_BROKER_ID} (AUD_NEWWWW). Baseline Activity is
-        unchanged.
+        Experiment lane — broker {OMEGA_LANE_B_BROKER_ID} (AUD_NEWWWW). Shadow rows still fill in W0;
+        gate signal column shows what would block once enforce is on.
       </p>
 
       <Phase2FlagSummary />
+      <Phase2ShadowStatsBar tradeRows={rawRows} />
+      <Phase2ViewFilterBar activeFilter={viewFilter} onFilterChange={setViewFilter} />
 
-      <ActivityTradeMobileList rows={rows} isTradeListLoading={loading} />
-      <ActivityTradeDesktopTable rows={rows} isTradeListLoading={loading} />
+      <Phase2ShadowTradeMobileList tradeRows={rows} isTradeListLoading={loading} />
+      <Phase2ShadowTradeDesktopTable tradeRows={rows} isTradeListLoading={loading} />
 
-      {hasMore && rows.length > 0 && (
+      {hasMore && rawRows.length > 0 && (
         <div className="flex justify-center">
           <button
             type="button"
