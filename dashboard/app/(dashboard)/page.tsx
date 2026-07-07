@@ -5,6 +5,7 @@ import { getSupabase } from '@/lib/supabase';
 import type { BridgeBrokerRow, BridgeEngineRow, BridgeHealthLogRow, BridgeTradeLogRow } from '@/lib/types';
 import { BridgeToggle } from '@/components/BridgeToggle';
 import { OverviewRecentActivity, OverviewRecentHeader } from '@/components/overview/OverviewRecentActivity';
+import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
 
 const TRADE_LOG_PAGE_SIZE = 25;
 
@@ -34,7 +35,12 @@ export default function OverviewPage() {
       supabase.from('bridge_brokers').select('broker_id, connection_status, last_heartbeat_at, display_name'),
       supabase.from('bridge_engines').select('engine_id, display_name, is_active, execution_threshold, max_daily_trades, trades_today, max_hold_hours').order('engine_id'),
       supabase.from('bridge_health_log').select('id, checked_at, oanda_ok, supabase_ok, broker_connection_status').order('checked_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('bridge_trade_log').select('id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, created_at').order('created_at', { ascending: false }).limit(TRADE_LOG_PAGE_SIZE),
+      supabase
+        .from('bridge_trade_log')
+        .select('id, signal_id, engine_id, pair, direction, decision, block_reason, decision_latency_ms, status, result, created_at')
+        .neq('broker_id', OMEGA_LANE_B_BROKER_ID)
+        .order('created_at', { ascending: false })
+        .limit(TRADE_LOG_PAGE_SIZE),
     ]);
 
     if (configRes.data?.config_value !== undefined) {

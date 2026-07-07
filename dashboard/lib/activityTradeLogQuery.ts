@@ -1,4 +1,5 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
+import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
 
 export const ACTIVITY_TRADE_LOG_PAGE_SIZE = 50;
 
@@ -24,6 +25,17 @@ export function applyActivityDecisionFilter<T extends { eq: Function; in: Functi
   return query;
 }
 
+/** Baseline Activity excludes Lane B; /omega-phase2 passes brokerId explicitly. */
+export function applyActivityBrokerScope<T extends { eq: Function; neq: Function }>(
+  query: T,
+  brokerIdFilter: string,
+): T {
+  if (brokerIdFilter) {
+    return query.eq('broker_id', brokerIdFilter) as T;
+  }
+  return query.neq('broker_id', OMEGA_LANE_B_BROKER_ID) as T;
+}
+
 export interface ActivityTradeLogFilters {
   decision: string;
   engineId: string;
@@ -45,7 +57,7 @@ export function buildActivityTradeLogQuery(
     );
   q = applyActivityDecisionFilter(q, filters.decision);
   if (filters.engineId) q = q.eq('engine_id', filters.engineId);
-  if (filters.brokerId) q = q.eq('broker_id', filters.brokerId);
+  q = applyActivityBrokerScope(q, filters.brokerId);
   return q;
 }
 

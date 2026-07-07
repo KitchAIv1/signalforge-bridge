@@ -16,6 +16,8 @@ import { NewsEventStrip } from '@/components/activity/NewsEventStrip';
 import { PresenceIndicator } from '@/components/PresenceIndicator';
 import { useBrokerFilterOptions } from '@/hooks/useBrokerFilterOptions';
 import { OandaConnectionStatus } from '@/components/OandaConnectionStatus';
+import { applyActivityBrokerScope } from '@/lib/activityTradeLogQuery';
+import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
 
 const PAGE_SIZE = 50;
 
@@ -107,7 +109,9 @@ export default function ActivityPage() {
   const [engine, setEngine] = useState('');
   const [broker, setBroker] = useState('');
   const [engines, setEngines] = useState<string[]>([]);
-  const { brokerOptions } = useBrokerFilterOptions();
+  const { brokerOptions } = useBrokerFilterOptions({
+    excludeBrokerIds: [OMEGA_LANE_B_BROKER_ID],
+  });
   const rebuildHourGateCtrl = useRebuildHourGate();
   const { omegaRawMode } = useEngineControlsState();
   usePresencePing(); // 60s heartbeat — bridge can treat as watching for omega sizing
@@ -128,7 +132,7 @@ export default function ActivityPage() {
         .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
       q = applyActivityDecisionFilter(q, decision);
       if (engine) q = q.eq('engine_id', engine);
-      if (broker) q = q.eq('broker_id', broker);
+      q = applyActivityBrokerScope(q, broker);
       const { data, error } = await q;
       if (error) {
         setLoading(false);
@@ -169,7 +173,7 @@ export default function ActivityPage() {
         .limit(5000);
       q = applyActivityDecisionFilter(q, decision);
       if (engine) q = q.eq('engine_id', engine);
-      if (broker) q = q.eq('broker_id', broker);
+      q = applyActivityBrokerScope(q, broker);
       const { data } = await q;
       const list = (data ?? []) as unknown as BridgeTradeLogRow[];
       const csv = toCSV(list);
