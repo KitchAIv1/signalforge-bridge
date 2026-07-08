@@ -130,8 +130,8 @@ export interface PriceQuote {
   spread: string;
 }
 
-export async function getPricing(instruments: string): Promise<PriceQuote[]> {
-  const res = await oandaFetch(`/v3/accounts/${OANDA_ACCOUNT_ID}/pricing?instruments=${encodeURIComponent(instruments)}`);
+export async function getPricing(instruments: string, accountId?: string): Promise<PriceQuote[]> {
+  const res = await oandaFetch(`/v3/accounts/${accountId ?? OANDA_ACCOUNT_ID}/pricing?instruments=${encodeURIComponent(instruments)}`);
   if (!res.ok) throw new Error(`OANDA pricing failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   const json = (await res.json()) as { prices?: Array<{ instrument: string; bids: Array<{ price: string }>; asks: Array<{ price: string }>; closeoutBid?: string; closeoutAsk?: string }> };
   const prices = json.prices ?? [];
@@ -282,11 +282,12 @@ export interface ClosedTradeDetails {
  */
 export async function getClosedTradeDetails(
   tradeId: string,
-  fromTime: string
+  fromTime: string,
+  accountId?: string,
 ): Promise<ClosedTradeDetails> {
   // Strategy 1: Direct trade lookup by ID (reliable, no time-window dependency)
   try {
-    const tradeDetails = await getTradeById(tradeId);
+    const tradeDetails = await getTradeById(tradeId, accountId);
     if (
       tradeDetails !== null &&
       tradeDetails.state === 'CLOSED' &&
@@ -304,8 +305,9 @@ export async function getClosedTradeDetails(
 
   // Strategy 2: Transactions API fallback (original implementation)
   const toTime = new Date().toISOString();
+  const resolvedAccountId = accountId ?? OANDA_ACCOUNT_ID;
   const res = await oandaFetch(
-    `/v3/accounts/${OANDA_ACCOUNT_ID}/transactions?from=${encodeURIComponent(fromTime)}&to=${encodeURIComponent(toTime)}&pageSize=100`,
+    `/v3/accounts/${resolvedAccountId}/transactions?from=${encodeURIComponent(fromTime)}&to=${encodeURIComponent(toTime)}&pageSize=100`,
   );
   if (!res.ok) return { exitPrice: null, pnlDollars: null, closedTime: null };
   const listJson = (await res.json()) as { pages?: string[] };

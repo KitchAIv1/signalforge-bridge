@@ -14,7 +14,7 @@ import {
 } from '../connectors/oanda.js';
 import { logInfo, logError } from '../utils/logger.js';
 import { sendTradeClosedAlert } from '../services/telegram/alertTradeClose.js';
-import { reconcileAmdTpLegCloses } from './amdTpLegReconcile.js';
+import { resolveAmdOandaAccountId } from '../services/amd/resolveAmdOandaAccountId.js';
 
 const INSTRUMENT = 'AUD_USD';
 const ENGINE_ID = 'engine_amd';
@@ -25,6 +25,10 @@ type TrailStateRow = Record<string, unknown>;
 
 function supabaseDb(): SupabaseClient {
   return getSupabaseClient();
+}
+
+function amdAccountId(): string {
+  return resolveAmdOandaAccountId();
 }
 
 function directionOf(state: TrailStateRow): 'long' | 'short' {
@@ -38,7 +42,7 @@ function pipsCaptured(direction: 'long' | 'short', fillPrice: number, exitPrice:
 }
 
 async function fetchMidPrice(): Promise<number | null> {
-  const pricing = await getPricing(INSTRUMENT);
+  const pricing = await getPricing(INSTRUMENT, amdAccountId());
   if (!pricing.length) return null;
   return (parseFloat(pricing[0].ask) + parseFloat(pricing[0].bid)) / 2;
 }
@@ -99,7 +103,7 @@ async function fetchClosedPnl(tradeId: string): Promise<{
   pnlDollars: number | null;
 }> {
   const fromTime = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-  const closed = await getClosedTradeDetails(tradeId, fromTime);
+  const closed = await getClosedTradeDetails(tradeId, fromTime, amdAccountId());
   return { exitPrice: closed.exitPrice, pnlDollars: closed.pnlDollars };
 }
 
@@ -165,7 +169,7 @@ async function closeAmdTrade(
 ): Promise<void> {
   const tradeId = state.oanda_trade_id as string;
   try {
-    await closeTrade(tradeId);
+    await closeTrade(tradeId, undefined, amdAccountId());
   } catch (err) {
     logError('[AmdTrail] closeTrade failed', { tradeId, err: String(err) });
     return;
@@ -280,15 +284,14 @@ function isTrailEligibleState(state: Record<string, unknown>): boolean {
 }
 
 export async function runAmdTrailMonitor(): Promise<void> {
+  const accountId = amdAccountId();
   let oandaOpenIds: Set<string>;
   try {
-    oandaOpenIds = new Set((await getOpenTrades()).map((tradeRow) => tradeRow.id));
+    oandaOpenIds = new Set((await getOpenTrades(accountId)).map((tradeRow) => tradeRow.id));
   } catch (err) {
     logError('[AmdTrail] getOpenTrades failed — skipping cycle', { err: String(err) });
     return;
   }
-
-  await reconcileAmdTpLegCloses(supabaseDb(), oandaOpenIds);
 
   const { data: openStates, error } = await supabaseDb()
     .from('amd_trail_stop_state')

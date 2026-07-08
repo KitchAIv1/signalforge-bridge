@@ -3,21 +3,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import type { RebuildHourGateControl } from '@/hooks/useRebuildHourGate';
+import type { AmdAsianCloseFilterControl } from '@/hooks/useAmdAsianCloseFilter';
 import { RebuildHourGateSwitch } from '@/components/RebuildHourGateSwitch';
+import { AmdAsianCloseFilterSwitch } from '@/components/AmdAsianCloseFilterSwitch';
 
 const LIVE_ENGINE_ROWS = [
   { id: 'omega', display: 'Omega' },
   { id: 'omega_inverse', display: 'Omega Inverse' },
   { id: 'engine_rebuild', display: 'Rebuild' },
+  { id: 'engine_amd', display: 'AMD' },
   { id: 'falcon', display: 'Falcon' },
   { id: 'sigma', display: 'Sigma' },
 ] as const;
 
 interface EngineControlsProps {
   hourGateControl: RebuildHourGateControl;
+  amdAsianCloseControl: AmdAsianCloseFilterControl;
 }
 
-export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControlsProps) {
+export function EngineControls({
+  hourGateControl: hourGateCtrl,
+  amdAsianCloseControl: amdAsianCloseCtrl,
+}: EngineControlsProps) {
   const {
     pausedIds,
     omegaDir,
@@ -61,9 +68,9 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
 
       {dropdownOpen ? (
         <div className="absolute right-0 top-full z-50 mt-1 w-max min-w-[16rem] max-w-[calc(100vw-1rem)] border border-slate-200 bg-white shadow-md md:min-w-[18rem]">
-          {loadError || hourGateCtrl.loadError ? (
+          {loadError || hourGateCtrl.loadError || amdAsianCloseCtrl.loadError ? (
             <p className="px-2.5 py-1.5 text-sm text-red-600">
-              {loadError ?? hourGateCtrl.loadError}
+              {loadError ?? hourGateCtrl.loadError ?? amdAsianCloseCtrl.loadError}
             </p>
           ) : null}
           {omegaRawMode ? (
@@ -188,6 +195,26 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
                           onToggle={() => void hourGateCtrl.toggleHourGate()}
                         />
                       </div>
+                    ) : row.id === 'engine_amd' ? (
+                      <div className="flex min-w-0 max-w-[11rem] flex-1 flex-wrap items-center justify-end gap-1.5 sm:max-w-none">
+                        <button
+                          type="button"
+                          onClick={() => void togglePause(row.id, row.display)}
+                          className={`inline-flex h-8 min-w-[2.75rem] shrink-0 items-center justify-center border px-2 text-sm font-semibold max-md:min-h-[44px] md:min-w-[4.5rem] ${
+                            paused
+                              ? 'border-red-200 bg-red-50 text-red-800'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          }`}
+                        >
+                          <span className="md:hidden">{paused ? 'OFF' : 'ON'}</span>
+                          <span className="hidden md:inline">{paused ? '● PAUSED' : '● LIVE'}</span>
+                        </button>
+                        <AmdAsianCloseFilterSwitch
+                          filterEnabled={amdAsianCloseCtrl.filterEnabled}
+                          busy={amdAsianCloseCtrl.busy}
+                          onToggle={() => void amdAsianCloseCtrl.toggleFilter()}
+                        />
+                      </div>
                     ) : (
                       <div className="flex flex-1 justify-end">
                         <button
@@ -212,12 +239,12 @@ export function EngineControls({ hourGateControl: hourGateCtrl }: EngineControls
           {lastSyncedUtc ? (
             <p className="px-2.5 py-1.5 text-sm text-slate-500">Last synced: {lastSyncedUtc}</p>
           ) : null}
-          {toast || hourGateCtrl.toast ? (
+          {toast || hourGateCtrl.toast || amdAsianCloseCtrl.toast ? (
             <p
               className="border-t border-slate-200 px-2.5 py-1.5 text-sm text-emerald-800"
               role="status"
             >
-              {toast ?? hourGateCtrl.toast}
+              {toast ?? hourGateCtrl.toast ?? amdAsianCloseCtrl.toast}
             </p>
           ) : null}
         </div>

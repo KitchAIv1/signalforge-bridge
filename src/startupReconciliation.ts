@@ -3,9 +3,11 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { OpenTrade } from './connectors/oanda.js';
 import { getOpenTrades, getTradeById } from './connectors/oanda.js';
 import { prePopulateDedupFromLog } from './core/conflictResolver.js';
 import { computeDerivedFields, resultFromPnl } from './monitoring/tradeMonitorHelpers.js';
+import { resolveAmdOandaAccountId } from './services/amd/resolveAmdOandaAccountId.js';
 
 function resultFromPnlDollars(pnlDollars: number | null): string {
   return resultFromPnl(pnlDollars);
@@ -14,9 +16,10 @@ function resultFromPnlDollars(pnlDollars: number | null): string {
 async function reconcileGhostOpenRow(
   supabase: SupabaseClient,
   row: { id: string; oanda_trade_id: string },
+  accountId?: string,
 ): Promise<void> {
   const oandaTradeId = row.oanda_trade_id;
-  const tradeDetails = await getTradeById(oandaTradeId);
+  const tradeDetails = await getTradeById(oandaTradeId, accountId);
 
   if (tradeDetails === null) {
     console.warn(
@@ -74,46 +77,81 @@ async function reconcileGhostOpenRow(
   );
 }
 
+async function forwardReconcileOpenTrades(
+  supabase: SupabaseClient,
+  oandaTrades: OpenTrade[],
+  logIds: Set<string>,
+): Promise<void> {
+  for (const ot of oandaTrades) {
+    if (logIds.has(ot.id)) continue;
+    await supabase.from('bridge_trade_log').insert({
+      signal_id: ot.id,
+      engine_id: 'reconciled',
+      pair: ot.instrument,
+      direction: ot.units.startsWith('-') ? 'SHORT' : 'LONG',
+      stop_loss: 0,
+      signal_received_at: ot.openTime ?? new Date().toISOString(),
+      decision: 'EXECUTED',
+      status: 'open',
+      oanda_trade_id: ot.id,
+      units: parseInt(ot.units, 10),
+      notes: 'reconciled on startup',
+    });
+    logIds.add(ot.id);
+  }
+}
+
 export async function runStartupReconciliation(
   supabase: SupabaseClient,
 ): Promise<void> {
-  // ── Forward reconciliation (existing — unchanged) ──────────────────────
-  const oandaTrades = await getOpenTrades();
+  const amdAccountId = resolveAmdOandaAccountId();
+  const [mainTrades, amdTrades] = await Promise.all([
+    getOpenTrades(),
+    getOpenTrades(amdAccountId),
+  ]);
+
   const { data: logOpen } = await supabase
     .from('bridge_trade_log')
-    .select('oanda_trade_id, id')
+    .select('oanda_trade_id, id, engine_id')
     .eq('status', 'open');
   const logIds = new Set(
     (logOpen ?? []).map(
       (r: { oanda_trade_id: string }) => r.oanda_trade_id,
     ),
   );
-  const oandaOpenIds = new Set(oandaTrades.map((t) => t.id));
+  const mainOpenIds = new Set(mainTrades.map((t) => t.id));
+  const amdOpenIds = new Set(amdTrades.map((t) => t.id));
 
-  for (const ot of oandaTrades) {
-    if (!logIds.has(ot.id)) {
-      await supabase.from('bridge_trade_log').insert({
-        signal_id: ot.id,
-        engine_id: 'reconciled',
-        pair: ot.instrument,
-        direction: ot.units.startsWith('-') ? 'SHORT' : 'LONG',
-        stop_loss: 0,
-        signal_received_at: ot.openTime ?? new Date().toISOString(),
-        decision: 'EXECUTED',
-        status: 'open',
-        oanda_trade_id: ot.id,
-        units: parseInt(ot.units, 10),
-        notes: 'reconciled on startup',
-      });
-    }
+  await forwardReconcileOpenTrades(supabase, mainTrades, logIds);
+  if (amdAccountId && amdAccountId !== process.env.OANDA_ACCOUNT_ID) {
+    await forwardReconcileOpenTrades(supabase, amdTrades, logIds);
   }
-  // ── End forward reconciliation ─────────────────────────────────────────
 
-  // ── Reverse reconciliation (NEW) ──────────────────────────────────────
   for (const row of logOpen ?? []) {
     const oandaTradeId = row.oanda_trade_id as string | null;
     if (!oandaTradeId) continue;
-    if (oandaOpenIds.has(oandaTradeId)) continue;
+
+    const engineId = row.engine_id as string | null;
+    const openOnMain = mainOpenIds.has(oandaTradeId);
+    const openOnAmd = amdOpenIds.has(oandaTradeId);
+
+    if (engineId === 'engine_amd') {
+      if (openOnAmd) continue;
+      try {
+        await reconcileGhostOpenRow(supabase, {
+          id: row.id as string,
+          oanda_trade_id: oandaTradeId,
+        }, amdAccountId);
+      } catch (err: unknown) {
+        console.error(
+          `[Reconciliation] Error processing AMD trade ${oandaTradeId}:`,
+          String(err),
+        );
+      }
+      continue;
+    }
+
+    if (openOnMain) continue;
 
     try {
       await reconcileGhostOpenRow(supabase, {
@@ -127,9 +165,7 @@ export async function runStartupReconciliation(
       );
     }
   }
-  // ── End reverse reconciliation ─────────────────────────────────────────
 
-  // ── Dedup pre-population (existing — unchanged) ────────────────────────
   const { data: recent } = await supabase
     .from('bridge_trade_log')
     .select('pair, direction, signal_received_at')

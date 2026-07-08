@@ -15,7 +15,11 @@ import {
 import { calculateUnits } from '../core/positionSizer.js';
 import { logInfo, logError } from '../utils/logger.js';
 import { sendTradeExecutedAlert } from './telegram/alertTradeExecution.js';
-import { submitAmdFailedRatchetOrder } from './amdFailedRatchetSubmit.js';
+import { loadAmdAsianCloseFilterEnabled } from './amd/loadAmdAsianCloseFilterEnabled.js';
+import {
+  AMD_BROKER_ID,
+  resolveAmdOandaAccountId,
+} from './amd/resolveAmdOandaAccountId.js';
 
 const TAG_ENTRY_HOUR: Record<string, number> = {
   AMD_COMPRESSION_BREAKOUT: 10,
@@ -68,10 +72,6 @@ function supabaseDb(): SupabaseClient {
 
 function isEnabled(): boolean {
   return process.env.AMD_DISTRIBUTION_ENABLED === 'true';
-}
-
-function isAsianCloseFilterEnabled(): boolean {
-  return process.env.AMD_ASIAN_CLOSE_FILTER_ENABLED === 'true';
 }
 
 function utcNowParts(): { todayStr: string; hourUtc: number; minUtc: number } {
@@ -185,6 +185,7 @@ async function writeBlockedLog(
   await supabaseDb().from('bridge_trade_log').insert({
     signal_id: randomUUID(),
     engine_id: ENGINE_ID,
+    broker_id: AMD_BROKER_ID,
     pair: INSTRUMENT,
     direction,
     stop_loss: stopLoss,
@@ -216,6 +217,7 @@ async function persistOpenTrade(
   await supabaseDb().from('bridge_trade_log').insert({
     signal_id: randomUUID(),
     engine_id: ENGINE_ID,
+    broker_id: AMD_BROKER_ID,
     pair: INSTRUMENT,
     direction: direction.toUpperCase(),
     stop_loss: hardSlPrice,
@@ -278,8 +280,9 @@ type OrderPlan = {
 };
 
 async function buildOrderPlan(direction: TradeDirection, weight: number): Promise<OrderPlan | null> {
-  const account = await getAccountSummary();
-  const pricing = await getPricing(INSTRUMENT);
+  const amdAccountId = resolveAmdOandaAccountId();
+  const account = await getAccountSummary(amdAccountId);
+  const pricing = await getPricing(INSTRUMENT, amdAccountId);
   if (!pricing.length) {
     logError('[AmdDistribution] getPricing returned empty');
     return null;
@@ -319,11 +322,7 @@ async function submitAmdOrder(
   plan: OrderPlan,
   todayStr: string,
 ): Promise<void> {
-  if (tag === 'AMD_FAILED') {
-    await submitAmdFailedRatchetOrder(supabaseDb(), direction, amdRow, plan, todayStr);
-    return;
-  }
-
+  const amdAccountId = resolveAmdOandaAccountId();
   const exitStrategy = tag === 'AMD_NONE' ? 'S1' : plan.exitStrategy;
   logInfo('[AmdDistribution] Placing order', {
     tag,
@@ -333,11 +332,15 @@ async function submitAmdOrder(
     units: plan.signedUnits,
     exitStrategy,
   });
-  const orderResult = await placeMarketOrder({
-    instrument: INSTRUMENT,
-    units: plan.signedUnits,
-    stopLossPrice: plan.hardSlPrice.toFixed(5),
-  });
+  const orderResult = await placeMarketOrder(
+    {
+      instrument: INSTRUMENT,
+      units: plan.signedUnits,
+      stopLossPrice: plan.hardSlPrice.toFixed(5),
+    },
+    10_000,
+    amdAccountId,
+  );
   const { tradeId, fillPrice: oandaFill } = parseFillFromOrder(orderResult);
   if (!tradeId) {
     logError('[AmdDistribution] OANDA order failed — no tradeId', { orderResult });
@@ -423,7 +426,7 @@ async function passesExecutionGates(
     logInfo('[AmdDistribution] auto_direction neutral — no trade today', { autoDirection });
     return { ok: false };
   }
-  if (isAsianCloseFilterEnabled()) {
+  if (await loadAmdAsianCloseFilterEnabled(supabaseDb())) {
     const biasSignal = amdRow.asian_close_bias_signal as string | null;
     if (biasSignal !== null && biasSignal !== 'NEUTRAL') {
       const biasDirection = biasSignal === 'BULLISH' ? 'long' : 'short';

@@ -6,6 +6,7 @@ import { AccountSnapshotBar } from '@/components/AccountSnapshotBar';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { useRebuildHourGate } from '@/hooks/useRebuildHourGate';
+import { useAmdAsianCloseFilter } from '@/hooks/useAmdAsianCloseFilter';
 import { useEngineControlsState } from '@/hooks/useEngineControlsState';
 import { usePresencePing } from '@/hooks/usePresencePing';
 import { ActivityTradeDesktopTable } from '@/components/activity/ActivityTradeDesktopTable';
@@ -113,6 +114,7 @@ export default function ActivityPage() {
     excludeBrokerIds: [OMEGA_LANE_B_BROKER_ID],
   });
   const rebuildHourGateCtrl = useRebuildHourGate();
+  const amdAsianCloseCtrl = useAmdAsianCloseFilter();
   const { omegaRawMode } = useEngineControlsState();
   usePresencePing(); // 60s heartbeat — bridge can treat as watching for omega sizing
 
@@ -232,7 +234,10 @@ export default function ActivityPage() {
         >
           Export CSV
         </button>
-        <EngineControls hourGateControl={rebuildHourGateCtrl} />
+        <EngineControls
+          hourGateControl={rebuildHourGateCtrl}
+          amdAsianCloseControl={amdAsianCloseCtrl}
+        />
         <PresenceIndicator />
         <OandaConnectionStatus />
       </div>

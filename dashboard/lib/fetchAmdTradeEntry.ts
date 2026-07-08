@@ -16,6 +16,7 @@ export async function fetchAmdTradeEntry(
     .eq('decision', 'EXECUTED')
     .gte('created_at', `${tradeDate}T00:00:00.000Z`)
     .lt('created_at', `${tradeDate}T23:59:59.999Z`)
+    .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
 

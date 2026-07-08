@@ -66,7 +66,7 @@ const SYSTEM_GATES: Array<{ number: string; gate: string; detail?: string }> = [
     number: '4b',
     gate: 'Asian close bias filter',
     detail:
-      'When AMD_ASIAN_CLOSE_FILTER_ENABLED=true: if asian_close_bias_signal opposes auto_direction → BLOCKED (ASIAN_CLOSE_DISAGREE). NEUTRAL or null → fall through.',
+      'Controlled via bridge_config amd_asian_close_filter_enabled (default off). When on: if asian_close_bias_signal opposes auto_direction → BLOCKED (ASIAN_CLOSE_DISAGREE).',
   },
   { number: '4', gate: 'Current UTC hour within entry/exit window (isEntryWindowOpen)' },
   { number: '5', gate: 'amd_state.evaluated_at = today (not stale)' },

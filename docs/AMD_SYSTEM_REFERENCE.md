@@ -1,5 +1,5 @@
 # AMD Intelligence System — Complete Reference
-**SignalForge / Veredix | v2.4.0 | Updated: 2026-05-31**
+**SignalForge / Veredix | v2.5.0 | Updated: 2026-06-01**
 **Status: Phase 4 Live — Forward Testing Active**
 
 ---
@@ -8,6 +8,7 @@
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-06-01 | v2.5.0 | `decision_auto_direction` snapshot (migration 030), contamination discovery, D1 bar timing fix |
 | 2026-05-31 | v2.4.0 | Added ASIAN_CLOSE_FILTER gate (§5.7), Scalper engine integration (§5.8), migrations 027/028 table refs |
 | 2026-05-27 | v2.3.0 | Phase 4 live reference baseline |
 
@@ -88,8 +89,16 @@ records the actual full-day classification.
   threshold ≥ 4 → TRENDING_UP/DOWN, else RANGING
   Used by AMD_SHIFTED only
 - Lookback: 21 calendar days fetched, last 5 or 7 used
-- toISO: `${tradeDate}T00:00:00Z` — today's
-  incomplete D1 excluded correctly
+
+**D1 bar timing at 10:31 UTC (2026-06-01 discovery):** OANDA D1 fetch through `tradeDateT10:30Z` returns the **prior session's evening bar** as the last row. That bar is **incomplete at live 10:31** (FX daily bar closes ~21:00 UTC). Including it flips D1 vote counts and can flip `auto_direction`.
+
+| Context | Handling |
+|---------|----------|
+| Live detector at 10:31 | [VERIFY] May still include incomplete last D1 bar — `decision_auto_direction` freeze preserves first computed value |
+| Backfill / reconstruction | `filterD1CandlesAt1031()` drops last D1 bar: `d1Raw.slice(0, -1)` (`scripts/decisionDirectionBackfill/filterD1At1031.ts`) |
+| Doc prior claim | ~~"today's incomplete D1 excluded correctly"~~ — **incorrect** for live fetch; corrected 2026-06-01 |
+
+Example (2026-06-01): with last bar → 2b/3br TRENDING_DOWN → `short`; after drop → 3b/2br TRENDING_UP → `long` (matches live 10:31 observation).
 
 ---
 
@@ -106,7 +115,7 @@ records the actual full-day classification.
 3. Fetch D1 candles → 5-candle + 7-candle bias
 4. Fetch M5 candles 10:00–10:30 UTC → M5 signal
 5. `computeAutoDirectionSnapshot()` → direction
-6. Upsert to `amd_state`
+6. Upsert to `amd_state` via `persistAmdInsightRow()` — freezes `decision_auto_direction` on first write
 7. `applyAutoDirectionToBridgeConfig()` → writes
    `bridge_config.omega_direction` if mode=auto
 8. Send Telegram notification
@@ -118,6 +127,7 @@ records the actual full-day classification.
    `compression_breakout_outcome`,
    `outcome_evaluated_at` to today's `amd_state` row
 4. Does NOT overwrite any live detection columns
+5. Sets `detection_locked = false` — **unlocks row for detection reruns** (see §3.6)
 
 ### 3.4 M5 Signal Computation
 - Window: 10:00–10:30 UTC (6 M5 candles)
@@ -130,6 +140,48 @@ records the actual full-day classification.
   - UP Judas + bullish net = WITH_JUDAS
   - DOWN Judas: inverted
 - Stored in `amd_state.m5_vs_judas_direction`
+
+### 3.5 Decision snapshot freeze — `persistAmdInsightRow()` (2026-06-01)
+
+Migration `030_amd_decision_snapshot.sql` (commit `4877c56`).
+
+Source: `src/services/amdDetector/amdDecisionSnapshot.ts`, called from `persistAmdInsightRow()` in `AmdDetectorService.ts`.
+
+```typescript
+// resolveDecisionSnapshotFields — first write wins
+decision_auto_direction: existingSnapshot?.decision_auto_direction ?? autoDir.auto_direction
+decision_evaluated_at:   existingSnapshot?.decision_evaluated_at ?? evaluatedAtISO
+```
+
+- **`auto_direction`** — updated on every full detection upsert (mutable).
+- **`decision_auto_direction`** — written once per day on first detection; preserved across reruns.
+
+### 3.6 `auto_direction` overwrite chain (contamination)
+
+Observed on 2026-06-01; scope audit in [DISCOVERY_AutoDirection_Contamination_June2026.md](./DISCOVERY_AutoDirection_Contamination_June2026.md).
+
+```
+10:31 UTC  runAmdDetection()
+           → auto_direction set, decision_auto_direction frozen, detection_locked=true
+
+16:30 UTC  runAmdOutcomeDetection() [AMD_FAILED/TEXTBOOK/COMPRESSION only]
+           → amd_outcome_tag written
+           → detection_locked=false  ← unlocks row
+
+21:xx UTC  bridge restart → runAmdDetection() (startup: after 10:31)
+           → full upsert with H1 through current hour + complete D1
+           → auto_direction REWRITTEN (may flip direction)
+           → evaluated_at updated to rerun timestamp
+           → decision_auto_direction UNCHANGED (post-4877c56)
+```
+
+**285/287** historical rows show `evaluated_at` outside 10:31–10:35 UTC. **101/287** differ between stored `auto_direction` and backfilled `decision_auto_direction`.
+
+### ⚠️ WARNING — backtesting direction
+
+**Never use `amd_state.auto_direction` for historical backtests or gate classification.**
+
+Always use **`decision_auto_direction`** (faithful 10:31 snapshot). Scripts: `scripts/disagreeCleanBacktest.ts`, `scripts/decisionDirectionBackfill.ts`.
 
 ---
 
@@ -251,10 +303,13 @@ timeGateHour != null (processOpenState line 231).
 - Hard SL: 15 pips fixed on OANDA at fill
 - Pip trail distance: 2.5 pips from peak
 - Instrument: AUD_USD
-- Engine weight: 0.1
+- OANDA account: dedicated `AMD_OANDA_ACCOUNT_ID` (default `101-001-38709456-004`)
+- Broker ID on log rows: `oanda_amd_demo`
+- Engine weight: **1.0** (on dedicated account ≈ 2% effective risk)
 - BASELINE_RISK_PCT: 0.02
 - One trade per day maximum (hasExecutedToday gate)
 - News blackout: ±90 min window checked
+- **Single-order only** — AMD_FAILED ratchet retired; all tags use S0 pip trail (AMD_NONE uses S1 time gate)
 
 ### 5.6 Execution Gates (all must pass)
 1. AMD_DISTRIBUTION_ENABLED = 'true'
@@ -269,8 +324,11 @@ timeGateHour != null (processOpenState line 231).
 
 ### 5.7 ASIAN_CLOSE_FILTER
 
-**Env var:** `AMD_ASIAN_CLOSE_FILTER_ENABLED=true`
-**Source:** `passesExecutionGates()` in `AmdDistributionEngine.ts`
+**Source of truth:** `bridge_config` key `amd_asian_close_filter_enabled` (default **false** at launch).
+Dashboard toggle: Activity → Controls → AMD → 🌏 Filter ON/OFF.
+
+**Deprecated env fallback:** `AMD_ASIAN_CLOSE_FILTER_ENABLED=true` (used only if config row missing).
+**Source:** `loadAmdAsianCloseFilterEnabled()` in `src/services/amd/loadAmdAsianCloseFilterEnabled.ts`
 
 When enabled, blocks distribution entry when Asian close bias **disagrees** with `auto_direction`:
 
@@ -342,7 +400,8 @@ One row per trading day per pair.
 | layer4_d1_bias, layer4_bullish_count, layer4_bearish_count | AmdDetectorService | 10:31 | 5-candle D1 bias |
 | layer4_d1_bias_7, layer4_bullish_count_7, layer4_bearish_count_7 | AmdDetectorService | 10:31 | 7-candle D1 bias |
 | daily_bias_alignment | AmdDetectorService | 10:31 | Judas vs D1 alignment |
-| auto_direction, auto_direction_confidence, auto_direction_reason | AmdDetectorService | 10:31 | Computed direction signal |
+| auto_direction, auto_direction_confidence, auto_direction_reason | AmdDetectorService | 10:31 | Computed direction signal (**mutable** — may be overwritten on rerun) |
+| decision_auto_direction, decision_evaluated_at | AmdDetectorService | 10:31 (first write only) | **Immutable** 10:31 decision snapshot (migration 030) |
 | amd_size_multiplier | AmdDetectorService | 10:31 | Position size multiplier |
 | m5_first_3_net_pips, m5_vs_judas_direction, m5_first_candle_direction, m5_evaluated_at | AmdDetectorService | 10:31 | M5 early distribution signal |
 | amd_outcome_tag, reversal_confirmed_outcome, compression_breakout_outcome, outcome_evaluated_at | Outcome cron | 16:30 | Full-day actual classification |
@@ -505,7 +564,12 @@ vs M5 WITH_JUDAS +0.6p avg (20% SL).
    votes show 2/2 producing RANGING classification.
    This is a data quality issue, not genuine ranging.
 
-7. **Forward testing sample still small.**
+7. **`auto_direction` historical contamination (2026-06-01).**
+   285/287 rows have post-10:31 `evaluated_at`. Use
+   `decision_auto_direction` for all backtests. See
+   DISCOVERY_AutoDirection_Contamination_June2026.md.
+
+8. **Forward testing sample still small.**
    AMD engine went live May 2026. Minimum 50 live
    AMD distribution trades needed before drawing
    conclusions about live accuracy.
@@ -528,7 +592,8 @@ vs M5 WITH_JUDAS +0.6p avg (20% SL).
 | Variable | Purpose |
 |----------|---------|
 | AMD_DISTRIBUTION_ENABLED | 'true' to enable live trading |
-| AMD_ASIAN_CLOSE_FILTER_ENABLED | 'true' to block when Asian close bias disagrees with auto_direction |
+| AMD_OANDA_ACCOUNT_ID | Dedicated OANDA sub-account for engine_amd (e.g. `101-001-38709456-004`) |
+| AMD_ASIAN_CLOSE_FILTER_ENABLED | Deprecated — use `bridge_config` `amd_asian_close_filter_enabled` instead |
 
 ### ScalperEngine (bridge Railway service)
 | Variable | Default | Purpose |
@@ -545,5 +610,5 @@ See [ENGINE_Scalper_Reference_v1_0_0_May2026.md](./ENGINE_Scalper_Reference_v1_0
 
 ---
 
-*AMD System Reference v2.4.0 | SignalForge / Veredix |
-Updated 2026-05-31 | Confidential*
+*AMD System Reference v2.6.0 | SignalForge / Veredix |
+Updated 2026-07-08 | Confidential*
