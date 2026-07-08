@@ -288,11 +288,11 @@ entries after this hour via isEntryWindowOpen).
 ### 5.4 Exit Strategy Per Tag
 | Tag | Exit Strategy | Time Gate | Trail |
 |-----|--------------|-----------|-------|
-| AMD_NONE | S1 | H11 UTC | 2.5 pip |
-| AMD_TEXTBOOK | S0 | None (timeGateHour=null) | 2.5 pip |
-| AMD_COMPRESSION_BREAKOUT | S0 | None | 2.5 pip |
-| AMD_FAILED | S0 | None | 2.5 pip |
-| AMD_SHIFTED | S0 | None | 2.5 pip |
+| AMD_NONE | S1 | H11 UTC | 5 pip |
+| AMD_TEXTBOOK | S0 | None (timeGateHour=null) | 5 pip |
+| AMD_COMPRESSION_BREAKOUT | S0 | None | 5 pip |
+| AMD_FAILED | S0 | None | 5 pip |
+| AMD_SHIFTED | S0 | None | 5 pip |
 
 S1 = pip trail + time gate when timeGateHour set.
 S0 = pip trail only + OANDA hard SL.
@@ -301,7 +301,7 @@ timeGateHour != null (processOpenState line 231).
 
 ### 5.5 Position Parameters
 - Hard SL: 15 pips fixed on OANDA at fill
-- Pip trail distance: 2.5 pips from peak
+- Pip trail distance: **5 pips** from peak (override: `AMD_PIP_TRAIL_PIPS` env)
 - Instrument: AUD_USD
 - OANDA account: dedicated `AMD_OANDA_ACCOUNT_ID` (default `101-001-38709456-004`)
 - Broker ID on log rows: `oanda_amd_demo`
@@ -418,7 +418,7 @@ One row per open AMD distribution trade.
 | oanda_trade_id | Links to OANDA position |
 | direction | long or short |
 | fill_price, hard_sl_price | Entry and SL levels |
-| trail_pip_distance | 2.5 pips |
+| trail_pip_distance | 5 pips (default; env override) |
 | peak_favorable_price | Updated every monitor cycle |
 | time_gate_utc_hour | null for S0, 11 for AMD_NONE |
 | exit_strategy | S0 or S1 |
@@ -593,6 +593,7 @@ vs M5 WITH_JUDAS +0.6p avg (20% SL).
 |----------|---------|
 | AMD_DISTRIBUTION_ENABLED | 'true' to enable live trading |
 | AMD_OANDA_ACCOUNT_ID | Dedicated OANDA sub-account for engine_amd (e.g. `101-001-38709456-004`) |
+| AMD_PIP_TRAIL_PIPS | Pip trail from peak (default **5**; set `2.5` to rollback) |
 | AMD_ASIAN_CLOSE_FILTER_ENABLED | Deprecated — use `bridge_config` `amd_asian_close_filter_enabled` instead |
 
 ### ScalperEngine (bridge Railway service)

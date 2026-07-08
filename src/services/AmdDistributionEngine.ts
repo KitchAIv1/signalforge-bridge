@@ -20,6 +20,7 @@ import {
   AMD_BROKER_ID,
   resolveAmdOandaAccountId,
 } from './amd/resolveAmdOandaAccountId.js';
+import { AMD_HARD_SL_PIPS, AMD_PIP_TRAIL_PIPS } from './amd/amdTrailConstants.js';
 
 const TAG_ENTRY_HOUR: Record<string, number> = {
   AMD_COMPRESSION_BREAKOUT: 10,
@@ -57,8 +58,7 @@ const TAG_TIME_GATE_HOUR: Record<string, number | null> = {
   AMD_NONE: 11,
 };
 
-const HARD_SL_PIPS = 15;
-const PIP_TRAIL_PIPS = 2.5;
+const HARD_SL_PIPS = AMD_HARD_SL_PIPS;
 const INSTRUMENT = 'AUD_USD';
 const ENGINE_ID = 'engine_amd';
 const BASELINE_RISK_PCT = 0.02;
@@ -240,7 +240,7 @@ async function persistOpenTrade(
     amd_size_multiplier: amdRow.amd_size_multiplier ?? null,
     amd_entry_hour: new Date().getUTCHours(),
     amd_exit_strategy: exitStrategy,
-    amd_pip_trail: PIP_TRAIL_PIPS,
+    amd_pip_trail: AMD_PIP_TRAIL_PIPS,
     amd_hard_sl_pips: HARD_SL_PIPS,
   });
 }
@@ -260,7 +260,7 @@ async function persistTrailState(
     direction,
     fill_price: fillPrice,
     hard_sl_price: hardSlPrice,
-    trail_pip_distance: PIP_TRAIL_PIPS,
+    trail_pip_distance: AMD_PIP_TRAIL_PIPS,
     peak_favorable_price: fillPrice,
     time_gate_utc_hour: TAG_TIME_GATE_HOUR[tag] ?? null,
     trade_date: todayStr,

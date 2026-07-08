@@ -17,11 +17,11 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 }
 
 const ENGINE_ROWS = [
-  { tag: 'AMD_TEXTBOOK',             entry: '12:00', exit: '13:00', strategy: 'S0', gate: 'None',    trail: '2.5 pip', sl: '15 pip', note: 'Gate kept: -7% pips but +11pp win rate' },
-  { tag: 'AMD_COMPRESSION_BREAKOUT', entry: '10:31', exit: '16:00', strategy: 'S0', gate: 'None',    trail: '2.5 pip', sl: '15 pip', note: 'Gate removed: was -25% damage' },
-  { tag: 'AMD_FAILED',               entry: '11:00', exit: '16:00', strategy: 'S0', gate: 'None',    trail: '2.5 pip', sl: '15 pip', note: 'Gate removed: was -90% damage' },
-  { tag: 'AMD_SHIFTED',              entry: '12:00', exit: '16:00', strategy: 'S0', gate: 'None',    trail: '2.5 pip', sl: '15 pip', note: 'Gate removed: was -55% damage' },
-  { tag: 'AMD_NONE',                 entry: '10:31', exit: '11:00', strategy: 'S1', gate: 'H11 UTC', trail: '2.5 pip', sl: '15 pip', note: 'Gate kept: +67% improvement' },
+  { tag: 'AMD_TEXTBOOK',             entry: '12:00', exit: '13:00', strategy: 'S0', gate: 'None',    trail: '5 pip', sl: '15 pip', note: 'Gate kept: -7% pips but +11pp win rate' },
+  { tag: 'AMD_COMPRESSION_BREAKOUT', entry: '10:31', exit: '16:00', strategy: 'S0', gate: 'None',    trail: '5 pip', sl: '15 pip', note: 'Gate removed: was -25% damage' },
+  { tag: 'AMD_FAILED',               entry: '11:00', exit: '16:00', strategy: 'S0', gate: 'None',    trail: '5 pip', sl: '15 pip', note: 'Gate removed: was -90% damage' },
+  { tag: 'AMD_SHIFTED',              entry: '12:00', exit: '16:00', strategy: 'S0', gate: 'None',    trail: '5 pip', sl: '15 pip', note: 'Gate removed: was -55% damage' },
+  { tag: 'AMD_NONE',                 entry: '10:31', exit: '11:00', strategy: 'S1', gate: 'H11 UTC', trail: '5 pip', sl: '15 pip', note: 'Gate kept: +67% improvement' },
   { tag: 'INSUFFICIENT_DATA',        entry: '—',     exit: '—',     strategy: '—',  gate: '—',       trail: '—',       sl: '—',      note: 'No trade' },
 ] as const;
 

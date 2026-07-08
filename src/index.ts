@@ -45,6 +45,7 @@ import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeS
 import { runShadowTrailExitResolver } from './services/shadowTrailExit/shadowTrailExitService.js';
 import { runMt5StartupDiagnostics } from './services/broker/mt5StartupDiagnostics.js';
 import { resolveAmdOandaAccountId } from './services/amd/resolveAmdOandaAccountId.js';
+import { AMD_PIP_TRAIL_PIPS } from './services/amd/amdTrailConstants.js';
 
 let ready = false;
 const signalQueue: Array<Record<string, unknown>> = [];
@@ -90,6 +91,7 @@ async function main(): Promise<void> {
   await runStartupReconciliation(supabase);
   if (process.env.AMD_DISTRIBUTION_ENABLED === 'true') {
     logInfo('[Startup] AMD OANDA account', { accountId: resolveAmdOandaAccountId() });
+    logInfo('[Startup] AMD pip trail', { trailPips: AMD_PIP_TRAIL_PIPS });
   }
   const tableName = getSignalTableName();
   logInfo('Bridge starting', { table: tableName, engines: engines.map((e) => e.engine_id), mode: process.env.OANDA_ENVIRONMENT ?? 'practice' });
