@@ -3,10 +3,10 @@
 export type Phase2ViewFilter = 'all' | 'executed' | 'shadow' | 'blocked';
 
 const FILTER_OPTIONS: Array<{ value: Phase2ViewFilter; label: string }> = [
-  { value: 'all', label: 'All Lane B' },
-  { value: 'executed', label: 'Executed' },
-  { value: 'shadow', label: 'Shadow only' },
-  { value: 'blocked', label: 'Live blocked' },
+  { value: 'all', label: 'All' },
+  { value: 'executed', label: 'Taken' },
+  { value: 'shadow', label: 'Speed-floor shadow' },
+  { value: 'blocked', label: 'Blocked' },
 ];
 
 interface Phase2ViewFilterBarProps {
@@ -18,7 +18,7 @@ export function Phase2ViewFilterBar({ activeFilter, onFilterChange }: Phase2View
   return (
     <div className="flex flex-wrap gap-2">
       {FILTER_OPTIONS.map((option) => {
-        const isActive = option.value === activeFilter;
+        const isActive = activeFilter === option.value;
         return (
           <button
             key={option.value}

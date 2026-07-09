@@ -1,50 +1,56 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { getSupabase } from '@/lib/supabase';
-import { ALPHAOMEGA_BANNER_LABEL, OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
-
-interface AlphaOmegaConfigSnapshot {
-  enabled: boolean;
-}
-
-function parseBool(raw: unknown): boolean {
-  return raw === true || raw === 'true';
-}
+import { useAlphaOmegaKillSwitch } from '@/hooks/useAlphaOmegaKillSwitch';
+import {
+  ALPHAOMEGA_BANNER_LABEL,
+  ALPHAOMEGA_ENTRY_STREAK_LENGTH,
+  ALPHAOMEGA_HARD_STOP_PIPS,
+  ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD,
+  OMEGA_LANE_B_BROKER_ID,
+} from '@/lib/omegaLaneBConstants';
 
 export function Phase2FlagSummary() {
-  const [config, setConfig] = useState<AlphaOmegaConfigSnapshot | null>(null);
-
-  const loadConfig = useCallback(async () => {
-    const supabase = getSupabase();
-    const { data } = await supabase
-      .from('bridge_config')
-      .select('config_value')
-      .eq('config_key', 'alpha_omega_enabled')
-      .maybeSingle();
-    setConfig({ enabled: data ? parseBool(data.config_value) : true });
-  }, []);
-
-  useEffect(() => {
-    void loadConfig();
-  }, [loadConfig]);
-
-  if (!config) return null;
-
-  const modeLabel = config.enabled ? 'ENFORCE (streak + opposing-pressure + hard-stop)' : 'DISABLED — legacy fallback';
+  const { enabled, toggleError, isSaving, handleToggle } = useAlphaOmegaKillSwitch();
+  if (enabled == null) return null;
 
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
-      <p className="font-medium text-amber-200">{ALPHAOMEGA_BANNER_LABEL} — {modeLabel}</p>
-      <p className="mt-1 text-slate-400">
-        Broker: <span className="text-slate-200">{OMEGA_LANE_B_BROKER_ID}</span> (AUD_NEWWWW)
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <BannerCopy enabled={enabled} />
+        <button
+          type="button"
+          onClick={() => void handleToggle()}
+          disabled={isSaving}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+            enabled
+              ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+              : 'border-slate-400 bg-slate-200/40 text-slate-700 dark:border-slate-500 dark:bg-slate-800 dark:text-slate-300'
+          }`}
+        >
+          {isSaving ? 'Saving…' : enabled ? 'Disable ALPHAOMEGA' : 'Enable ALPHAOMEGA'}
+        </button>
+      </div>
+      {toggleError ? (
+        <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{toggleError}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function BannerCopy({ enabled }: { enabled: boolean }) {
+  const modeLabel = enabled ? 'ENFORCE' : 'DISABLED — legacy fallback';
+  return (
+    <div>
+      <p className="font-medium text-amber-800 dark:text-amber-200">
+        {ALPHAOMEGA_BANNER_LABEL} — {modeLabel}
       </p>
-      <ul className="mt-2 list-inside list-disc text-slate-400">
-        <li>Entry: 7-in-a-row founding streak (&lt;=45min) crack, with a 30min minimum formation-speed floor</li>
-        <li>Exit: 5 opposing fires, OR 10-pip hard stop (live M5 bar-walk), OR backstop reconfirm-crack</li>
-      </ul>
-      <p className="mt-2 text-xs text-slate-500">
-        Lane A Activity unchanged. Speed-floor-only blocks are logged with a shadow advisory for ongoing comparison.
+      <p className="mt-1 text-slate-500 dark:text-slate-400">
+        Broker: <span className="text-slate-700 dark:text-slate-200">{OMEGA_LANE_B_BROKER_ID}</span>{' '}
+        (AUD_NEWWWW)
+      </p>
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        {ALPHAOMEGA_ENTRY_STREAK_LENGTH}/45 crack · ≥30m floor · exit @
+        {ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD} opp / {ALPHAOMEGA_HARD_STOP_PIPS}p / backstop
       </p>
     </div>
   );

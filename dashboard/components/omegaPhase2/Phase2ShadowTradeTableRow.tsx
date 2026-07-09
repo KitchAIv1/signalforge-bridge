@@ -1,16 +1,24 @@
 'use client';
 
 import type { BridgeTradeLogRow } from '@/lib/types';
-import { amdTagColor, amdTagLabel } from '@/lib/amdPanelFormatters';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { Phase2LaneAdvisoryBadge } from '@/components/omegaPhase2/Phase2LaneAdvisoryBadge';
 import { resolvePhase2AdvisoryDisplay } from '@/lib/phase2LaneAdvisoryFormat';
 import { formatCloseReason } from '@/lib/formatCloseReason';
+import { formatAlphaOmegaBlockReason } from '@/lib/alphaOmegaAdvisoryParse';
+import {
+  formatDurationMinutes,
+  formatSignedDollars,
+  formatSignedPips,
+  foundingCellText,
+  pnlToneClass,
+} from '@/lib/alphaOmegaTradeDisplay';
 
-export const PHASE2_SHADOW_DESKTOP_COLUMN_COUNT = 11;
+export const PHASE2_SHADOW_DESKTOP_COLUMN_COUNT = 10;
 
 interface Phase2ShadowTradeTableRowProps {
   tradeRow: BridgeTradeLogRow;
+  onSelectTrade?: (tradeRow: BridgeTradeLogRow) => void;
 }
 
 function decisionBadgeClass(decision: string): string {
@@ -23,22 +31,56 @@ function decisionBadgeClass(decision: string): string {
   return 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
 }
 
-export function Phase2ShadowTradeTableRow({ tradeRow }: Phase2ShadowTradeTableRowProps) {
+function exitOrBlockLabel(tradeRow: BridgeTradeLogRow): string {
+  if (tradeRow.decision === 'BLOCKED') {
+    return formatAlphaOmegaBlockReason(tradeRow.block_reason);
+  }
+  return formatCloseReason(tradeRow.close_reason);
+}
+
+export function Phase2ShadowTradeTableRow({
+  tradeRow,
+  onSelectTrade,
+}: Phase2ShadowTradeTableRowProps) {
+  return (
+    <tr
+      className={`border-b border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50 ${
+        onSelectTrade ? 'cursor-pointer' : ''
+      }`}
+      onClick={onSelectTrade ? () => onSelectTrade(tradeRow) : undefined}
+    >
+      <TradeRowCells tradeRow={tradeRow} />
+    </tr>
+  );
+}
+
+function TradeRowCells({ tradeRow }: { tradeRow: BridgeTradeLogRow }) {
   const advisoryDisplay = resolvePhase2AdvisoryDisplay(
     tradeRow.lane_advisory,
     tradeRow.decision,
     tradeRow.block_reason,
   );
   const isLong = tradeRow.direction === 'long' || tradeRow.direction === 'LONG';
-  const pnlClass =
-    tradeRow.result === 'win'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : tradeRow.result === 'loss'
-        ? 'text-red-600 dark:text-red-400'
-        : 'text-slate-600 dark:text-slate-400';
-
+  const toneClass = pnlToneClass(tradeRow.result, tradeRow.pnl_pips);
   return (
-    <tr className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50">
+    <>
+      <TradeIdentityCells tradeRow={tradeRow} isLong={isLong} advisoryDisplay={advisoryDisplay} />
+      <TradeOutcomeCells tradeRow={tradeRow} toneClass={toneClass} />
+    </>
+  );
+}
+
+function TradeIdentityCells({
+  tradeRow,
+  isLong,
+  advisoryDisplay,
+}: {
+  tradeRow: BridgeTradeLogRow;
+  isLong: boolean;
+  advisoryDisplay: ReturnType<typeof resolvePhase2AdvisoryDisplay>;
+}) {
+  return (
+    <>
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
         {formatActivityIsoTimestamp(tradeRow.created_at)}
       </td>
@@ -51,35 +93,42 @@ export function Phase2ShadowTradeTableRow({ tradeRow }: Phase2ShadowTradeTableRo
       </td>
       <td className="px-3 py-2 text-xs">
         <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${decisionBadgeClass(tradeRow.decision)}`}>
-          {tradeRow.decision}
+          {tradeRow.decision === 'EXECUTED' ? 'TAKEN' : tradeRow.decision}
         </span>
       </td>
       <td className="px-3 py-2 text-xs">
         <Phase2LaneAdvisoryBadge display={advisoryDisplay} />
       </td>
-      <td
-        className="max-w-[160px] truncate px-3 py-2 text-xs text-slate-600 dark:text-slate-400"
-        title={tradeRow.block_reason ?? undefined}
-      >
-        {tradeRow.block_reason ?? '—'}
+      <td className="px-3 py-2 font-mono text-xs tabular-nums text-slate-700 dark:text-slate-300">
+        {foundingCellText(tradeRow.lane_advisory)}
       </td>
-      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{tradeRow.signal_session ?? '—'}</td>
+    </>
+  );
+}
+
+function TradeOutcomeCells({
+  tradeRow,
+  toneClass,
+}: {
+  tradeRow: BridgeTradeLogRow;
+  toneClass: string;
+}) {
+  return (
+    <>
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
+        {exitOrBlockLabel(tradeRow)}
+      </td>
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">{tradeRow.status}</td>
-      <td className={`px-3 py-2 text-xs font-medium ${pnlClass}`}>
-        {tradeRow.pnl_r != null ? (tradeRow.pnl_r >= 0 ? '+' : '') + Number(tradeRow.pnl_r).toFixed(2) + 'R' : '—'}
+      <td className={`px-3 py-2 text-xs font-medium tabular-nums ${toneClass}`}>
+        <div>{formatSignedPips(tradeRow.pnl_pips)}</div>
+        <div className="text-[10px] opacity-80">{formatSignedDollars(tradeRow.pnl_dollars)}</div>
+      </td>
+      <td className="px-3 py-2 text-xs tabular-nums text-slate-600 dark:text-slate-400">
+        {formatDurationMinutes(tradeRow.duration_minutes)}
       </td>
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
-        {formatCloseReason(tradeRow.close_reason)}
+        {tradeRow.signal_session ?? '—'}
       </td>
-      <td className={`px-3 py-2 text-xs font-medium ${amdTagColor(tradeRow.amd_tag ?? null)}`}>
-        {tradeRow.amd_tag ? amdTagLabel(tradeRow.amd_tag) : '—'}
-      </td>
-      <td
-        className="max-w-[180px] truncate px-3 py-2 font-mono text-[10px] text-slate-500 dark:text-slate-500"
-        title={tradeRow.lane_advisory ?? undefined}
-      >
-        {tradeRow.lane_advisory ?? '—'}
-      </td>
-    </tr>
+    </>
   );
 }

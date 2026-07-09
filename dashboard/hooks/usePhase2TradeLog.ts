@@ -8,11 +8,14 @@ import {
   type BridgeTradeLogRow,
 } from '@/lib/activityTradeLogQuery';
 import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
-import { isPhase2ShadowFlagged } from '@/lib/phase2LaneAdvisoryFormat';
+import {
+  isAlphaOmegaLiveBlock,
+  isPhase2ShadowFlagged,
+} from '@/lib/phase2LaneAdvisoryFormat';
 import type { Phase2ViewFilter } from '@/components/omegaPhase2/Phase2ViewFilterBar';
 
 function decisionForServerFilter(viewFilter: Phase2ViewFilter): string {
-  if (viewFilter === 'executed' || viewFilter === 'shadow') return 'EXECUTED';
+  if (viewFilter === 'executed') return 'EXECUTED';
   if (viewFilter === 'blocked') return 'BLOCKED';
   return '';
 }
@@ -24,7 +27,24 @@ function applyClientViewFilter(
   if (viewFilter === 'shadow') {
     return tradeRows.filter((row) => isPhase2ShadowFlagged(row));
   }
+  if (viewFilter === 'blocked') {
+    return tradeRows.filter((row) => isAlphaOmegaLiveBlock(row));
+  }
   return tradeRows;
+}
+
+async function fetchPhase2Page(
+  pageNum: number,
+  viewFilter: Phase2ViewFilter,
+): Promise<BridgeTradeLogRow[] | null> {
+  const supabase = getSupabase();
+  const { data, error } = await buildActivityTradeLogQuery(supabase, pageNum, {
+    decision: decisionForServerFilter(viewFilter),
+    engineId: 'omega',
+    brokerId: OMEGA_LANE_B_BROKER_ID,
+  });
+  if (error) return null;
+  return (data ?? []) as unknown as BridgeTradeLogRow[];
 }
 
 export function usePhase2TradeLog(viewFilter: Phase2ViewFilter) {
@@ -35,17 +55,11 @@ export function usePhase2TradeLog(viewFilter: Phase2ViewFilter) {
 
   const fetchPage = useCallback(
     async (pageNum: number, append: boolean) => {
-      const supabase = getSupabase();
-      const { data, error } = await buildActivityTradeLogQuery(supabase, pageNum, {
-        decision: decisionForServerFilter(viewFilter),
-        engineId: 'omega',
-        brokerId: OMEGA_LANE_B_BROKER_ID,
-      });
-      if (error) {
+      const list = await fetchPhase2Page(pageNum, viewFilter);
+      if (!list) {
         setLoading(false);
         return;
       }
-      const list = (data ?? []) as unknown as BridgeTradeLogRow[];
       setRawRows((prev) => (append ? [...prev, ...list] : list));
       setHasMore(list.length === ACTIVITY_TRADE_LOG_PAGE_SIZE);
       setLoading(false);

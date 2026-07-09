@@ -13,3 +13,9 @@ export const LANE_B_BLOCK_PHASE2_DIST = 'OMEGA_LANE_B_PHASE2_DIST_SKIP';
 export const ALPHAOMEGA_NAV_LABEL = 'ALPHAOMEGA';
 export const ALPHAOMEGA_PAGE_TITLE = 'ALPHAOMEGA (Phase 2)';
 export const ALPHAOMEGA_BANNER_LABEL = 'ALPHAOMEGA';
+
+/** Dashboard mirrors of src/core/alphaOmega/alphaOmegaConstants.ts (display only). */
+export const ALPHAOMEGA_ENTRY_STREAK_LENGTH = 7;
+export const ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD = 5;
+export const ALPHAOMEGA_HARD_STOP_PIPS = 10;
+export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
