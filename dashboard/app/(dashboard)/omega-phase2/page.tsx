@@ -7,7 +7,7 @@ import { Phase2ShadowTradeDesktopTable } from '@/components/omegaPhase2/Phase2Sh
 import { Phase2ShadowTradeMobileList } from '@/components/omegaPhase2/Phase2ShadowTradeMobileList';
 import { Phase2ViewFilterBar, type Phase2ViewFilter } from '@/components/omegaPhase2/Phase2ViewFilterBar';
 import { usePhase2TradeLog } from '@/hooks/usePhase2TradeLog';
-import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { ALPHAOMEGA_PAGE_TITLE, OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
 
 export default function OmegaPhase2ActivityPage() {
   const [viewFilter, setViewFilter] = useState<Phase2ViewFilter>('all');
@@ -16,11 +16,11 @@ export default function OmegaPhase2ActivityPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-        Omega Phase 2 (Lane B)
+        {ALPHAOMEGA_PAGE_TITLE}
       </h1>
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Experiment lane — broker {OMEGA_LANE_B_BROKER_ID} (AUD_NEWWWW). Shadow rows still fill in W0;
-        gate signal column shows what would block once enforce is on.
+        Broker {OMEGA_LANE_B_BROKER_ID} (AUD_NEWWWW). Entry/exit run the validated streak +
+        opposing-pressure + hard-stop logic; gate signal column shows what would block.
       </p>
 
       <Phase2FlagSummary />

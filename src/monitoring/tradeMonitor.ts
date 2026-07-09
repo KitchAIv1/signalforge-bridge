@@ -26,6 +26,7 @@ import {
   runTrailingStopCheck,
 } from './trailingStopMonitor.js';
 import { getTrailEnabled } from './trailingStopSupport.js';
+import { isOmegaLaneBBroker } from '../core/alphaOmega/alphaOmegaConstants.js';
 import {
   cleanupOrphanedTp2FloorStates,
   closeTp2FloorLeg,
@@ -262,7 +263,16 @@ export async function runTradeMonitor(
     }
 
     const isTrailEligibleLeg = legType === null || legType === 'trail';
-    if (isTrailStopEngine(row.engine_id as string) && isTrailEligibleLeg && venueOpenIds.has(tid)) {
+    // ALPHAOMEGA: Lane B (oanda_phase2_demo) now manages its own exit — opposing-fire
+    // count + hard stop (alphaOmegaHardStopMonitor.ts) + backstop crack, all fed by
+    // omegaMultiBrokerExecution.ts's streak tracker. Skip the shared trail logic for
+    // Lane B rows so the two mechanisms never race on the same trade. Lane A is unaffected.
+    if (
+      isTrailStopEngine(row.engine_id as string) &&
+      isTrailEligibleLeg &&
+      venueOpenIds.has(tid) &&
+      !isOmegaLaneBBroker(brokerId)
+    ) {
       const logRow = row as Record<string, unknown>;
       await ensureTrailStopState(supabase, logRow);
       const trail = await runTrailingStopCheck(supabase, logRow, tid);

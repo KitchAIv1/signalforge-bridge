@@ -31,6 +31,7 @@ import { fetchTodayDistributionCandles } from './services/distributionM5/distrib
 import { fetchTodayD1Candles } from './services/d1/fetchTodayD1Candle.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
+import { runAlphaOmegaHardStopMonitor } from './monitoring/alphaOmegaHardStopMonitor.js';
 import {
   hardClose as scalperHardClose,
   initializeDayState as scalperInitDay,
@@ -289,6 +290,16 @@ async function main(): Promise<void> {
   setInterval(() => {
     void runAmdTrailMonitor().catch((amdTrailErr) => {
       console.error('[AmdTrail] Monitor error:', amdTrailErr);
+    });
+  }, 30000);
+
+  // ALPHAOMEGA — Lane B (oanda_phase2_demo) hard-stop check, isolated from Lane A.
+  // Opposing-fire-count + backstop-crack exits are fire-driven (handled inline in
+  // omegaMultiBrokerExecution.ts); this interval covers the price-based hard stop,
+  // which needs continuous checking since adverse moves can happen between fires.
+  setInterval(() => {
+    void runAlphaOmegaHardStopMonitor().catch((alphaOmegaErr) => {
+      console.error('[AlphaOmegaHardStop] Monitor error:', alphaOmegaErr);
     });
   }, 30000);
 
