@@ -2,24 +2,25 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import type { AlphaOmegaStreakSnapshot } from '@/hooks/useAlphaOmegaLiveState';
-import { ALPHAOMEGA_ENTRY_STREAK_LENGTH } from '@/lib/omegaLaneBConstants';
+import { AlphaOmegaStepRail } from '@/components/omegaPhase2/AlphaOmegaStepRail';
+import {
+  ALPHAOMEGA_ENTRY_SPEED_CEILING_MIN,
+  ALPHAOMEGA_ENTRY_STREAK_LENGTH,
+} from '@/lib/omegaLaneBConstants';
 import {
   directionToneClass,
   formatRelativeAge,
-  meterFillPercent,
 } from '@/lib/alphaOmegaLiveDisplay';
+import {
+  armWindowFillPercent,
+  describeArmingStatus,
+  minutesSinceIso,
+  streakThresholdSlots,
+} from '@/lib/alphaOmegaStreakDisplay';
 
 interface AlphaOmegaStreakRadarProps {
   streak: AlphaOmegaStreakSnapshot | null;
   isLoading: boolean;
-}
-
-function armingLabel(streak: AlphaOmegaStreakSnapshot): string {
-  if (streak.armed && streak.armedDirection) {
-    return `ARMED for ${streak.armedDirection.toUpperCase()}`;
-  }
-  if (streak.currentStreakLength > 0) return 'Arming';
-  return 'Idle';
 }
 
 export function AlphaOmegaStreakRadar({ streak, isLoading }: AlphaOmegaStreakRadarProps) {
@@ -46,33 +47,55 @@ function StreakRadarBody({ streak }: { streak: AlphaOmegaStreakSnapshot }) {
     const tickId = window.setInterval(() => setNowMs(Date.now()), 5_000);
     return () => window.clearInterval(tickId);
   }, []);
+
   const length = streak.currentStreakLength;
-  const fill = meterFillPercent(length, ALPHAOMEGA_ENTRY_STREAK_LENGTH);
   const dirLabel = streak.currentStreakDirection?.toUpperCase() ?? '—';
+  const streakAgeMin = minutesSinceIso(streak.currentStreakStartAt, nowMs);
+  const { filledSlots, overflow } = streakThresholdSlots(length, ALPHAOMEGA_ENTRY_STREAK_LENGTH);
+  const status = describeArmingStatus(streak, streakAgeMin);
+  const railAccent = streak.armed ? 'amber' : status.tone === 'too_slow' ? 'rose' : 'sky';
+
   return (
     <>
-      <StreakHeader streak={streak} dirLabel={dirLabel} length={length} />
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            streak.armed ? 'bg-amber-500' : 'bg-sky-500'
-          }`}
-          style={{ width: `${fill}%` }}
+      <StreakHeader dirLabel={dirLabel} length={length} badge={status.badge} armed={streak.armed} />
+      <div className="mt-3">
+        <AlphaOmegaStepRail
+          filledSlots={filledSlots}
+          totalSlots={ALPHAOMEGA_ENTRY_STREAK_LENGTH}
+          overflow={overflow}
+          accent={railAccent}
+          label={`Streak ${filledSlots} of ${ALPHAOMEGA_ENTRY_STREAK_LENGTH}`}
         />
       </div>
+      <ArmWindowMeter streakAgeMin={streakAgeMin} armed={streak.armed} tooSlow={status.tone === 'too_slow'} />
+      {status.reason ? (
+        <p
+          className={`mt-2 text-xs ${
+            status.tone === 'too_slow'
+              ? 'text-rose-700 dark:text-rose-300'
+              : status.tone === 'armed'
+                ? 'text-amber-800 dark:text-amber-200'
+                : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          {status.reason}
+        </p>
+      ) : null}
       <StreakAgeMeta streak={streak} nowMs={nowMs} />
     </>
   );
 }
 
 function StreakHeader({
-  streak,
   dirLabel,
   length,
+  badge,
+  armed,
 }: {
-  streak: AlphaOmegaStreakSnapshot;
   dirLabel: string;
   length: number;
+  badge: string;
+  armed: boolean;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
@@ -80,14 +103,45 @@ function StreakHeader({
         {dirLabel} · {length}/{ALPHAOMEGA_ENTRY_STREAK_LENGTH}
       </p>
       <span
-        className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
-          streak.armed
+        className={`rounded px-2 py-0.5 text-[11px] font-semibold transition-colors duration-300 ${
+          armed
             ? 'bg-amber-500/20 text-amber-800 dark:text-amber-200'
             : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
         }`}
       >
-        {armingLabel(streak)}
+        {badge}
       </span>
+    </div>
+  );
+}
+
+function ArmWindowMeter({
+  streakAgeMin,
+  armed,
+  tooSlow,
+}: {
+  streakAgeMin: number | null;
+  armed: boolean;
+  tooSlow: boolean;
+}) {
+  const fill = armWindowFillPercent(streakAgeMin);
+  const ageLabel = streakAgeMin != null ? `${streakAgeMin.toFixed(0)}m` : '—';
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex justify-between text-[11px] text-slate-500">
+        <span>Arm window</span>
+        <span className="tabular-nums">
+          {ageLabel} / {ALPHAOMEGA_ENTRY_SPEED_CEILING_MIN}m
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            armed ? 'bg-amber-500' : tooSlow ? 'bg-rose-500' : 'bg-sky-500'
+          }`}
+          style={{ width: `${fill}%` }}
+        />
+      </div>
     </div>
   );
 }

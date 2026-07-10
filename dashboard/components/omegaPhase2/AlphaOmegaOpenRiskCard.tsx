@@ -4,31 +4,35 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type {
   AlphaOmegaLastExitSnapshot,
   AlphaOmegaOpenPositionSnapshot,
+  AlphaOmegaStreakSnapshot,
 } from '@/hooks/useAlphaOmegaLiveState';
+import { AlphaOmegaStepRail } from '@/components/omegaPhase2/AlphaOmegaStepRail';
 import { ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD } from '@/lib/omegaLaneBConstants';
 import {
   directionToneClass,
   formatRelativeAge,
-  meterFillPercent,
 } from '@/lib/alphaOmegaLiveDisplay';
+import { describeFlatNextNeed, streakThresholdSlots } from '@/lib/alphaOmegaStreakDisplay';
 import { formatCloseReason } from '@/lib/formatCloseReason';
 
 interface AlphaOmegaOpenRiskCardProps {
   openPosition: AlphaOmegaOpenPositionSnapshot | null;
   lastExit: AlphaOmegaLastExitSnapshot | null;
+  streak: AlphaOmegaStreakSnapshot | null;
   isLoading: boolean;
 }
 
 export function AlphaOmegaOpenRiskCard({
   openPosition,
   lastExit,
+  streak,
   isLoading,
 }: AlphaOmegaOpenRiskCardProps) {
   if (isLoading && !openPosition) {
     return <RiskShell>Loading…</RiskShell>;
   }
   if (!openPosition) {
-    return <FlatRiskState lastExit={lastExit} />;
+    return <FlatRiskState lastExit={lastExit} streak={streak} />;
   }
   return (
     <OpenRiskBody
@@ -38,12 +42,21 @@ export function AlphaOmegaOpenRiskCard({
   );
 }
 
-function FlatRiskState({ lastExit }: { lastExit: AlphaOmegaLastExitSnapshot | null }) {
+function FlatRiskState({
+  lastExit,
+  streak,
+}: {
+  lastExit: AlphaOmegaLastExitSnapshot | null;
+  streak: AlphaOmegaStreakSnapshot | null;
+}) {
   const nowMs = useNowMsTick();
   return (
     <RiskShell>
       <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">Flat</p>
       <p className="mt-1 text-sm text-slate-500">Waiting for crack entry</p>
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        {describeFlatNextNeed(streak)}
+      </p>
       {lastExit ? <LastExitMeta lastExit={lastExit} nowMs={nowMs} /> : null}
     </RiskShell>
   );
@@ -90,7 +103,7 @@ function OpenRiskBody({
 }) {
   const nowMs = useNowMsTick();
   const opposing = openPosition.opposingFireCount;
-  const fill = meterFillPercent(opposing, ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD);
+  const { filledSlots } = streakThresholdSlots(opposing, ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD);
   const dirLabel = openPosition.direction.toUpperCase();
   return (
     <RiskShell accent={nearExit ? 'rose' : 'sky'}>
@@ -102,12 +115,12 @@ function OpenRiskBody({
         </span>
         <span className="text-slate-400"> · {openPosition.totalFireCount} fires total</span>
       </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            nearExit ? 'bg-rose-500' : 'bg-sky-500'
-          }`}
-          style={{ width: `${fill}%` }}
+      <div className="mt-3">
+        <AlphaOmegaStepRail
+          filledSlots={filledSlots}
+          totalSlots={ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD}
+          accent={nearExit ? 'rose' : 'sky'}
+          label={`Opposing ${filledSlots} of ${ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD}`}
         />
       </div>
       <OpenRiskMeta openPosition={openPosition} nearExit={nearExit} />
