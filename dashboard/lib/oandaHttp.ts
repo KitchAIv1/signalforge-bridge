@@ -1,19 +1,33 @@
-import { assertOandaServerEnv } from '@/lib/oandaServerEnv';
+import {
+  assertOandaServerEnv,
+  assertOandaServerEnvForBroker,
+  type OandaServerEnv,
+} from '@/lib/oandaServerEnv';
 
 export async function oandaDashboardFetch(
   path: string,
   init?: RequestInit,
+  envOverride?: OandaServerEnv,
 ): Promise<Response> {
-  const { baseUrl, apiToken } = assertOandaServerEnv();
-  return fetch(`${baseUrl}${path}`, {
+  const env = envOverride ?? assertOandaServerEnv();
+  return fetch(`${env.baseUrl}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${apiToken}`,
+      Authorization: `Bearer ${env.apiToken}`,
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
     cache: 'no-store',
   });
+}
+
+export async function oandaDashboardFetchForBroker(
+  brokerId: string,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const env = assertOandaServerEnvForBroker(brokerId);
+  return oandaDashboardFetch(path, init, env);
 }
 
 export async function readOandaErrorBody(res: Response): Promise<string> {
