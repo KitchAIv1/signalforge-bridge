@@ -12,6 +12,10 @@ import { placeMarketOrderViaBroker } from '../services/broker/brokerMarketOrder.
 import { computeTrailInsertFields } from '../monitoring/trailingStopSupport.js';
 import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
 import {
+  alphaOmegaLaneLabelForBroker,
+  formatAlphaOmegaFoundingHint,
+} from '../services/telegram/alphaOmegaTelegramLabels.js';
+import {
   applyOmegaFillUpdate,
   insertPendingOmegaRow,
   markOmegaRowCancelled,
@@ -266,6 +270,8 @@ export async function executeOmegaTrailV1Order(deps: OmegaTrailV1ExecutionDeps):
     amdSizeMultiplier: amdState?.amdSizeMultiplier ?? null,
     directionSource: directionMode === 'auto' ? 'auto' : 'manual',
     engineId: norm.engineId,
+    laneLabel: alphaOmegaLaneLabelForBroker(brokerId),
+    foundingHint: formatAlphaOmegaFoundingHint(laneAdvisory ?? null),
   }).catch(() => {});
 
   if (!tradeId || fillPrice == null) {

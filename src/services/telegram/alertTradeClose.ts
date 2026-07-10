@@ -10,6 +10,8 @@ export type TradeCloseAlertParams = {
   pnlDollars: number;
   closeReason: string;
   durationMinutes: number;
+  /** e.g. ALPHAOMEGA — shown when set so Lane B is distinct from Lane A */
+  laneLabel?: string | null;
 };
 
 function resultBadge(pnlDollars: number): string {
@@ -34,16 +36,22 @@ export async function sendTradeClosedAlert(
 ): Promise<void> {
   const {
     engineId, instrument, direction, entryPrice, exitPrice,
-    pnlPips, pnlDollars, closeReason, durationMinutes,
+    pnlPips, pnlDollars, closeReason, durationMinutes, laneLabel,
   } = params;
 
   const pnlSign = pnlDollars >= 0 ? '+' : '';
   const pipSign = pnlPips >= 0 ? '+' : '';
+  const title = laneLabel
+    ? `${resultBadge(pnlDollars)} <b>${laneLabel} Closed — ${formatPair(instrument)}</b>`
+    : `${resultBadge(pnlDollars)} <b>Trade Closed — ${formatPair(instrument)}</b>`;
+  const engineLine = laneLabel
+    ? `Engine:    ${engineId}  ·  Lane: <b>${laneLabel}</b>`
+    : `Engine:    ${engineId}`;
 
   const text = joinLines([
-    `${resultBadge(pnlDollars)} <b>Trade Closed — ${formatPair(instrument)}</b>`,
+    title,
     DIVIDER,
-    `Engine:    ${engineId}`,
+    engineLine,
     `Direction: ${directionLabel(direction)}`,
     `Entry: <code>${entryPrice.toFixed(5)}</code>  Exit: <code>${exitPrice.toFixed(5)}</code>`,
     `P&L:   <b>${pnlSign}${pnlDollars.toFixed(2)} USD</b>  (${pipSign}${pnlPips.toFixed(1)}p)`,

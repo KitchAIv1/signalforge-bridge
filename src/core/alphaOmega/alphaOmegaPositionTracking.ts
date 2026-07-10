@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveBrokerForLogRow } from '../../services/broker/resolveBrokerForLogRow.js';
 import { closeTradeViaBroker } from '../../monitoring/brokerTradeLifecycle.js';
 import { logInfo, logWarn } from '../../utils/logger.js';
+import { sendAlphaOmegaClosedAlert } from '../../services/telegram/alertAlphaOmegaClose.js';
 import {
   ALPHAOMEGA_CLOSE_BACKSTOP_CRACK,
   ALPHAOMEGA_CLOSE_OPPOSING_COUNT,
@@ -85,42 +86,77 @@ export async function closeAlphaOmegaPosition(
   try {
     const logRowId = await findLogRowIdForTrade(supabase, position.oanda_trade_id);
     const broker = await resolveBrokerForLogRow(supabase, position.broker_id, 'omega');
-    const { closedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(broker, position.oanda_trade_id);
-
-    if (logRowId) {
-      let pnlPips: number | null = null;
-      if (exitPriceNum != null && position.entry_price != null) {
-        const move = position.direction === 'LONG'
-          ? exitPriceNum - position.entry_price
-          : position.entry_price - exitPriceNum;
-        pnlPips = Math.round((move / 0.0001) * 10) / 10;
-      }
-      const { error: updateErr } = await supabase
-        .from('bridge_trade_log')
-        .update({
-          status: 'closed',
-          close_reason: reason,
-          closed_at: closedAt,
-          exit_price: exitPriceNum,
-          pnl_dollars: pnlDollars,
-          pnl_pips: pnlPips,
-          result: pnlDollars == null ? 'breakeven' : pnlDollars > 0 ? 'win' : pnlDollars < 0 ? 'loss' : 'breakeven',
-        })
-        .eq('id', logRowId);
-      if (updateErr) {
-        logWarn('[AlphaOmega] bridge_trade_log update after close failed', { error: updateErr.message, oandaTradeId: position.oanda_trade_id });
-      }
-    }
-
+    const { closedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(
+      broker,
+      position.oanda_trade_id,
+    );
+    const pnlPips = computePnlPips(position, exitPriceNum);
+    await updateClosedTradeLog(supabase, logRowId, reason, closedAt, exitPriceNum, pnlDollars, pnlPips);
     await supabase.from('alpha_omega_position_state').delete().eq('oanda_trade_id', position.oanda_trade_id);
-
     logInfo('[AlphaOmega] Closed Lane B position', {
       oandaTradeId: position.oanda_trade_id,
       reason,
       pnlDollars,
     });
+    void sendAlphaOmegaClosedAlert({
+      supabase,
+      position,
+      reason,
+      closedAt,
+      exitPrice: exitPriceNum,
+      pnlDollars,
+      pnlPips,
+    }).catch((alertErr) => {
+      logWarn('[AlphaOmega] Telegram close alert failed', { error: String(alertErr) });
+    });
   } catch (err) {
-    logWarn('[AlphaOmega] closeAlphaOmegaPosition failed', { oandaTradeId: position.oanda_trade_id, error: String(err) });
+    logWarn('[AlphaOmega] closeAlphaOmegaPosition failed', {
+      oandaTradeId: position.oanda_trade_id,
+      error: String(err),
+    });
+  }
+}
+
+function computePnlPips(
+  position: AlphaOmegaPositionRow,
+  exitPriceNum: number | null,
+): number | null {
+  if (exitPriceNum == null || position.entry_price == null) return null;
+  const move =
+    position.direction === 'LONG'
+      ? exitPriceNum - position.entry_price
+      : position.entry_price - exitPriceNum;
+  return Math.round((move / 0.0001) * 10) / 10;
+}
+
+async function updateClosedTradeLog(
+  supabase: SupabaseClient,
+  logRowId: string | null,
+  reason: string,
+  closedAt: string,
+  exitPriceNum: number | null,
+  pnlDollars: number | null,
+  pnlPips: number | null,
+): Promise<void> {
+  if (!logRowId) return;
+  const result =
+    pnlDollars == null ? 'breakeven' : pnlDollars > 0 ? 'win' : pnlDollars < 0 ? 'loss' : 'breakeven';
+  const { error: updateErr } = await supabase
+    .from('bridge_trade_log')
+    .update({
+      status: 'closed',
+      close_reason: reason,
+      closed_at: closedAt,
+      exit_price: exitPriceNum,
+      pnl_dollars: pnlDollars,
+      pnl_pips: pnlPips,
+      result,
+    })
+    .eq('id', logRowId);
+  if (updateErr) {
+    logWarn('[AlphaOmega] bridge_trade_log update after close failed', {
+      error: updateErr.message,
+    });
   }
 }
 
