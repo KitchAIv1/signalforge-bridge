@@ -25,16 +25,36 @@ export function applyActivityDecisionFilter<T extends { eq: Function; in: Functi
   return query;
 }
 
-/** Baseline Activity excludes Lane B; /omega-phase2 passes brokerId explicitly. */
+/**
+ * Activity broker scope:
+ * - Explicit brokerId → that broker only (/omega-phase2).
+ * - EXECUTED → exclude Lane B fills; keep broker_id NULL pre-exec rows.
+ * - BLOCKED / SKIPPED / DEDUPLICATED → include Lane B (ALPHAOMEGA reasons).
+ * - All ('') → shared ledger + Lane B non-fills only (no Lane B EXECUTED).
+ */
 export function applyActivityBrokerScope<T extends { eq: Function; or: Function }>(
   query: T,
   brokerIdFilter: string,
+  decisionFilter: string = 'EXECUTED',
 ): T {
   if (brokerIdFilter) {
     return query.eq('broker_id', brokerIdFilter) as T;
   }
-  // Pre-execution rows (BLOCKED/SKIPPED/DEDUPLICATED) store broker_id NULL — neq alone drops them.
-  return query.or(`broker_id.is.null,broker_id.neq.${OMEGA_LANE_B_BROKER_ID}`) as T;
+  if (decisionFilter === 'EXECUTED') {
+    // Pre-execution rows store broker_id NULL — neq alone would drop them.
+    return query.or(`broker_id.is.null,broker_id.neq.${OMEGA_LANE_B_BROKER_ID}`) as T;
+  }
+  if (
+    decisionFilter === 'BLOCKED' ||
+    decisionFilter === 'SKIPPED' ||
+    decisionFilter === 'DEDUPLICATED'
+  ) {
+    return query;
+  }
+  // All: Lane A + null-broker + Lane B blocks/skips — never Lane B fills.
+  return query.or(
+    `broker_id.is.null,broker_id.neq.${OMEGA_LANE_B_BROKER_ID},and(broker_id.eq.${OMEGA_LANE_B_BROKER_ID},decision.neq.EXECUTED)`,
+  ) as T;
 }
 
 export interface ActivityTradeLogFilters {
@@ -58,7 +78,7 @@ export function buildActivityTradeLogQuery(
     );
   q = applyActivityDecisionFilter(q, filters.decision);
   if (filters.engineId) q = q.eq('engine_id', filters.engineId);
-  q = applyActivityBrokerScope(q, filters.brokerId);
+  q = applyActivityBrokerScope(q, filters.brokerId, filters.decision);
   return q;
 }
 

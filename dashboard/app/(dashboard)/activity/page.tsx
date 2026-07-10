@@ -134,7 +134,7 @@ export default function ActivityPage() {
         .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
       q = applyActivityDecisionFilter(q, decision);
       if (engine) q = q.eq('engine_id', engine);
-      q = applyActivityBrokerScope(q, broker);
+      q = applyActivityBrokerScope(q, broker, decision);
       const { data, error } = await q;
       if (error) {
         setLoading(false);
@@ -175,7 +175,7 @@ export default function ActivityPage() {
         .limit(5000);
       q = applyActivityDecisionFilter(q, decision);
       if (engine) q = q.eq('engine_id', engine);
-      q = applyActivityBrokerScope(q, broker);
+      q = applyActivityBrokerScope(q, broker, decision);
       const { data } = await q;
       const list = (data ?? []) as unknown as BridgeTradeLogRow[];
       const csv = toCSV(list);
