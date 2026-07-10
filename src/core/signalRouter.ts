@@ -27,6 +27,10 @@ import {
 import { checkOmegaBrokerSequencingBlock } from './omegaOpenTradeSequencer.js';
 import { executeOmegaOnAllBrokers } from '../services/broker/omegaMultiBrokerExecution.js';
 import {
+  handleOmegaValidationFailure,
+  observeOmegaFireIfNeeded,
+} from './alphaOmega/alphaOmegaRouterHooks.js';
+import {
   parseOmegaRawModeFlag,
   shouldBypassDirectionFlip,
   shouldBypassExecutionThreshold,
@@ -377,6 +381,11 @@ export async function processSignal(
 ): Promise<void> {
   const { config, engines, getCachedAccount, getOpenTradesFromLog, supabase } = deps;
   const signalId = (payload.id ?? '').toString();
+
+  // ALPHAOMEGA: count EVERY Omega fire at the soonest router entry — before
+  // stale / 4-pip / other gates — matching validated research fire stream.
+  const alphaOmegaFireOutcome = await observeOmegaFireIfNeeded(supabase, payload);
+
   const staleAge = Date.now() - new Date((payload.created_at ?? 0).toString()).getTime();
   if (staleAge > config.staleSignalMaxAgeMs) {
     logWarn('Skipping stale signal', { signalId, engineId: payload.engine_id, ageMs: staleAge });
@@ -386,7 +395,20 @@ export async function processSignal(
 
   const validation = validateSignal(payload, config.defaultRiskReward);
   if (!validation.pass) {
-    await supabase.from('bridge_trade_log').insert(buildTradeLogRow(payload, 'BLOCKED', validation.reason ?? 'Validation failed', null, null, 0, undefined));
+    await handleOmegaValidationFailure({
+      supabase,
+      payload,
+      signalId,
+      config,
+      engines,
+      fireOutcome: alphaOmegaFireOutcome,
+      validationReason: validation.reason ?? 'Validation failed',
+      decisionLatencyMs: Date.now() - receivedAt.getTime(),
+      cachedAccountEquity: getCachedAccount()?.equity ?? null,
+      openTradeCount: 0,
+      buildTradeLogRow,
+      attachOmegaAuditFields,
+    });
     return;
   }
   const norm = validation.normalized!;
@@ -994,6 +1016,7 @@ export async function processSignal(
         directionMode,
         buildTradeLogRow,
         attachOmegaAuditFields,
+        alphaOmegaFireOutcome,
       });
       return;
     }
