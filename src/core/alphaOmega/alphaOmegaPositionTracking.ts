@@ -21,6 +21,7 @@ import {
   OPPOSING_SHARE_THRESHOLD,
 } from './alphaOmegaConstants.js';
 import type { AlphaOmegaDirection, CrackEvent, StreakFireInput } from './alphaOmegaStreakTracker.js';
+import { filterOpenAlphaOmegaPositions } from './reconcileAlphaOmegaPositionOrphans.js';
 
 export interface AlphaOmegaPositionRow {
   oanda_trade_id: string;
@@ -41,7 +42,7 @@ export async function loadOpenLaneBPositions(supabase: SupabaseClient): Promise<
     logWarn('[AlphaOmega] loadOpenLaneBPositions failed', { error: error.message });
     return [];
   }
-  return (data ?? []) as AlphaOmegaPositionRow[];
+  return filterOpenAlphaOmegaPositions(supabase, (data ?? []) as AlphaOmegaPositionRow[]);
 }
 
 export async function registerAlphaOmegaPosition(

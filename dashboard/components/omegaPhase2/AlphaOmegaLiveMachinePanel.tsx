@@ -5,7 +5,7 @@ import { AlphaOmegaStreakRadar } from '@/components/omegaPhase2/AlphaOmegaStreak
 import { useAlphaOmegaLiveState } from '@/hooks/useAlphaOmegaLiveState';
 
 export function AlphaOmegaLiveMachinePanel() {
-  const { streak, openPosition, loading, errorMessage } = useAlphaOmegaLiveState();
+  const { streak, openPosition, lastExit, loading, errorMessage } = useAlphaOmegaLiveState();
 
   return (
     <div className="space-y-2">
@@ -14,7 +14,11 @@ export function AlphaOmegaLiveMachinePanel() {
       ) : null}
       <div className="grid gap-3 lg:grid-cols-2">
         <AlphaOmegaStreakRadar streak={streak} isLoading={loading} />
-        <AlphaOmegaOpenRiskCard openPosition={openPosition} isLoading={loading} />
+        <AlphaOmegaOpenRiskCard
+          openPosition={openPosition}
+          lastExit={lastExit}
+          isLoading={loading}
+        />
       </div>
       <p className="text-[11px] text-slate-500">Live state refreshes every 15s</p>
     </div>

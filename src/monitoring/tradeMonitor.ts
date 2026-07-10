@@ -27,6 +27,7 @@ import {
 } from './trailingStopMonitor.js';
 import { getTrailEnabled } from './trailingStopSupport.js';
 import { isOmegaLaneBBroker } from '../core/alphaOmega/alphaOmegaConstants.js';
+import { clearLaneBPositionStateAfterExternalClose } from '../core/alphaOmega/clearAlphaOmegaPositionState.js';
 import {
   cleanupOrphanedTp2FloorStates,
   closeTp2FloorLeg,
@@ -181,7 +182,7 @@ export async function runTradeMonitor(
         if (intraTradeCandles.length > 0) update.intra_trade_candles = intraTradeCandles;
         if (postExitCandles.length > 0)   update.post_exit_candles   = postExitCandles;
       }
-      await finalizeOpenLogRowClose(
+      const externalClosed = await finalizeOpenLogRowClose(
         supabase,
         row.id as string,
         update,
@@ -198,6 +199,7 @@ export async function runTradeMonitor(
         },
         details.pnlDollars,
       );
+      await clearLaneBPositionStateAfterExternalClose(supabase, brokerId, tid, externalClosed);
       continue;
     }
     if (elapsed >= maxHold) {
@@ -231,7 +233,7 @@ export async function runTradeMonitor(
       if ((row.leg_type as string | null) === 'tp2') {
         await deleteTp2FloorState(supabase, tid);
       }
-      await finalizeOpenLogRowClose(
+      const maxHoldClosed = await finalizeOpenLogRowClose(
         supabase,
         row.id as string,
         update,
@@ -248,6 +250,7 @@ export async function runTradeMonitor(
         },
         pnlDollars,
       );
+      await clearLaneBPositionStateAfterExternalClose(supabase, brokerId, tid, maxHoldClosed);
       continue;
     }
 

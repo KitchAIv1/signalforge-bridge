@@ -50,7 +50,8 @@ function BannerCopy({ enabled }: { enabled: boolean }) {
       </p>
       <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
         {ALPHAOMEGA_ENTRY_STREAK_LENGTH}/45 crack · ≥30m floor · exit @
-        {ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD} opp / {ALPHAOMEGA_HARD_STOP_PIPS}p / backstop
+        {ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD} opp / {ALPHAOMEGA_HARD_STOP_PIPS}p / backstop /
+        max hold
       </p>
     </div>
   );

@@ -1,39 +1,74 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import type { AlphaOmegaOpenPositionSnapshot } from '@/hooks/useAlphaOmegaLiveState';
+import type {
+  AlphaOmegaLastExitSnapshot,
+  AlphaOmegaOpenPositionSnapshot,
+} from '@/hooks/useAlphaOmegaLiveState';
 import { ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD } from '@/lib/omegaLaneBConstants';
 import {
   directionToneClass,
   formatRelativeAge,
   meterFillPercent,
 } from '@/lib/alphaOmegaLiveDisplay';
+import { formatCloseReason } from '@/lib/formatCloseReason';
 
 interface AlphaOmegaOpenRiskCardProps {
   openPosition: AlphaOmegaOpenPositionSnapshot | null;
+  lastExit: AlphaOmegaLastExitSnapshot | null;
   isLoading: boolean;
 }
 
 export function AlphaOmegaOpenRiskCard({
   openPosition,
+  lastExit,
   isLoading,
 }: AlphaOmegaOpenRiskCardProps) {
   if (isLoading && !openPosition) {
     return <RiskShell>Loading…</RiskShell>;
   }
   if (!openPosition) {
-    return (
-      <RiskShell>
-        <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">Flat</p>
-        <p className="mt-1 text-sm text-slate-500">Waiting for crack entry</p>
-      </RiskShell>
-    );
+    return <FlatRiskState lastExit={lastExit} />;
   }
   return (
     <OpenRiskBody
       openPosition={openPosition}
       nearExit={openPosition.opposingFireCount >= ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD - 1}
     />
+  );
+}
+
+function FlatRiskState({ lastExit }: { lastExit: AlphaOmegaLastExitSnapshot | null }) {
+  const nowMs = useNowMsTick();
+  return (
+    <RiskShell>
+      <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">Flat</p>
+      <p className="mt-1 text-sm text-slate-500">Waiting for crack entry</p>
+      {lastExit ? <LastExitMeta lastExit={lastExit} nowMs={nowMs} /> : null}
+    </RiskShell>
+  );
+}
+
+function LastExitMeta({
+  lastExit,
+  nowMs,
+}: {
+  lastExit: AlphaOmegaLastExitSnapshot;
+  nowMs: number;
+}) {
+  const pips =
+    lastExit.pnlPips != null
+      ? `${lastExit.pnlPips > 0 ? '+' : ''}${lastExit.pnlPips.toFixed(1)}p`
+      : null;
+  return (
+    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+      Last exit:{' '}
+      <span className="text-slate-800 dark:text-slate-200">
+        {lastExit.direction.toUpperCase()} · {formatCloseReason(lastExit.closeReason)}
+        {pips ? ` · ${pips}` : ''}
+      </span>
+      <span className="text-slate-400"> · {formatRelativeAge(lastExit.closedAt, nowMs)}</span>
+    </p>
   );
 }
 
