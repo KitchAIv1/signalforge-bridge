@@ -27,6 +27,12 @@ import {
   type AlphaOmegaFireOutcome,
   EMPTY_ALPHAOMEGA_FIRE_OUTCOME,
 } from '../../core/alphaOmega/alphaOmegaFireObserver.js';
+import {
+  isAlphaOmegaEntryAdvisory,
+  isAlphaOmegaPureSizingEnabled,
+  sizeAlphaOmegaPureUnits,
+  withPureSizingAdvisory,
+} from '../../core/alphaOmega/alphaOmegaPureSizer.js';
 
 type RouterNormalizedSignal = NonNullable<ValidationResult['normalized']>;
 
@@ -119,13 +125,22 @@ export async function executeOmegaOnAllBrokers(params: OmegaFanOutParams): Promi
   const routes = await loadExecutionRoutes(params.supabase, 'omega');
   const baseEquity = params.cachedAccountEquity ?? 0;
   const alphaOmegaEnabled = await isAlphaOmegaEnabled(params.supabase);
+  const pureSizingEnabled =
+    alphaOmegaEnabled && (await isAlphaOmegaPureSizingEnabled(params.supabase));
   const fireOutcome = alphaOmegaEnabled
     ? await resolveFireOutcome(params)
     : EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
   const crackEvent = crackForEntry(fireOutcome);
 
   for (const route of routes) {
-    await processOneBrokerRoute(params, route, baseEquity, alphaOmegaEnabled, crackEvent);
+    await processOneBrokerRoute(
+      params,
+      route,
+      baseEquity,
+      alphaOmegaEnabled,
+      pureSizingEnabled,
+      crackEvent,
+    );
   }
 }
 
@@ -149,6 +164,7 @@ async function processOneBrokerRoute(
   route: Awaited<ReturnType<typeof loadExecutionRoutes>>[number],
   baseEquity: number,
   alphaOmegaEnabled: boolean,
+  pureSizingEnabled: boolean,
   crackEvent: ReturnType<typeof crackForEntry>,
 ): Promise<void> {
   if (await hasOpenOmegaOnBroker(params.supabase, route.brokerId)) {
@@ -160,7 +176,7 @@ async function processOneBrokerRoute(
   }
 
   const routeEquity = await fetchRouteEquity(route, baseEquity);
-  const routeUnits = scaleUnitsForBrokerRoute({
+  let routeUnits = scaleUnitsForBrokerRoute({
     baseUnits: params.finalUnits,
     baseEquity,
     route,
@@ -168,7 +184,7 @@ async function processOneBrokerRoute(
     engineWeight: params.engine.weight,
   });
   const isLaneB = isOmegaLaneBBroker(route.brokerId);
-  const laneAdvisory = await resolveLaneAdvisory(
+  let laneAdvisory = await resolveLaneAdvisory(
     params,
     isLaneB,
     alphaOmegaEnabled,
@@ -177,6 +193,34 @@ async function processOneBrokerRoute(
     routeEquity,
   );
   if (laneAdvisory === 'BLOCKED_SKIP') return;
+
+  if (
+    pureSizingEnabled &&
+    laneAdvisory != null &&
+    isAlphaOmegaEntryAdvisory(laneAdvisory)
+  ) {
+    const inheritedUnits = routeUnits;
+    routeUnits = sizeAlphaOmegaPureUnits({
+      routeEquity,
+      engineWeight: params.engine.weight,
+      riskPct: params.config.riskPerTradePct,
+      entry: params.norm.entryPrice,
+      stopLoss: params.norm.stopLoss,
+      instrument: params.norm.oandaInstrument,
+      direction: params.norm.direction,
+      capitalAllocationPct: route.capitalAllocationPct,
+      slPipsOverride: params.norm.slPipsFromSignal ?? undefined,
+    });
+    laneAdvisory = withPureSizingAdvisory(laneAdvisory);
+    logInfo('[AlphaOmega] Pure sizing applied (Lane B AO entry)', {
+      signalId: params.signalId,
+      brokerId: route.brokerId,
+      inheritedUnits,
+      pureUnits: routeUnits,
+      routeEquity,
+    });
+  }
+
   await placeRouteOrder(params, route, routeEquity, routeUnits, isLaneB, alphaOmegaEnabled, laneAdvisory);
 }
 

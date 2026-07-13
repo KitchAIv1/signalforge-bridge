@@ -12,6 +12,7 @@ import {
   type Phase2ViewFilter,
 } from '@/components/omegaPhase2/Phase2ViewFilterBar';
 import { usePhase2TradeLog } from '@/hooks/usePhase2TradeLog';
+import { usePhase2ScoreboardRows } from '@/hooks/usePhase2ScoreboardRows';
 import { downloadAlphaOmegaTradeCsv } from '@/lib/alphaOmegaTradeCsv';
 import { ALPHAOMEGA_PAGE_TITLE, OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
 import type { BridgeTradeLogRow } from '@/lib/types';
@@ -20,6 +21,7 @@ export default function OmegaPhase2ActivityPage() {
   const [viewFilter, setViewFilter] = useState<Phase2ViewFilter>('all');
   const [selectedTrade, setSelectedTrade] = useState<BridgeTradeLogRow | null>(null);
   const { rows, rawRows, loading, hasMore, loadMore } = usePhase2TradeLog(viewFilter);
+  const { tradeRows: scoreboardRows } = usePhase2ScoreboardRows();
 
   const handleExportCsv = useCallback(() => {
     downloadAlphaOmegaTradeCsv(rows);
@@ -49,7 +51,7 @@ export default function OmegaPhase2ActivityPage() {
 
       <Phase2FlagSummary />
       <AlphaOmegaLiveMachinePanel />
-      <AlphaOmegaScoreboard tradeRows={rawRows} />
+      <AlphaOmegaScoreboard tradeRows={scoreboardRows} />
       <Phase2ViewFilterBar activeFilter={viewFilter} onFilterChange={setViewFilter} />
 
       <Phase2ShadowTradeMobileList

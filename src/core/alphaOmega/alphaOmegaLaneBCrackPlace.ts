@@ -20,6 +20,11 @@ import {
   readOmegaFireDirection,
   readOmegaFireTimestamp,
 } from './alphaOmegaFireIdentity.js';
+import {
+  isAlphaOmegaPureSizingEnabled,
+  sizeAlphaOmegaPureUnits,
+  withPureSizingAdvisory,
+} from './alphaOmegaPureSizer.js';
 
 type NormalizedOmega = NonNullable<ValidationResult['normalized']>;
 
@@ -71,7 +76,7 @@ async function resolveRouteEquity(
   }
 }
 
-function sizeLaneBUnits(
+function sizeLaneBUnitsLegacy(
   params: PlaceLaneBCrackParams,
   routeEquity: number,
 ): number {
@@ -101,13 +106,32 @@ export async function placeLaneBCrackOrder(params: PlaceLaneBCrackParams): Promi
     params.laneBRoute,
     params.cachedAccountEquity ?? 0,
   );
-  const routeUnits = sizeLaneBUnits(params, routeEquity);
-  const laneAdvisory =
+  const pureSizing = await isAlphaOmegaPureSizingEnabled(params.supabase);
+  let routeUnits: number;
+  let laneAdvisory =
     `ALPHAOMEGA_ENTRY:len=${params.foundingLength}:speed=${params.foundingSpeedMin?.toFixed(1)}m`;
+  if (pureSizing) {
+    routeUnits = sizeAlphaOmegaPureUnits({
+      routeEquity,
+      engineWeight: params.engine.weight,
+      riskPct: params.config.riskPerTradePct,
+      entry: params.norm.entryPrice,
+      stopLoss: params.norm.stopLoss,
+      instrument: params.norm.oandaInstrument,
+      direction: params.norm.direction,
+      capitalAllocationPct: params.laneBRoute.capitalAllocationPct,
+      slPipsOverride: params.norm.slPipsFromSignal ?? undefined,
+    });
+    laneAdvisory = withPureSizingAdvisory(laneAdvisory);
+  } else {
+    routeUnits = sizeLaneBUnitsLegacy(params, routeEquity);
+  }
   logInfo('[AlphaOmega] Lane B crack entry despite rSize<4 shared gate', {
     signalId: params.signalId,
     foundingLength: params.foundingLength,
     foundingSpeedMin: params.foundingSpeedMin,
+    pureSizing,
+    routeUnits,
   });
   await executeCrackOrder(params, routeEquity, routeUnits, laneAdvisory);
 }

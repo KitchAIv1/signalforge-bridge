@@ -35,6 +35,10 @@ export const BACKSTOP_SPEED_CEILING_MIN = ENTRY_SPEED_CEILING_MIN;
 export const PIP_SIZE = 0.0001;
 
 export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
+/** When true, Lane B AO entries size at base risk only (no AMD/news/confluence/graduated). Default off. */
+export const ALPHAOMEGA_PURE_SIZING_CONFIG_KEY = 'alpha_omega_pure_sizing';
+/** Confluence score that leaves calculateUnits riskPct unscaled (bands are <75 and >=85). */
+export const ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE = 80;
 
 export const ALPHAOMEGA_BLOCK_NO_CRACK = 'ALPHAOMEGA_NO_QUALIFYING_CRACK';
 export const ALPHAOMEGA_BLOCK_SPEED_FLOOR = 'ALPHAOMEGA_SPEED_FLOOR';

@@ -65,7 +65,7 @@ function SecondaryMetricRow({
       <ScoreCard
         label="Entries taken"
         value={String(metrics.entriesTaken)}
-        hint="EXECUTED in loaded rows"
+        hint="Lane B EXECUTED fills"
         valueClass="text-emerald-600 dark:text-emerald-300"
       />
       <ScoreCard
