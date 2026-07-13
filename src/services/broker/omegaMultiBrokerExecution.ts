@@ -33,6 +33,10 @@ import {
   sizeAlphaOmegaPureUnits,
   withPureSizingAdvisory,
 } from '../../core/alphaOmega/alphaOmegaPureSizer.js';
+import {
+  isOmegaRawPureSizingEnabled,
+  sizeOmegaRawPureUnits,
+} from '../../core/omegaRawPolicy/omegaRawPureSizer.js';
 
 type RouterNormalizedSignal = NonNullable<ValidationResult['normalized']>;
 
@@ -125,8 +129,9 @@ export async function executeOmegaOnAllBrokers(params: OmegaFanOutParams): Promi
   const routes = await loadExecutionRoutes(params.supabase, 'omega');
   const baseEquity = params.cachedAccountEquity ?? 0;
   const alphaOmegaEnabled = await isAlphaOmegaEnabled(params.supabase);
-  const pureSizingEnabled =
+  const aoPureSizingEnabled =
     alphaOmegaEnabled && (await isAlphaOmegaPureSizingEnabled(params.supabase));
+  const omegaRawPureSizing = await isOmegaRawPureSizingEnabled(params.supabase);
   const fireOutcome = alphaOmegaEnabled
     ? await resolveFireOutcome(params)
     : EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
@@ -138,7 +143,8 @@ export async function executeOmegaOnAllBrokers(params: OmegaFanOutParams): Promi
       route,
       baseEquity,
       alphaOmegaEnabled,
-      pureSizingEnabled,
+      aoPureSizingEnabled,
+      omegaRawPureSizing,
       crackEvent,
     );
   }
@@ -164,7 +170,8 @@ async function processOneBrokerRoute(
   route: Awaited<ReturnType<typeof loadExecutionRoutes>>[number],
   baseEquity: number,
   alphaOmegaEnabled: boolean,
-  pureSizingEnabled: boolean,
+  aoPureSizingEnabled: boolean,
+  omegaRawPureSizing: boolean,
   crackEvent: ReturnType<typeof crackForEntry>,
 ): Promise<void> {
   if (await hasOpenOmegaOnBroker(params.supabase, route.brokerId)) {
@@ -195,7 +202,7 @@ async function processOneBrokerRoute(
   if (laneAdvisory === 'BLOCKED_SKIP') return;
 
   if (
-    pureSizingEnabled &&
+    aoPureSizingEnabled &&
     laneAdvisory != null &&
     isAlphaOmegaEntryAdvisory(laneAdvisory)
   ) {
@@ -213,6 +220,26 @@ async function processOneBrokerRoute(
     });
     laneAdvisory = withPureSizingAdvisory(laneAdvisory);
     logInfo('[AlphaOmega] Pure sizing applied (Lane B AO entry)', {
+      signalId: params.signalId,
+      brokerId: route.brokerId,
+      inheritedUnits,
+      pureUnits: routeUnits,
+      routeEquity,
+    });
+  } else if (omegaRawPureSizing && !isAlphaOmegaEntryAdvisory(laneAdvisory)) {
+    const inheritedUnits = routeUnits;
+    routeUnits = sizeOmegaRawPureUnits({
+      equity: routeEquity,
+      engineWeight: params.engine.weight,
+      riskPct: params.config.riskPerTradePct,
+      entry: params.norm.entryPrice,
+      stopLoss: params.norm.stopLoss,
+      instrument: params.norm.oandaInstrument,
+      direction: params.norm.direction,
+      capitalAllocationPct: route.capitalAllocationPct,
+      slPipsOverride: params.norm.slPipsFromSignal ?? undefined,
+    });
+    logInfo('[OmegaRaw] Pure sizing applied (route)', {
       signalId: params.signalId,
       brokerId: route.brokerId,
       inheritedUnits,

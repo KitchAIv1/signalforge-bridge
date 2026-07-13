@@ -1,5 +1,6 @@
 /**
- * Omega Trail v1 live execution — single order, direction-specific SL, 0.5R trail.
+ * Omega Trail v1 live execution — single order, direction-specific SL.
+ * Trail lock: bridge_config omega_trail_peak_giveback_pips (default 1.5p) or legacy 0.5R.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -10,6 +11,8 @@ import type { ActiveAmdState } from '../services/amdDetector/amdStateService.js'
 import type { BrokerClient } from '../connectors/broker/types.js';
 import { placeMarketOrderViaBroker } from '../services/broker/brokerMarketOrder.js';
 import { computeTrailInsertFields } from '../monitoring/trailingStopSupport.js';
+import { loadOmegaTrailPeakGivebackPips } from './omegaRawPolicy/omegaRawTrailGiveback.js';
+import { isAlphaOmegaEntryAdvisory } from './alphaOmega/alphaOmegaPureSizer.js';
 import { sendTradeExecutedAlert } from '../services/telegram/alertTradeExecution.js';
 import {
   alphaOmegaLaneLabelForBroker,
@@ -86,7 +89,14 @@ async function registerTrailState(
   signalId: string,
 ): Promise<void> {
   rowRecord.fill_price = fillPrice;
-  const trailMetrics = computeTrailInsertFields(rowRecord);
+  const peakGivebackPips = await loadOmegaTrailPeakGivebackPips(supabase);
+  // Lane B AO entries keep legacy 0.5R trail_distance (monitor skips Lane B exits anyway).
+  const aoEntry = isAlphaOmegaEntryAdvisory(
+    rowRecord.lane_advisory != null ? String(rowRecord.lane_advisory) : null,
+  );
+  const trailMetrics = computeTrailInsertFields(rowRecord, {
+    omegaPeakGivebackPips: aoEntry ? null : peakGivebackPips,
+  });
   if (!trailMetrics) {
     logError('[Omega TrailV1] Trail metrics unavailable — trade monitor will retry', {
       tradeId,
@@ -114,7 +124,12 @@ async function registerTrailState(
     });
     return;
   }
-  logInfo('[Omega TrailV1] Trail state registered in-loop', { tradeId, signalId });
+  logInfo('[Omega TrailV1] Trail state registered in-loop', {
+    tradeId,
+    signalId,
+    trailDistance: trailMetrics.trailDistance,
+    peakGivebackPips,
+  });
 }
 
 async function bumpOmegaTradesToday(

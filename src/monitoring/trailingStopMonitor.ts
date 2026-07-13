@@ -23,6 +23,7 @@ import {
   pairToInstrument,
   trailStopRowExists,
 } from './trailingStopSupport.js';
+import { loadOmegaTrailPeakGivebackPips } from '../core/omegaRawPolicy/omegaRawTrailGiveback.js';
 
 const candleFetchFailures = new Map<string, number>();
 const CANDLE_FAILURE_ALERT_THRESHOLD = 5;
@@ -65,7 +66,12 @@ export async function ensureTrailStopState(
     if (tradeId == null || typeof tradeId !== 'string') return;
     if (await trailStopRowExists(supabase, tradeId)) return;
 
-    const metrics = computeTrailInsertFields(row);
+    const engineId = row.engine_id != null ? String(row.engine_id) : '';
+    const peakGivebackPips =
+      engineId === 'omega' ? await loadOmegaTrailPeakGivebackPips(supabase) : null;
+    const metrics = computeTrailInsertFields(row, {
+      omegaPeakGivebackPips: peakGivebackPips,
+    });
     if (!metrics) return;
 
     const { error: insErr } = await supabase.from('trail_stop_state').insert({
@@ -88,7 +94,8 @@ export async function ensureTrailStopState(
     console.log(
       `[TrailStop] Initialized state for trade ${tradeId} pair=${String(row.pair)} direction=${String(
         row.direction
-      )} rSize=${metrics.rSizeRaw}`
+      )} rSize=${metrics.rSizeRaw} trailDist=${metrics.trailDistance}` +
+        (peakGivebackPips != null ? ` givebackPips=${peakGivebackPips}` : ''),
     );
   } catch (err) {
     console.warn('[TrailStop] ensureTrailStopState', String(err));

@@ -106,7 +106,23 @@ export function favorableAndAdverse(
 
 export const NO_TRAIL_CLOSE = { shouldClose: false, reason: '', pnlR: null as number | null };
 
-export function computeTrailInsertFields(row: Record<string, unknown>): {
+export interface TrailInsertOptions {
+  /**
+   * Omega-only: when > 0, trail_distance = pips × pipSize (fixed peak giveback)
+   * instead of rSizeRaw × TRAIL_STOP_TRAIL_DISTANCE_OMEGA.
+   */
+  omegaPeakGivebackPips?: number | null;
+}
+
+function pipSizeForPair(pair: string): number {
+  const normalized = pair.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  return normalized.includes('JPY') ? 0.01 : 0.0001;
+}
+
+export function computeTrailInsertFields(
+  row: Record<string, unknown>,
+  options?: TrailInsertOptions,
+): {
   rSizeRaw: number;
   slDistance: number;
   trailDistance: number;
@@ -121,10 +137,20 @@ export function computeTrailInsertFields(row: Record<string, unknown>): {
   const slMultiplier = getSlMultiplierForTrade(engineIdForTrail, directionForTrail);
   const trailDistanceR = getTrailDistanceMultiplier(engineIdForTrail);
   const activationR = getActivationR();
+  const givebackPips = options?.omegaPeakGivebackPips;
+  const useFixedGiveback =
+    engineIdForTrail === 'omega' &&
+    givebackPips != null &&
+    Number.isFinite(givebackPips) &&
+    givebackPips > 0;
+  const pair = row.pair != null ? String(row.pair) : 'AUD_USD';
+  const trailDistance = useFixedGiveback
+    ? givebackPips * pipSizeForPair(pair)
+    : rSizeRaw * trailDistanceR;
   return {
     rSizeRaw,
     slDistance: rSizeRaw * slMultiplier,
-    trailDistance: rSizeRaw * trailDistanceR,
+    trailDistance,
     activationThreshold: rSizeRaw * activationR,
   };
 }

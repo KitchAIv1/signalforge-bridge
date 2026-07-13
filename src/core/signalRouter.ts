@@ -37,6 +37,10 @@ import {
   shouldBypassIsActive,
   shouldBypassWindowGate,
 } from './omegaRawModeGates.js';
+import {
+  isOmegaRawPureSizingEnabled,
+  sizeOmegaRawPureUnits,
+} from './omegaRawPolicy/omegaRawPureSizer.js';
 import { isDuplicate, hasOpenOppositePosition, countOpenSamePair, prePopulateDedupFromLog } from './conflictResolver.js';
 import { countSameCurrencyExposure } from './correlationChecker.js';
 import { runRiskChecks } from './riskManager.js';
@@ -831,52 +835,77 @@ export async function processSignal(
     norm.oandaInstrument,
     getCachedConversionRates()
   );
-  const unitCount = calculateUnits({
-    equity: cachedAccount?.equity ?? 0,
-    engineWeight: engine.weight,
-    riskPct: config.riskPerTradePct,
-    entry: norm.entryPrice,
-    stopLoss: norm.stopLoss,
-    instrument: norm.oandaInstrument,
-    consecutiveLosses: getConsecutiveLosses(),
-    graduatedThreshold: config.graduatedResponseThreshold,
-    confluenceScore: norm.confluenceScore,
-    conversionRate,
-    slPipsOverride: norm.slPipsFromSignal ?? undefined,
-  });
-  let units = norm.direction === 'LONG' ? unitCount : -unitCount;
 
-  const omegaNewsExploitMult =
-    config.newsBlackoutEnabled &&
-    norm.engineId === 'omega' &&
-    newsResult !== null &&
-    newsResult.exploitationActive
-      ? 1.5
-      : 1.0;
-  const omegaNewsReduceMult =
-    config.newsBlackoutEnabled &&
-    norm.engineId === 'omega' &&
-    newsResult !== null &&
-    newsResult.preEventAction === 'REDUCE' &&
-    newsResult.inPreWindow
-      ? 0.5
-      : 1.0;
-  if (norm.engineId === 'omega') {
-    units = Math.round(units * omegaNewsExploitMult * omegaNewsReduceMult);
-  }
+  const omegaPureSizing =
+    norm.engineId === 'omega' && (await isOmegaRawPureSizingEnabled(supabase));
 
-  // AMD dynamic sizing — live multiplier applied to Omega units
-  // amdSizeMultiplier is null before 10:05 UTC AMD cron fires — defaults to 1.0x (no change)
-  // multiplier is computed in computeAutoDirectionSnapshot and stored in amd_state
-  if (norm.engineId === 'omega') {
-    const amdMultiplier = amdState?.amdSizeMultiplier ?? 1.0;
-    if (amdMultiplier !== 1.0) {
-      units = Math.round(units * amdMultiplier);
-      logInfo(
-        `[AmdSizing] Applied amd_size_multiplier=${amdMultiplier} → units=${units} | ` +
-        `tag=${amdState?.amdTag ?? 'null'} | ` +
-        `confidence=${amdState?.autoDirectionConfidence ?? 'null'}`
-      );
+  let units: number;
+  if (omegaPureSizing) {
+    units = sizeOmegaRawPureUnits({
+      equity: cachedAccount?.equity ?? 0,
+      engineWeight: engine.weight,
+      riskPct: config.riskPerTradePct,
+      entry: norm.entryPrice,
+      stopLoss: norm.stopLoss,
+      instrument: norm.oandaInstrument,
+      direction: norm.direction,
+      conversionRate,
+      slPipsOverride: norm.slPipsFromSignal ?? undefined,
+    });
+    logInfo('[OmegaRaw] Pure sizing applied (no AMD/news/confluence/graduated)', {
+      signalId,
+      units,
+      equity: cachedAccount?.equity ?? 0,
+      weight: engine.weight,
+      riskPct: config.riskPerTradePct,
+    });
+  } else {
+    const unitCount = calculateUnits({
+      equity: cachedAccount?.equity ?? 0,
+      engineWeight: engine.weight,
+      riskPct: config.riskPerTradePct,
+      entry: norm.entryPrice,
+      stopLoss: norm.stopLoss,
+      instrument: norm.oandaInstrument,
+      consecutiveLosses: getConsecutiveLosses(),
+      graduatedThreshold: config.graduatedResponseThreshold,
+      confluenceScore: norm.confluenceScore,
+      conversionRate,
+      slPipsOverride: norm.slPipsFromSignal ?? undefined,
+    });
+    units = norm.direction === 'LONG' ? unitCount : -unitCount;
+
+    const omegaNewsExploitMult =
+      config.newsBlackoutEnabled &&
+      norm.engineId === 'omega' &&
+      newsResult !== null &&
+      newsResult.exploitationActive
+        ? 1.5
+        : 1.0;
+    const omegaNewsReduceMult =
+      config.newsBlackoutEnabled &&
+      norm.engineId === 'omega' &&
+      newsResult !== null &&
+      newsResult.preEventAction === 'REDUCE' &&
+      newsResult.inPreWindow
+        ? 0.5
+        : 1.0;
+    if (norm.engineId === 'omega') {
+      units = Math.round(units * omegaNewsExploitMult * omegaNewsReduceMult);
+    }
+
+    // AMD dynamic sizing — live multiplier applied to Omega units
+    // amdSizeMultiplier is null before 10:05 UTC AMD cron fires — defaults to 1.0x (no change)
+    if (norm.engineId === 'omega') {
+      const amdMultiplier = amdState?.amdSizeMultiplier ?? 1.0;
+      if (amdMultiplier !== 1.0) {
+        units = Math.round(units * amdMultiplier);
+        logInfo(
+          `[AmdSizing] Applied amd_size_multiplier=${amdMultiplier} → units=${units} | ` +
+          `tag=${amdState?.amdTag ?? 'null'} | ` +
+          `confidence=${amdState?.autoDirectionConfidence ?? 'null'}`
+        );
+      }
     }
   }
 
