@@ -2,13 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
-import { PNL_CALENDAR_QUERY_START_ISO } from '@/lib/pnlCalendarConstants';
+import { fetchPnlCalendarTrades } from '@/lib/fetchPnlCalendarTrades';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 
 const REFRESH_MS = 5 * 60 * 1000;
-
-const TRADE_LOG_SELECT =
-  'id, created_at, engine_id, direction, result, pnl_r, pnl_dollars, close_reason, bar1_strength, oanda_trade_id, pair, leg_type, signal_id';
 
 export function usePnlCalendarTrades() {
   const [trades, setTrades] = useState<PnlTradeRow[]>([]);
@@ -17,26 +14,20 @@ export function usePnlCalendarTrades() {
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const supabase = getSupabase();
-    const { data: rows, error: queryError } = await supabase
-      .from('bridge_trade_log')
-      .select(TRADE_LOG_SELECT)
-      .in('engine_id', [
-        'omega',
-        'engine_rebuild',
-        'scalper',
-        'engine_amd',
-        'omega_inverse',
-        'audusd_fade',
-      ])
-      .eq('status', 'closed')
-      .gte('created_at', PNL_CALENDAR_QUERY_START_ISO)
-      .order('created_at', { ascending: true });
-    if (queryError) {
-      setFetchError(queryError.message);
+    const result = await fetchPnlCalendarTrades(getSupabase());
+    if (result.errorMessage) {
+      setFetchError(result.errorMessage);
+      // Keep any pages already fetched so a mid-pagination failure does not wipe the grid.
+      if (result.trades.length > 0) {
+        setTrades(result.trades);
+      }
     } else {
-      setFetchError(null);
-      setTrades((rows ?? []) as PnlTradeRow[]);
+      setFetchError(
+        result.truncated
+          ? 'Calendar trade history hit the page cap — newest days may be incomplete.'
+          : null,
+      );
+      setTrades(result.trades);
     }
     setLoading(false);
   }, []);

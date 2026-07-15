@@ -114,16 +114,20 @@ export function PnlCalendarView() {
         {fetchError && (
           <div
             style={{
-              background: 'rgba(244,63,94,0.08)',
-              border: '1px solid rgba(244,63,94,0.2)',
+              background: fetchError.includes('page cap')
+                ? 'rgba(245,158,11,0.08)'
+                : 'rgba(244,63,94,0.08)',
+              border: fetchError.includes('page cap')
+                ? '1px solid rgba(245,158,11,0.25)'
+                : '1px solid rgba(244,63,94,0.2)',
               borderRadius: 10,
               padding: '12px 16px',
-              color: '#f43f5e',
+              color: fetchError.includes('page cap') ? '#f59e0b' : '#f43f5e',
               fontSize: 13,
               marginBottom: 20,
             }}
           >
-            ⚠ Query error: {fetchError}
+            {fetchError}
           </div>
         )}
 
