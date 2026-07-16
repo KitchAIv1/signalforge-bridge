@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+/**
+ * Unit tests: Lane B AO close R must stay signed (negatives must not become 0).
+ */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { computeAlphaOmegaClosePnlR } from './computeAlphaOmegaClosePnlR.js';
 
 describe('computeAlphaOmegaClosePnlR', () => {
@@ -14,7 +19,7 @@ describe('computeAlphaOmegaClosePnlR', () => {
       units: 50000,
     });
     // risk = 0.001 * 50000 = 50 → -50/50 = -1R
-    expect(pnlR).toBe(-1);
+    assert.equal(pnlR, -1);
   });
 
   it('falls back to pips / hard stop for negative AO exits', () => {
@@ -28,7 +33,7 @@ describe('computeAlphaOmegaClosePnlR', () => {
       stopLoss: null,
       units: null,
     });
-    expect(pnlR).toBe(-0.84);
+    assert.equal(pnlR, -0.84);
   });
 
   it('does not coerce negative R to zero', () => {
@@ -43,6 +48,6 @@ describe('computeAlphaOmegaClosePnlR', () => {
       units: null,
     });
     // SHORT: fill - exit = 1.1 - 1.102 = -0.002 / 0.001 = -2R
-    expect(pnlR).toBe(-2);
+    assert.equal(pnlR, -2);
   });
 });
