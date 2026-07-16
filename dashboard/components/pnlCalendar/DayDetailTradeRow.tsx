@@ -5,6 +5,7 @@ import { calendarTradeEngineLabel } from '@/lib/pnlCalendarEngineFilter';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 import { getRColor, getRValue } from '@/lib/pnlCalendarFormat';
 import { formatCloseReason } from '@/lib/formatCloseReason';
+import { hasPnlCalendarTradeR, resolvePnlCalendarTradeR } from '@/lib/resolvePnlCalendarTradeR';
 
 interface DayDetailTradeRowProps {
   trade: PnlTradeRow;
@@ -21,7 +22,7 @@ export function DayDetailTradeRow({ trade }: DayDetailTradeRowProps) {
     hour12: false,
     timeZone: 'UTC',
   });
-  const rComponent = trade.pnl_r ?? 0;
+  const rComponent = resolvePnlCalendarTradeR(trade);
   const engColor = ENGINE_COLORS[trade.engine_id] ?? '#64748b';
   const verdictWin = trade.result?.toLowerCase() === 'win';
   const verdictLoss = trade.result?.toLowerCase() === 'loss';
@@ -88,7 +89,7 @@ export function DayDetailTradeRow({ trade }: DayDetailTradeRowProps) {
           fontWeight: 600,
         }}
       >
-        {trade.pnl_r !== null ? getRValue(rComponent) : '—'}
+        {hasPnlCalendarTradeR(trade) ? getRValue(rComponent) : '—'}
       </td>
       <td
         style={{

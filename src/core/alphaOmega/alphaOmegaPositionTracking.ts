@@ -20,6 +20,7 @@ import {
   OPPOSING_SHARE_MIN_FIRES,
   OPPOSING_SHARE_THRESHOLD,
 } from './alphaOmegaConstants.js';
+import { computeAlphaOmegaClosePnlR } from './computeAlphaOmegaClosePnlR.js';
 import type { AlphaOmegaDirection, CrackEvent, StreakFireInput } from './alphaOmegaStreakTracker.js';
 import { filterOpenAlphaOmegaPositions } from './reconcileAlphaOmegaPositionOrphans.js';
 
@@ -63,14 +64,27 @@ export async function registerAlphaOmegaPosition(
   }
 }
 
-async function findLogRowIdForTrade(supabase: SupabaseClient, oandaTradeId: string): Promise<string | null> {
+interface OpenLogRowForClose {
+  id: string;
+  fill_price: number | null;
+  stop_loss: number | null;
+  units: number | null;
+  direction: string | null;
+  r_size_raw: number | null;
+}
+
+async function findOpenLogRowForTrade(
+  supabase: SupabaseClient,
+  oandaTradeId: string,
+): Promise<OpenLogRowForClose | null> {
   const { data } = await supabase
     .from('bridge_trade_log')
-    .select('id')
+    .select('id, fill_price, stop_loss, units, direction, r_size_raw')
     .eq('oanda_trade_id', oandaTradeId)
     .eq('status', 'open')
     .maybeSingle();
-  return (data?.id as string | undefined) ?? null;
+  if (!data?.id) return null;
+  return data as OpenLogRowForClose;
 }
 
 /**
@@ -85,14 +99,22 @@ export async function closeAlphaOmegaPosition(
   reason: string,
 ): Promise<void> {
   try {
-    const logRowId = await findLogRowIdForTrade(supabase, position.oanda_trade_id);
+    const logRow = await findOpenLogRowForTrade(supabase, position.oanda_trade_id);
     const broker = await resolveBrokerForLogRow(supabase, position.broker_id, 'omega');
     const { closedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(
       broker,
       position.oanda_trade_id,
     );
     const pnlPips = computePnlPips(position, exitPriceNum);
-    await updateClosedTradeLog(supabase, logRowId, reason, closedAt, exitPriceNum, pnlDollars, pnlPips);
+    await updateClosedTradeLog(
+      supabase,
+      logRow,
+      reason,
+      closedAt,
+      exitPriceNum,
+      pnlDollars,
+      pnlPips,
+    );
     await supabase.from('alpha_omega_position_state').delete().eq('oanda_trade_id', position.oanda_trade_id);
     logInfo('[AlphaOmega] Closed Lane B position', {
       oandaTradeId: position.oanda_trade_id,
@@ -132,16 +154,26 @@ function computePnlPips(
 
 async function updateClosedTradeLog(
   supabase: SupabaseClient,
-  logRowId: string | null,
+  logRow: OpenLogRowForClose | null,
   reason: string,
   closedAt: string,
   exitPriceNum: number | null,
   pnlDollars: number | null,
   pnlPips: number | null,
 ): Promise<void> {
-  if (!logRowId) return;
+  if (!logRow) return;
   const result =
     pnlDollars == null ? 'breakeven' : pnlDollars > 0 ? 'win' : pnlDollars < 0 ? 'loss' : 'breakeven';
+  const pnlR = computeAlphaOmegaClosePnlR({
+    exitPrice: exitPriceNum,
+    fillPrice: logRow.fill_price != null ? Number(logRow.fill_price) : null,
+    direction: logRow.direction,
+    rSizeRaw: logRow.r_size_raw != null ? Number(logRow.r_size_raw) : null,
+    pnlPips,
+    pnlDollars,
+    stopLoss: logRow.stop_loss != null ? Number(logRow.stop_loss) : null,
+    units: logRow.units != null ? Number(logRow.units) : null,
+  });
   const { error: updateErr } = await supabase
     .from('bridge_trade_log')
     .update({
@@ -151,9 +183,10 @@ async function updateClosedTradeLog(
       exit_price: exitPriceNum,
       pnl_dollars: pnlDollars,
       pnl_pips: pnlPips,
+      pnl_r: pnlR,
       result,
     })
-    .eq('id', logRowId);
+    .eq('id', logRow.id);
   if (updateErr) {
     logWarn('[AlphaOmega] bridge_trade_log update after close failed', {
       error: updateErr.message,

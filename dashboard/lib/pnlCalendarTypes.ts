@@ -7,6 +7,8 @@ export type PnlTradeRow = {
   direction: string;
   result: string;
   pnl_r: number | null;
+  /** Used to derive R for Lane B AO rows that closed before pnl_r was written. */
+  pnl_pips: number | null;
   pnl_dollars: number | null;
   close_reason: string | null;
   bar1_strength: string | null;

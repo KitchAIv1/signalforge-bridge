@@ -4,6 +4,7 @@ import {
   groupMultiLegTrades,
 } from '@/lib/multiLegAggregation';
 import type { DaySummary, EquityPoint, PnlTradeRow } from '@/lib/pnlCalendarTypes';
+import { resolvePnlCalendarTradeR } from '@/lib/resolvePnlCalendarTradeR';
 
 function createEmptyDaySummary(isoDateKey: string): DaySummary {
   return {
@@ -31,7 +32,7 @@ function createEmptyDaySummary(isoDateKey: string): DaySummary {
 
 function foldTradeFinancials(day: DaySummary, trade: PnlTradeRow): void {
   day.trades.push(trade);
-  const rComponent = trade.pnl_r ?? 0;
+  const rComponent = resolvePnlCalendarTradeR(trade);
   day.netR += rComponent;
   if (trade.pnl_dollars === null || trade.pnl_dollars === undefined) {
     day.hasNullDollars = true;
@@ -106,7 +107,7 @@ export function buildEquityCurve(trades: PnlTradeRow[]): EquityPoint[] {
     { label: 'Apr 30', cumR: 0, omegaR: 0, rebuildR: 0, amdR: 0, omegaInverseR: 0 },
   ];
   for (const trade of sorted) {
-    const rComponent = trade.pnl_r ?? 0;
+    const rComponent = resolvePnlCalendarTradeR(trade);
     cumR += rComponent;
     if (trade.engine_id === 'omega') omegaR += rComponent;
     if (trade.engine_id === 'engine_rebuild') rebuildR += rComponent;

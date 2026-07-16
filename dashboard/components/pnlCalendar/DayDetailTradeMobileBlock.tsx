@@ -5,6 +5,7 @@ import { calendarTradeEngineLabel } from '@/lib/pnlCalendarEngineFilter';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 import { getRColor, getRValue } from '@/lib/pnlCalendarFormat';
 import { formatCloseReason } from '@/lib/formatCloseReason';
+import { hasPnlCalendarTradeR, resolvePnlCalendarTradeR } from '@/lib/resolvePnlCalendarTradeR';
 
 interface DayDetailTradeMobileBlockProps {
   trade: PnlTradeRow;
@@ -21,7 +22,7 @@ export function DayDetailTradeMobileBlock({ trade }: DayDetailTradeMobileBlockPr
     hour12: false,
     timeZone: 'UTC',
   });
-  const rComponent = trade.pnl_r ?? 0;
+  const rComponent = resolvePnlCalendarTradeR(trade);
   const engColor = ENGINE_COLORS[trade.engine_id] ?? '#64748b';
   const verdictWin = trade.result?.toLowerCase() === 'win';
   const verdictLoss = trade.result?.toLowerCase() === 'loss';
@@ -61,7 +62,7 @@ export function DayDetailTradeMobileBlock({ trade }: DayDetailTradeMobileBlockPr
           {(trade.result ?? '—').toUpperCase()}
         </span>
         <span style={{ color: getRColor(rComponent), fontFamily: "'Roboto Mono', monospace" }}>
-          {trade.pnl_r !== null ? getRValue(rComponent) : '—'}
+          {hasPnlCalendarTradeR(trade) ? getRValue(rComponent) : '—'}
         </span>
         <span style={{ color: getRColor(trade.pnl_dollars ?? 0), fontFamily: "'Roboto Mono', monospace" }}>
           {trade.pnl_dollars !== null

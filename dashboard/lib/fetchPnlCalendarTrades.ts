@@ -13,7 +13,7 @@ import {
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 
 export const PNL_CALENDAR_TRADE_SELECT =
-  'id, created_at, engine_id, broker_id, direction, result, pnl_r, pnl_dollars, close_reason, bar1_strength, oanda_trade_id, pair, leg_type, signal_id';
+  'id, created_at, engine_id, broker_id, direction, result, pnl_r, pnl_pips, pnl_dollars, close_reason, bar1_strength, oanda_trade_id, pair, leg_type, signal_id';
 
 export interface FetchPnlCalendarTradesResult {
   trades: PnlTradeRow[];
