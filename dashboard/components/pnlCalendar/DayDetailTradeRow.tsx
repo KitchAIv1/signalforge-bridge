@@ -1,6 +1,7 @@
 'use client';
 
 import { ENGINE_COLORS } from '@/lib/pnlCalendarConstants';
+import { calendarTradeEngineLabel } from '@/lib/pnlCalendarEngineFilter';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 import { getRColor, getRValue } from '@/lib/pnlCalendarFormat';
 import { formatCloseReason } from '@/lib/formatCloseReason';
@@ -10,9 +11,7 @@ interface DayDetailTradeRowProps {
 }
 
 function engineLabelFor(trade: PnlTradeRow): string {
-  if (trade.engine_id === 'omega') return 'Omega';
-  if (trade.engine_id === 'engine_rebuild') return 'Rebuild';
-  return trade.engine_id;
+  return calendarTradeEngineLabel(trade);
 }
 
 export function DayDetailTradeRow({ trade }: DayDetailTradeRowProps) {

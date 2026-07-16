@@ -2,6 +2,8 @@ export type PnlTradeRow = {
   id: string;
   created_at: string;
   engine_id: string;
+  /** Null on some legacy rows; Lane B AO uses oanda_phase2_demo. */
+  broker_id: string | null;
   direction: string;
   result: string;
   pnl_r: number | null;
