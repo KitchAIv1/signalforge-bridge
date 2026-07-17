@@ -1,42 +1,69 @@
-# Omega Lane B — Phase 2 Rollout (W0 Shadow)
+# Omega Lane B — ALPHAOMEGA Rollout
 
-Lane A (`oanda_practice`) stays RAW. Lane B (`oanda_phase2_demo` / AUD_NEWWWW) runs R1 + Phase 2 gates at fan-out only.
+**Status:** Live (July 2026)  
+**Lane A:** `oanda_practice` — RAW Omega (unchanged by ALPHAOMEGA logic)  
+**Lane B:** `oanda_phase2_demo` — ALPHAOMEGA validated entry/exit  
+
+> Supersedes the W0 “R1 / Phase 2 shadow gate” enablement table. Those flags from migration `055` are historical; live decisions come from ALPHAOMEGA (`057`+). Full contract: [ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md](./ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md).
+
+---
 
 ## Pre-deploy
 
-1. Apply `migrations/055_omega_lane_b_phase2_demo.sql` in Supabase.
-2. Set env on bridge host: `OANDA_PHASE2_ACCOUNT_ID=101-001-38709456-003`
-3. Confirm `bridge_links`: `oanda_practice` + `oanda_phase2_demo` active; `vtmarkets_omega_demo` inactive for omega.
+1. Apply migrations in order: `055` → `057` → `058` → `060` (plus `056` if AMD dedicated account not yet applied; `059` for Lane A RAW trail only).
+2. Set on bridge host: `OANDA_PHASE2_ACCOUNT_ID=<phase2-practice-account>`.
+3. Confirm `bridge_links`: `oanda_practice` + `oanda_phase2_demo` active for omega as intended.
 4. Restart bridge after env + migration.
 
-## W0 defaults (migration 055)
+---
 
-| `bridge_config` key | Default |
-|---------------------|---------|
-| `omega_lane_b_r1_enforce` | `false` |
-| `omega_lane_b_phase2_shadow` | `true` |
-| `omega_lane_b_phase2_enforce` | `false` |
+## Live config keys (`bridge_config`)
 
-Shadow mode: gates log `lane_advisory` on executed rows; trades still fill on Lane B.
+| Key | Typical / default | Meaning |
+|-----|-------------------|---------|
+| `alpha_omega_enabled` | `true` | Master kill switch for Lane B ALPHAOMEGA |
+| `alpha_omega_pure_sizing` | operator choice | Base-risk-only sizing when `true` |
+| `alpha_omega_giveback_trail_enabled` | `false` | Peak ≥6p then giveback 3p when `true` |
 
-## Weekly enablement
+Legacy Phase-2 keys from `055` (`omega_lane_b_r1_enforce`, `omega_lane_b_phase2_shadow`, `omega_lane_b_phase2_enforce`) are **not** the current entry/exit authority once ALPHAOMEGA is enabled.
 
-| Week | Set in Supabase `bridge_config` |
-|------|----------------------------------|
-| W1 | `omega_lane_b_r1_enforce` → `true` |
-| W3+ | `omega_lane_b_phase2_enforce` → `true` (after Jul-3-type days stay clean) |
+---
 
 ## Verification
 
-- `/activity` — unchanged; filter `oanda_practice` for Lane A.
-- `/omega-phase2` — Lane B only (`oanda_phase2_demo`).
-- Same signal → two `bridge_trade_log` rows (different `broker_id`).
+| Check | Expectation |
+|-------|-------------|
+| `/activity` | Filter `oanda_phase2_demo` for Lane B; Lane A via `oanda_practice` |
+| `/omega-phase2` | Streak radar, scoreboard, Open Risk (peak / giveback when armed) |
+| Same Omega fire | Up to two `bridge_trade_log` rows (different `broker_id`) when both lanes execute |
+| Telegram | ALPHAOMEGA-tagged Lane B entries / exits |
+| Giveback off | Behavior bit-identical to pre-`060` exits (flag default false) |
+
+---
+
+## Giveback trail enablement (optional)
+
+1. Confirm migration `060` applied (`peak_favorable_pips` column exists).
+2. Set `alpha_omega_giveback_trail_enabled` → `true` in Supabase (no redeploy required).
+3. Watch Open Risk for peak/arm text; closes show “Giveback trail” / `GB` on scoreboard.
+
+---
 
 ## Rollback
+
+**Stop Lane B fills:**
 
 ```sql
 UPDATE bridge_links SET is_active = false
 WHERE engine_id = 'omega' AND broker_id = 'oanda_phase2_demo';
 ```
 
-Lane A continues unaffected.
+**Disable ALPHAOMEGA logic (keep link):**
+
+```sql
+UPDATE bridge_config
+SET config_value = 'false'::jsonb
+WHERE config_key = 'alpha_omega_enabled';
+```
+
+Lane A continues unaffected either way.

@@ -1,7 +1,7 @@
 {
   "name": "signalforge-bridge",
-  "version": "1.0.0",
-  "description": "SignalForge Bridge — listens to signals table, runs risk pipeline, executes on OANDA",
+  "version": "1.2.0",
+  "description": "SignalForge Bridge \u2014 listens to signals table, runs risk pipeline, executes on OANDA",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

@@ -25,6 +25,8 @@ Supabase is the shared control and audit plane. Engines write source signals, th
 | `asian_m5_candles` | Asian session M5 candles (00:00–08:00 UTC). Migration 028. |
 | `asian_direction_log` | Asian direction automation audit log. Migration 020. |
 | `scalper_day_state` / `scalper_trades` | Scalper engine daily state and trades. Migration 027. |
+| `alpha_omega_streak_state` | ALPHAOMEGA singleton streak tracker. Migration 057. |
+| `alpha_omega_position_state` | ALPHAOMEGA open Lane B position state. Migration 057 / 060. |
 | `intelligence_snapshots` | Dashboard Intelligence evaluation snapshots. |
 
 ## Shadow Tables
@@ -80,6 +82,21 @@ These are research or engine-owned sources. Product docs should not assume the b
 | `027_scalper.sql` | 2026-05-31 | Creates `scalper_day_state` and `scalper_trades` — production AUD_USD price-ratchet scalper state and trade audit. See [ENGINE_Scalper_Reference_v1_0_0_May2026.md](../ENGINE_Scalper_Reference_v1_0_0_May2026.md). |
 | `028_asian_m5_candles.sql` | 2026-05-31 | Creates `asian_m5_candles` — M5 OHLC JSONB for Asian session 00:00–08:00 UTC. See [SERVICE_AsianM5Candles_May2026.md](../SERVICE_AsianM5Candles_May2026.md). |
 
+### Migrations 054–060 (July 2026)
+
+| Migration | Purpose |
+| --- | --- |
+| `054_omega_max_hold_3h.sql` | Omega `max_hold` → 180 minutes. |
+| `054_bridge_trade_log_broker_aware_dedup.sql` | Broker-aware trade-log dedup (same `054_` prefix series — apply both). |
+| `055_omega_lane_b_phase2_demo.sql` | Lane B broker link + early Phase-2 config keys. |
+| `056_amd_dedicated_oanda.sql` | AMD dedicated OANDA account wiring. |
+| `057_alphaomega_state.sql` | `alpha_omega_streak_state`, `alpha_omega_position_state`, `alpha_omega_enabled`. |
+| `058_alphaomega_pure_sizing.sql` | `alpha_omega_pure_sizing` flag. |
+| `059_omega_raw_pure_sizing_15p_trail.sql` | Lane A RAW pure sizing + 1.5p peak giveback trail. |
+| `060_alphaomega_giveback_trail.sql` | `peak_favorable_pips` + `alpha_omega_giveback_trail_enabled` (default false). |
+
+See [ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md](../ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md) and [CHANGELOG_July2026.md](../CHANGELOG_July2026.md).
+
 Known gap: `migrations/` and `supabase/migrations/` overlap for some files. The production canonical migration path should be decided and documented.
 
 ## Base Config Keys
@@ -125,6 +142,9 @@ Base keys from `002_bridge_config_defaults.sql`:
 | `rebuild_hour_gate_enabled` | Toggle bad-hour block for Rebuild. |
 | `direction_mode` | `manual` or `auto` Omega direction mode. |
 | `presence_last_seen` | Dashboard presence heartbeat while Activity is open. |
+| `alpha_omega_enabled` | Lane B ALPHAOMEGA master kill switch. |
+| `alpha_omega_pure_sizing` | When true, Lane B sizes at base risk only. |
+| `alpha_omega_giveback_trail_enabled` | When true, Lane B 6p peak / 3p giveback trail. |
 
 ## Environment Variables
 

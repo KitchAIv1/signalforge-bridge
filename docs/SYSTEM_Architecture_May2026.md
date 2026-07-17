@@ -9,6 +9,11 @@
 
 | Date | Change |
 |------|--------|
+| 2026-07-17 | Docs refresh v1.2.0 — ALPHAOMEGA Lane B, dual-OANDA, giveback trail; see [CHANGELOG_July2026.md](./CHANGELOG_July2026.md) |
+| 2026-07-13 | Lane A RAW pure sizing + 1.5p peak giveback trail; migration 059 |
+| 2026-07-09 | Lane B rewired to ALPHAOMEGA (streak-crack entry / multi-exit); migration 057 |
+| 2026-07-08 | AMD dedicated OANDA account + pip trail 2.5→5; migration 056 |
+| 2026-07-07 | Dual-OANDA Lane B (`oanda_phase2_demo`); migration 055 |
 | 2026-07-03 | OMEGA max_hold reduced 6h → 3h (180m best setup); migration 054 |
 | 2026-05-31 | Initial May 2026 architecture snapshot |
 
@@ -63,6 +68,7 @@ All cron strings from `src/index.ts`. `{ timezone: 'UTC' }` on every `cron.sched
 | **Every 30 s** | `setInterval(30000)` | Trade monitor — `runTradeMonitor()` |
 | **Every 30 s** | `setInterval(30000)` | Heartbeat — `runHeartbeat()` |
 | **Every 30 s** | `setInterval(30000)` | AMD trail monitor — `runAmdTrailMonitor()` |
+| **Every 30 s** | `setInterval(30000)` | ALPHAOMEGA hard-stop / giveback — `runAlphaOmegaHardStopMonitor()` *(Lane B)* |
 | **Every 30 s** | `setInterval(30000)` | Scalper monitors — `runMonitors()` *(if enabled)* |
 | **UTC midnight** | `scheduleMidnightReset()` | Reset `bridge_engines.trades_today` |
 
@@ -83,8 +89,9 @@ From `bridge_engines` query (2026-05-31). `paused_engines` in `bridge_config`: `
 
 | engine_id | display_name | is_active | paused | max_hold_h | Entry trigger | Exit | Primary tables |
 |-----------|--------------|-----------|--------|------------|---------------|------|----------------|
-| **omega** | Engine Omega — AUDUSD M5 DTW Pattern | true | no | 3 | External signal insert → Realtime | Trail v1 (2R/3R/0.5R), max_hold 3h, RAW mode | `signals`, `bridge_trade_log` |
-| **engine_amd** | AMD Distribution | true | no | 6 | Tag entry hour + AMD state (`AmdDistributionEngine`, every 5 min) | Pip trail + tag hard exit hour | `amd_state`, `bridge_trade_log` |
+| **omega** (Lane A) | Engine Omega — AUDUSD M5 DTW Pattern | true | no | 3 | External signal → Realtime → `oanda_practice` | RAW + optional 1.5p peak giveback (`059`); max_hold 3h | `signals`, `bridge_trade_log` |
+| **omega** (Lane B / ALPHAOMEGA) | Same signal, Phase-2 account | true | no | 3 | Streak-crack entry on `oanda_phase2_demo` | Opposing 5 / share / 10p hard / backstop / optional 6p→3p giveback | `alpha_omega_*`, `bridge_trade_log` |
+| **engine_amd** | AMD Distribution | true | no | 6 | Tag entry hour + AMD state (`AmdDistributionEngine`, every 5 min) | Pip trail (5p) + tag hard exit hour; dedicated OANDA account | `amd_state`, `bridge_trade_log` |
 | **engine_rebuild** | Engine Rebuild | true | **yes (decommissioning)** | 0.5 | External signal (paused) | M15 max hold | `signals`, `bridge_trade_log`, shadow tables |
 | **falcon** | Falcon | true | **yes** | 2 | External signal | max hold | `signals`, `bridge_trade_log` |
 | **sigma** | Sigma | true | no | 2 | External signal | max hold | `signals`, `bridge_trade_log` |
@@ -158,6 +165,8 @@ External engines ──► signals (Realtime) ──► signalRouter ──► O
 | `scalper_day_state` | Scalper daily reference/trigger/ratchet state |
 | `scalper_trades` | Scalper per-trade audit |
 | `trail_stop_state` | Persistent trailing-stop state |
+| `alpha_omega_streak_state` | ALPHAOMEGA singleton streak machine (Lane B) |
+| `alpha_omega_position_state` | ALPHAOMEGA open Lane B position tracking |
 | `news_events` | News blackout data |
 | `rebuild_shadow_signals` | Rebuild research (decommissioning) |
 
@@ -175,7 +184,8 @@ Grouped by service. All read at runtime from Railway env.
 | `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SERVICE_KEY` | — | Bridge DB access |
 | `SIGNAL_TABLE` | `signals` | Realtime subscription table |
 | `OANDA_API_TOKEN` | — | Broker auth |
-| `OANDA_ACCOUNT_ID` | — | Account routing |
+| `OANDA_ACCOUNT_ID` | — | Primary / Lane A account routing |
+| `OANDA_PHASE2_ACCOUNT_ID` | — | Lane B (`oanda_phase2_demo`) account |
 | `OANDA_ENVIRONMENT` | `practice` | `practice` or `live` |
 | `LOG_LEVEL` | `info` | Logger verbosity |
 | `ALERT_WEBHOOK_URL` | — | Monitoring webhook |

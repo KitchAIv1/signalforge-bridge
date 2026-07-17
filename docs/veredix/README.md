@@ -16,7 +16,13 @@ Veredix is the trading operations system built around the SignalForge Bridge. Th
 
 ## Source Of Truth
 
-This documentation reflects the current repository behavior as of May 2026. It consolidates and updates scattered information from:
+This documentation reflects the current repository behavior as of **July 2026 (bridge v1.2.0)**. For the July commit audit and ALPHAOMEGA/Lane B contract, start with:
+
+- [CHANGELOG_July2026.md](../CHANGELOG_July2026.md)
+- [ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md](../ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md)
+- [OMEGA_LANE_B_ROLLOUT.md](../OMEGA_LANE_B_ROLLOUT.md)
+
+It consolidates and updates scattered information from:
 
 - `README.md`
 - `SIGNALFORGE_BRIDGE_REFERENCE.md`
@@ -47,7 +53,9 @@ This documentation reflects the current repository behavior as of May 2026. It c
 | AMD | Accumulation, Manipulation, Distribution daily intelligence for AUD_USD. |
 | Regime | H4/D1 market state classifier used as advisory and audit context for Omega. |
 | OANDA | Current live broker integration. |
-| VT Markets | Planned future broker target requiring a broker abstraction layer. |
+| VT Markets | Parallel MT5 path for selected engines; still evolving toward a full broker abstraction. |
+| Lane A | Omega on `oanda_practice` — RAW execution path. |
+| Lane B / ALPHAOMEGA | Omega on `oanda_phase2_demo` — streak-crack entry and validated multi-exit stack. |
 
 ## Documentation Principles
 
