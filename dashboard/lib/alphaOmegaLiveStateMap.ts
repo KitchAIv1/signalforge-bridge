@@ -19,6 +19,8 @@ export interface AlphaOmegaOpenPositionSnapshot {
   entryPrice: number | null;
   opposingFireCount: number;
   totalFireCount: number;
+  /** Running best-ever favorable excursion (pips) since entry. 0 until the giveback trail is enabled. */
+  peakFavorablePips: number;
   updatedAt: string | null;
 }
 
@@ -48,6 +50,7 @@ export function mapAlphaOmegaPositionRow(
     entryPrice: row.entry_price != null ? Number(row.entry_price) : null,
     opposingFireCount: Number(row.opposing_fire_count ?? 0),
     totalFireCount: Number(row.total_fire_count ?? 0),
+    peakFavorablePips: Number(row.peak_favorable_pips ?? 0),
     updatedAt: (row.updated_at as string | null) ?? null,
   };
 }

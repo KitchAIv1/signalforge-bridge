@@ -24,12 +24,29 @@ import {
   PIP_SIZE,
 } from '../core/alphaOmega/alphaOmegaConstants.js';
 import {
+  evaluateGivebackTrail,
+  isAlphaOmegaGivebackTrailEnabled,
+} from '../core/alphaOmega/alphaOmegaGivebackTrail.js';
+import {
   closeAlphaOmegaPosition,
   loadOpenLaneBPositions,
+  updatePeakFavorablePips,
   type AlphaOmegaPositionRow,
 } from '../core/alphaOmega/alphaOmegaPositionTracking.js';
 
-async function checkPositionHardStop(position: AlphaOmegaPositionRow, instrument: string): Promise<void> {
+/**
+ * Checks the price-based exits for one open Lane B position, in priority
+ * order: hard stop first (unchanged), then — only if the hard stop didn't
+ * already close it, and only when the giveback trail is enabled — the
+ * peak-favorable-giveback trail. Reuses the single already-fetched candle
+ * for both checks; the trail is purely additive and never runs before or
+ * instead of the hard stop.
+ */
+async function checkPositionHardStop(
+  position: AlphaOmegaPositionRow,
+  instrument: string,
+  givebackTrailEnabled: boolean,
+): Promise<void> {
   if (position.entry_price == null) return;
   const candle = await fetchLatestM5Candle(instrument);
   if (!candle) return;
@@ -38,9 +55,23 @@ async function checkPositionHardStop(position: AlphaOmegaPositionRow, instrument
     ? (position.entry_price - candle.low) / PIP_SIZE
     : (candle.high - position.entry_price) / PIP_SIZE;
 
+  const supabase = getSupabaseClient();
   if (adversePips >= HARD_STOP_PIPS) {
-    const supabase = getSupabaseClient();
     await closeAlphaOmegaPosition(supabase, position, ALPHAOMEGA_CLOSE_HARD_STOP);
+    return;
+  }
+
+  if (!givebackTrailEnabled) return;
+  const trail = evaluateGivebackTrail(
+    { direction: position.direction, entryPrice: position.entry_price, peakFavorablePips: position.peak_favorable_pips },
+    candle,
+  );
+  if (trail.shouldExit && trail.exitReason) {
+    await closeAlphaOmegaPosition(supabase, position, trail.exitReason);
+    return;
+  }
+  if (trail.nextPeakFavorablePips !== position.peak_favorable_pips) {
+    await updatePeakFavorablePips(supabase, position.oanda_trade_id, trail.nextPeakFavorablePips);
   }
 }
 
@@ -58,10 +89,14 @@ export async function runAlphaOmegaHardStopMonitor(): Promise<void> {
   }
   if (positions.length === 0) return;
 
+  // Read once per cycle (not once per position) — cheap either way today since
+  // Lane B holds at most one open position, but correct regardless.
+  const givebackTrailEnabled = await isAlphaOmegaGivebackTrailEnabled(supabase);
+
   for (const position of positions) {
     try {
       const instrument = pairToInstrument(DEFAULT_INSTRUMENT);
-      await checkPositionHardStop(position, instrument);
+      await checkPositionHardStop(position, instrument, givebackTrailEnabled);
     } catch (err) {
       logWarn('[AlphaOmegaHardStop] checkPositionHardStop failed', {
         oandaTradeId: position.oanda_trade_id,

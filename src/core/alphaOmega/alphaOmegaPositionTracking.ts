@@ -32,12 +32,16 @@ export interface AlphaOmegaPositionRow {
   entry_price: number | null;
   opposing_fire_count: number;
   total_fire_count: number;
+  /** Running best-ever favorable excursion (pips) since entry. Feeds the giveback-trail exit. */
+  peak_favorable_pips: number;
 }
 
 export async function loadOpenLaneBPositions(supabase: SupabaseClient): Promise<AlphaOmegaPositionRow[]> {
   const { data, error } = await supabase
     .from('alpha_omega_position_state')
-    .select('oanda_trade_id, broker_id, direction, entry_fired_at, entry_price, opposing_fire_count, total_fire_count')
+    .select(
+      'oanda_trade_id, broker_id, direction, entry_fired_at, entry_price, opposing_fire_count, total_fire_count, peak_favorable_pips',
+    )
     .eq('broker_id', OMEGA_LANE_B_BROKER_ID);
   if (error) {
     logWarn('[AlphaOmega] loadOpenLaneBPositions failed', { error: error.message });
@@ -58,9 +62,25 @@ export async function registerAlphaOmegaPosition(
     entry_price: params.entryPrice,
     opposing_fire_count: 0,
     total_fire_count: 0,
+    peak_favorable_pips: 0,
   });
   if (error) {
     logWarn('[AlphaOmega] registerAlphaOmegaPosition failed', { error: error.message, oandaTradeId: params.oandaTradeId });
+  }
+}
+
+/** Persists the running peak-favorable-excursion so it survives across 30s monitor cycles. */
+export async function updatePeakFavorablePips(
+  supabase: SupabaseClient,
+  oandaTradeId: string,
+  nextPeakFavorablePips: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('alpha_omega_position_state')
+    .update({ peak_favorable_pips: nextPeakFavorablePips, updated_at: new Date().toISOString() })
+    .eq('oanda_trade_id', oandaTradeId);
+  if (error) {
+    logWarn('[AlphaOmega] updatePeakFavorablePips failed', { error: error.message, oandaTradeId });
   }
 }
 

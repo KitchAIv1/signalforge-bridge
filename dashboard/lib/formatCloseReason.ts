@@ -10,6 +10,7 @@ const CLOSE_REASON_LABELS: Record<string, string> = {
   alphaomega_opposing_share: 'Opposing 100%',
   alphaomega_hard_stop: 'Hard stop 10p',
   alphaomega_backstop_crack: 'Backstop crack',
+  alphaomega_peak_giveback_trail: 'Giveback trail',
 };
 
 export function formatCloseReason(closeReason: string | null): string {

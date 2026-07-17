@@ -78,6 +78,7 @@ function SecondaryMetricRow({
         opposing={metrics.exitOpposing}
         hardStop={metrics.exitHardStop}
         backstop={metrics.exitBackstop}
+        givebackTrail={metrics.exitGivebackTrail}
         other={metrics.exitOther}
       />
     </div>
@@ -118,14 +119,16 @@ function ExitMixCard({
   opposing,
   hardStop,
   backstop,
+  givebackTrail,
   other,
 }: {
   opposing: number;
   hardStop: number;
   backstop: number;
+  givebackTrail: number;
   other: number;
 }) {
-  const total = opposing + hardStop + backstop + other;
+  const total = opposing + hardStop + backstop + givebackTrail + other;
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Exit mix</p>
@@ -136,6 +139,9 @@ function ExitMixCard({
         <ExitChip label="Opp" count={opposing} className="bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200" />
         <ExitChip label="HS" count={hardStop} className="bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200" />
         <ExitChip label="BS" count={backstop} className="bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" />
+        {givebackTrail > 0 ? (
+          <ExitChip label="GB" count={givebackTrail} className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200" />
+        ) : null}
         {other > 0 ? (
           <ExitChip label="Other" count={other} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" />
         ) : null}

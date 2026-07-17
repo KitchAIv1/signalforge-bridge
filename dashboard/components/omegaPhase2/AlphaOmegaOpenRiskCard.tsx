@@ -7,7 +7,11 @@ import type {
   AlphaOmegaStreakSnapshot,
 } from '@/hooks/useAlphaOmegaLiveState';
 import { AlphaOmegaStepRail } from '@/components/omegaPhase2/AlphaOmegaStepRail';
-import { ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD } from '@/lib/omegaLaneBConstants';
+import {
+  ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS,
+  ALPHAOMEGA_GIVEBACK_PIPS,
+  ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD,
+} from '@/lib/omegaLaneBConstants';
 import {
   directionToneClass,
   formatRelativeAge,
@@ -168,7 +172,30 @@ function OpenRiskMeta({
           {nearExit ? 'Opposing pressure' : 'Hard stop watching'}
         </dd>
       </div>
+      <PeakGivebackMeta openPosition={openPosition} />
     </dl>
+  );
+}
+
+function PeakGivebackMeta({ openPosition }: { openPosition: AlphaOmegaOpenPositionSnapshot }) {
+  const peak = openPosition.peakFavorablePips;
+  if (peak <= 0) return null;
+  const armed = peak >= ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS;
+  return (
+    <>
+      <div>
+        <dt>Peak favorable</dt>
+        <dd className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+          +{peak.toFixed(1)}p
+        </dd>
+      </div>
+      <div>
+        <dt>Giveback trail</dt>
+        <dd className="text-slate-800 dark:text-slate-200">
+          {armed ? `Armed · locks on ${ALPHAOMEGA_GIVEBACK_PIPS}p giveback` : `Arms at +${ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS}p`}
+        </dd>
+      </div>
+    </>
   );
 }
 

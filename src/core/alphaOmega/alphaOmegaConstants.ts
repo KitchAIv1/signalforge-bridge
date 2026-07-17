@@ -32,6 +32,18 @@ export const HARD_STOP_PIPS = 10;
 export const BACKSTOP_STREAK_LENGTH = ENTRY_STREAK_LENGTH;
 export const BACKSTOP_SPEED_CEILING_MIN = ENTRY_SPEED_CEILING_MIN;
 
+/**
+ * Exit: peak-favorable-giveback profit lock — additive, checked after the hard
+ * stop in the same 30s monitor cycle. Validated Jul 17 2026 research: +74% net
+ * pips on the post-freeze live-parity backtest (n=69->70), +76% ($1,798.94) on
+ * every real Lane B trade ever placed at these exact values. Does not change
+ * opposing-count/share/hard-stop/backstop — purely additive, kill-switched.
+ */
+export const ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS = 6;
+export const ALPHAOMEGA_GIVEBACK_PIPS = 3;
+/** When true, the giveback trail is active. Default off — flip via bridge_config. */
+export const ALPHAOMEGA_GIVEBACK_TRAIL_ENABLED_CONFIG_KEY = 'alpha_omega_giveback_trail_enabled';
+
 export const PIP_SIZE = 0.0001;
 
 export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
@@ -48,6 +60,7 @@ export const ALPHAOMEGA_CLOSE_OPPOSING_COUNT = 'alphaomega_opposing_count';
 export const ALPHAOMEGA_CLOSE_OPPOSING_SHARE = 'alphaomega_opposing_share';
 export const ALPHAOMEGA_CLOSE_HARD_STOP = 'alphaomega_hard_stop';
 export const ALPHAOMEGA_CLOSE_BACKSTOP_CRACK = 'alphaomega_backstop_crack';
+export const ALPHAOMEGA_CLOSE_PEAK_GIVEBACK_TRAIL = 'alphaomega_peak_giveback_trail';
 
 export function isOmegaLaneBBroker(brokerId: string | null | undefined): boolean {
   return brokerId === OMEGA_LANE_B_BROKER_ID;

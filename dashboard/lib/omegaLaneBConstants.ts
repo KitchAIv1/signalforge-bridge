@@ -21,3 +21,6 @@ export const ALPHAOMEGA_ENTRY_SPEED_FLOOR_MIN = 30;
 export const ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD = 5;
 export const ALPHAOMEGA_HARD_STOP_PIPS = 10;
 export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
+/** Peak-favorable-giveback profit lock — additive, kill-switched via alpha_omega_giveback_trail_enabled. */
+export const ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS = 6;
+export const ALPHAOMEGA_GIVEBACK_PIPS = 3;

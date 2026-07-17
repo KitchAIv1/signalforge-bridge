@@ -21,10 +21,11 @@ export interface AlphaOmegaScoreboardMetrics {
   exitOpposing: number;
   exitHardStop: number;
   exitBackstop: number;
+  exitGivebackTrail: number;
   exitOther: number;
 }
 
-type ExitKind = 'opposing' | 'hard_stop' | 'backstop' | 'other';
+type ExitKind = 'opposing' | 'hard_stop' | 'backstop' | 'giveback_trail' | 'other';
 type PipBucket = { sum: number; n: number };
 
 function startOfUtcDayMs(nowMs: number): number {
@@ -41,6 +42,7 @@ function classifyExit(closeReason: string | null): ExitKind {
   }
   if (closeReason === 'alphaomega_hard_stop') return 'hard_stop';
   if (closeReason === 'alphaomega_backstop_crack') return 'backstop';
+  if (closeReason === 'alphaomega_peak_giveback_trail') return 'giveback_trail';
   return 'other';
 }
 
@@ -61,6 +63,7 @@ function emptyMetrics(): AlphaOmegaScoreboardMetrics {
     exitOpposing: 0,
     exitHardStop: 0,
     exitBackstop: 0,
+    exitGivebackTrail: 0,
     exitOther: 0,
   };
 }
@@ -69,6 +72,7 @@ function addExitCount(metrics: AlphaOmegaScoreboardMetrics, exitKind: ExitKind):
   if (exitKind === 'opposing') metrics.exitOpposing += 1;
   else if (exitKind === 'hard_stop') metrics.exitHardStop += 1;
   else if (exitKind === 'backstop') metrics.exitBackstop += 1;
+  else if (exitKind === 'giveback_trail') metrics.exitGivebackTrail += 1;
   else metrics.exitOther += 1;
 }
 
