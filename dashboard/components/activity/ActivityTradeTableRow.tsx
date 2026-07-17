@@ -8,6 +8,7 @@ import { CloseTagButton } from '@/components/activity/CloseTagButton';
 import { OmegaLegTypeBadge } from '@/components/shared/OmegaLegTypeBadge';
 import { BrokerVenueBadge } from '@/components/shared/BrokerVenueBadge';
 import { formatCloseReason } from '@/lib/formatCloseReason';
+import { engineDisplayLabel } from '@/lib/engineDisplayLabel';
 
 export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
   const isExecuted = row.decision === 'EXECUTED';
@@ -37,7 +38,7 @@ export function ActivityTradeTableRow({ row }: { row: BridgeTradeLogRow }) {
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{formatActivityIsoTimestamp(row.created_at)}</td>
       <td className="px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100">
         <div className="flex flex-wrap items-center gap-1">
-          {row.engine_id}
+          {engineDisplayLabel(row.engine_id)}
           <OmegaLegTypeBadge legType={row.leg_type} />
           <BrokerVenueBadge brokerId={row.broker_id} />
         </div>

@@ -19,6 +19,7 @@ import { useBrokerFilterOptions } from '@/hooks/useBrokerFilterOptions';
 import { OandaConnectionStatus } from '@/components/OandaConnectionStatus';
 import { applyActivityBrokerScope } from '@/lib/activityTradeLogQuery';
 import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { engineDisplayLabel } from '@/lib/engineDisplayLabel';
 
 const PAGE_SIZE = 50;
 
@@ -212,7 +213,7 @@ export default function ActivityPage() {
           <option value="">All engines</option>
           {engines.map((id) => (
             <option key={id} value={id}>
-              {id}
+              {engineDisplayLabel(id)}
             </option>
           ))}
         </select>

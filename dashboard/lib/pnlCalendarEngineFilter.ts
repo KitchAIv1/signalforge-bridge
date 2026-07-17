@@ -17,6 +17,7 @@ export const PNL_CALENDAR_FILTER_KEYS = [
   'engine_rebuild',
   'scalper',
   'omega_inverse',
+  'pdl_window',
 ] as const;
 
 export type PnlCalendarFilterKey = (typeof PNL_CALENDAR_FILTER_KEYS)[number];
@@ -42,6 +43,7 @@ export const PNL_CALENDAR_FILTER_OPTIONS: readonly PnlCalendarFilterOption[] = [
   { key: 'engine_rebuild', label: 'Rebuild', colorKey: 'engine_rebuild' },
   { key: 'scalper', label: 'Scalper', colorKey: 'scalper' },
   { key: 'omega_inverse', label: 'Omega Inverse', colorKey: 'omega_inverse' },
+  { key: 'pdl_window', label: 'PDL Window', colorKey: 'pdl_window' },
 ];
 
 export function isOmegaLaneBTrade(trade: PnlTradeRow): boolean {
@@ -64,6 +66,7 @@ export function tradeMatchesCalendarFilter(
   if (trade.engine_id === 'engine_rebuild') return selected.has('engine_rebuild');
   if (trade.engine_id === 'scalper') return selected.has('scalper');
   if (trade.engine_id === 'omega_inverse') return selected.has('omega_inverse');
+  if (trade.engine_id === 'pdl_window') return selected.has('pdl_window');
   return false;
 }
 
@@ -93,5 +96,6 @@ export function calendarTradeEngineLabel(trade: PnlTradeRow): string {
   if (trade.engine_id === 'engine_rebuild') return 'Rebuild';
   if (trade.engine_id === 'omega_inverse') return 'Omega Inverse';
   if (trade.engine_id === 'scalper') return 'Scalper';
+  if (trade.engine_id === 'pdl_window') return 'PDL Window';
   return trade.engine_id;
 }

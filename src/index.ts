@@ -43,6 +43,7 @@ import {
 } from './services/audusdFade/FadeEngine.js';
 import { runPdlSweepDetection } from './services/pdlSweepDetector/pdlSweepDetectorService.js';
 import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeService.js';
+import { PdlWindowEngine } from './services/pdlWindow/PdlWindowEngine.js';
 import { runShadowTrailExitResolver } from './services/shadowTrailExit/shadowTrailExitService.js';
 import { runMt5StartupDiagnostics } from './services/broker/mt5StartupDiagnostics.js';
 import { resolveAmdOandaAccountId } from './services/amd/resolveAmdOandaAccountId.js';
@@ -250,15 +251,20 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
-  // 12:10 UTC Mon-Fri — PDL sweep shadow detection
+  // 12:10 UTC Mon-Fri — PDL sweep detection (+ optional live PDL Window entry)
   cron.schedule('10 12 * * 1-5', async () => {
     try {
       await runPdlSweepDetection();
     } catch (pdlSweepErr) {
       console.error('[PdlSweep] Detection cron error:', pdlSweepErr);
     }
+    try {
+      await PdlWindowEngine.runEntryOnce();
+    } catch (pdlWindowEntryErr) {
+      console.error('[PdlWindow] Entry cron error:', pdlWindowEntryErr);
+    }
   }, { timezone: 'UTC' });
-  logInfo('[cron] registered 10 12 * * 1-5 PDL sweep detection');
+  logInfo('[cron] registered 10 12 * * 1-5 PDL sweep detection (+ PdlWindow entry if enabled)');
 
   // 13:05 UTC Mon-Fri — PDL sweep outcome evaluation
   cron.schedule('5 13 * * 1-5', async () => {
@@ -341,6 +347,28 @@ async function main(): Promise<void> {
       `[AudFade] Engine registered — AUDUSD_FADE_ENABLED=true | OANDA account=${
         fadeAccount ?? 'SHARED (AUDUSD_FADE_OANDA_ACCOUNT_ID unset — risks cross-engine netting)'
       }`,
+    );
+  }
+
+  // PDL Window — always LONG 12:00–15:00 unless all-3-false; SL 20p.
+  // Shares Fade OANDA/MT5 accounts. OANDA blocks if Fade open; MT5 does not.
+  // Controlled by PDL_WINDOW_ENABLED. Separate interval from Fade (do not nest).
+  if (process.env.PDL_WINDOW_ENABLED === 'true') {
+    setInterval(() => {
+      void PdlWindowEngine.runMonitors().catch((e) =>
+        console.error('[PdlWindow] Monitor error:', e),
+      );
+    }, 30000);
+    cron.schedule('0 15 * * 1-5', () => {
+      void PdlWindowEngine.hardFlatten1500().catch((e) =>
+        console.error('[PdlWindow] HardFlatten error:', e),
+      );
+    }, { timezone: 'UTC' });
+    const pdlAccount = process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID;
+    logInfo(
+      `[PdlWindow] Engine registered — PDL_WINDOW_ENABLED=true | OANDA=${
+        pdlAccount ?? 'SHARED'
+      } | magic=88003 | OANDA fade-open guard ON | MT5 fade-open guard OFF`,
     );
   }
 

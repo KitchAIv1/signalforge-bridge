@@ -152,7 +152,7 @@ function HistoryTableShell({ children }: { children: ReactNode }) {
             <th className="px-3 py-2 text-left">Outcome</th>
             <th className="px-3 py-2 text-left">Correct</th>
             <th className="px-3 py-2 text-left">AMD tag</th>
-            <th className="px-3 py-2 text-left">Engine</th>
+            <th className="px-3 py-2 text-left">AMD dir</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{children}</tbody>

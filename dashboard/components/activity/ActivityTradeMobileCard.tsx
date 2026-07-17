@@ -6,6 +6,7 @@ import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat
 import { RegimeConfidenceBadge } from '@/components/RegimeConfidenceBadge';
 import { OmegaLegTypeBadge } from '@/components/shared/OmegaLegTypeBadge';
 import { BrokerVenueBadge } from '@/components/shared/BrokerVenueBadge';
+import { engineDisplayLabel } from '@/lib/engineDisplayLabel';
 
 interface ActivityTradeMobileCardProps {
   row: BridgeTradeLogRow;
@@ -45,7 +46,7 @@ export function ActivityTradeMobileCard({ row }: ActivityTradeMobileCardProps) {
         <div className="min-w-0 space-y-1">
           <div className="text-xs font-medium text-slate-600 dark:text-slate-400">{formatActivityIsoTimestamp(row.created_at)}</div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-900 dark:text-slate-100">
-            <span className="font-semibold">{row.engine_id}</span>
+            <span className="font-semibold">{engineDisplayLabel(row.engine_id)}</span>
             <OmegaLegTypeBadge legType={row.leg_type} />
             <BrokerVenueBadge brokerId={row.broker_id} />
             <span className="text-slate-700 dark:text-slate-400">{row.pair}</span>

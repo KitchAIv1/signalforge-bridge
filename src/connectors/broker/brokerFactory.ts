@@ -21,13 +21,15 @@ const MT5_BROKER_ACCOUNT_ENV: Record<string, string> = {
 const ENGINE_MAGIC: Record<string, number> = {
   omega: 88001,
   audusd_fade: 88002,
+  pdl_window: 88003,
 };
 
 function resolveOandaAccountId(engineId: string, brokerId?: string): string | undefined {
   if (brokerId === 'oanda_phase2_demo') {
     return process.env.OANDA_PHASE2_ACCOUNT_ID?.trim() || undefined;
   }
-  if (engineId === 'audusd_fade') {
+  // Share Fade's dedicated OANDA account — Fade behavior unchanged.
+  if (engineId === 'audusd_fade' || engineId === 'pdl_window') {
     return process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID ?? process.env.OANDA_ACCOUNT_ID;
   }
   return process.env.OANDA_ACCOUNT_ID;

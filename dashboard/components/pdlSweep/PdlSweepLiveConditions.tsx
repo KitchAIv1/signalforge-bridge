@@ -27,15 +27,56 @@ function ConditionPill({ label, met, value }: PillProps) {
 
 type LivePanelProps = {
   todayRow: PdlSweepSignalRow | null;
+  liveArmed: boolean;
+  paused: boolean;
 };
 
-export function PdlSweepLiveConditions({ todayRow }: LivePanelProps) {
-  const conditions = todayRow?.conditions_met as ConditionsMet | null;
-  const allMet = conditions?.pdl_breach && conditions?.london_down && conditions?.h11_up;
+function resolveBanner(
+  conditions: ConditionsMet | null,
+  liveArmed: boolean,
+  paused: boolean,
+): { text: string; active: boolean; noTrade: boolean } {
+  if (!conditions) {
+    return { text: '— Awaiting today 12:10 UTC detection', active: false, noTrade: false };
+  }
+  const allFalse =
+    !conditions.pdl_breach && !conditions.london_down && !conditions.h11_up;
+  if (allFalse) {
+    return { text: 'NO TRADE today — all three conditions false', active: false, noTrade: true };
+  }
+  if (paused) {
+    return {
+      text: 'LIVE LONG candidate — paused in Controls',
+      active: false,
+      noTrade: false,
+    };
+  }
+  if (liveArmed) {
+    return {
+      text: 'LIVE LONG candidate — 12:00–15:00 · SL 20p',
+      active: true,
+      noTrade: false,
+    };
+  }
+  return {
+    text: 'Research: trade candidate (live engine off)',
+    active: false,
+    noTrade: false,
+  };
+}
 
+export function PdlSweepLiveConditions({ todayRow, liveArmed, paused }: LivePanelProps) {
+  const conditions = todayRow?.conditions_met as ConditionsMet | null;
   const depth = todayRow?.pdl_sweep_depth_pips;
   const london = todayRow?.london_net_pips;
   const h11 = todayRow?.h11_net_pips;
+  const banner = resolveBanner(conditions, liveArmed, paused);
+
+  const bannerClass = banner.noTrade
+    ? 'rounded-md bg-slate-800 text-slate-200 px-4 py-3 text-sm font-semibold text-center'
+    : banner.active
+      ? 'rounded-md bg-emerald-700 text-white px-4 py-3 text-sm font-semibold text-center'
+      : 'rounded-md bg-slate-100 text-slate-600 px-4 py-3 text-sm text-center dark:bg-slate-800 dark:text-slate-400';
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-4 dark:border-slate-700 dark:bg-slate-900">
@@ -59,20 +100,11 @@ export function PdlSweepLiveConditions({ todayRow }: LivePanelProps) {
           value={h11 != null ? `${h11}p` : '—'}
         />
       </div>
-      <div
-        className={
-          allMet
-            ? 'rounded-md bg-red-600 text-white px-4 py-3 text-sm font-semibold text-center'
-            : 'rounded-md bg-slate-100 text-slate-600 px-4 py-3 text-sm text-center dark:bg-slate-800 dark:text-slate-400'
-        }
-      >
-        {allMet
-          ? 'SIGNAL ACTIVE — Predicted LONG 12:00–13:00'
-          : '— No signal today'}
-      </div>
+      <div className={bannerClass}>{banner.text}</div>
       <div className="text-xs text-slate-500 dark:text-slate-400">
-        AMD: {todayRow?.amd_outcome_tag ?? 'pending'} | Engine:{' '}
-        {todayRow?.decision_auto_direction ?? '—'}
+        AMD: {todayRow?.amd_outcome_tag ?? 'pending'} | AMD dir:{' '}
+        {todayRow?.decision_auto_direction ?? '—'} | Live engine: pdl_window
+        {paused ? ' (paused)' : liveArmed ? ' (armed)' : ' (off / waiting registration)'}
       </div>
     </div>
   );

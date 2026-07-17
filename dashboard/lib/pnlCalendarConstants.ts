@@ -19,6 +19,7 @@ export const PNL_CALENDAR_ENGINE_IDS = [
   'engine_amd',
   'omega_inverse',
   'audusd_fade',
+  'pdl_window',
 ] as const;
 
 export const ENGINE_COLORS: Record<string, string> = {
@@ -28,4 +29,5 @@ export const ENGINE_COLORS: Record<string, string> = {
   engine_amd: '#f59e0b',
   omega_inverse: '#c026d3',
   audusd_fade: '#0ea5e9',
+  pdl_window: '#14b8a6',
 };

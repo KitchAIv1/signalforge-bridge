@@ -14,6 +14,7 @@ const LIVE_ENGINE_ROWS = [
   { id: 'engine_amd', display: 'AMD' },
   { id: 'falcon', display: 'Falcon' },
   { id: 'sigma', display: 'Sigma' },
+  { id: 'pdl_window', display: 'PDL Window' },
 ] as const;
 
 interface EngineControlsProps {

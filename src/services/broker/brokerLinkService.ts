@@ -41,15 +41,16 @@ async function fetchBrokerRows(
 }
 
 function defaultOandaRoute(engineId: string): EngineBrokerRoute {
+  const usesFadeOanda =
+    engineId === 'audusd_fade' || engineId === 'pdl_window';
   return {
     brokerId: 'oanda_practice',
     broker: createOandaBroker({
       brokerId: 'oanda_practice',
       brokerType: 'oanda',
-      accountId:
-        engineId === 'audusd_fade'
-          ? process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID ?? process.env.OANDA_ACCOUNT_ID
-          : process.env.OANDA_ACCOUNT_ID,
+      accountId: usesFadeOanda
+        ? process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID ?? process.env.OANDA_ACCOUNT_ID
+        : process.env.OANDA_ACCOUNT_ID,
     }),
     capitalAllocationPct: 1,
   };
