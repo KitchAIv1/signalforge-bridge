@@ -9,6 +9,7 @@
 
 | Date | Change |
 |------|--------|
+| 2026-07-18 | AO live posture v1.2.1 — pure sizing ON, giveback ON, omega.weight 0.25 (migration `062`) |
 | 2026-07-17 | Docs refresh v1.2.0 — ALPHAOMEGA Lane B, dual-OANDA, giveback trail; see [CHANGELOG_July2026.md](./CHANGELOG_July2026.md) |
 | 2026-07-13 | Lane A RAW pure sizing + 1.5p peak giveback trail; migration 059 |
 | 2026-07-09 | Lane B rewired to ALPHAOMEGA (streak-crack entry / multi-exit); migration 057 |

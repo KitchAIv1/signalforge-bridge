@@ -12,7 +12,8 @@ Lane A (`oanda_practice`) is **not** governed by this document. See RAW Omega / 
 
 | Date | Change |
 |------|--------|
-| 2026-07-17 | Giveback trail (6p / 3p), flag off — migration `060`, commit `f266331` |
+| 2026-07-18 | Live posture: pure sizing ON, giveback ON, `omega.weight` 0.15→**0.25** — migration `062` |
+| 2026-07-17 | Giveback trail (6p / 3p) shipped — migration `060`, commit `f266331` (flag later enabled) |
 | 2026-07-16 | Negative `pnl_r` write + calendar display — `c5681dd` |
 | 2026-07-13 | Pure sizing flag — migration `058`, `fc1d9ea` |
 | 2026-07-09 | Initial ALPHAOMEGA rewire — migration `057`, `af799e4` |
@@ -21,7 +22,9 @@ Lane A (`oanda_practice`) is **not** governed by this document. See RAW Omega / 
 
 ## 1. Purpose
 
-ALPHAOMEGA replaces the early July Phase-2 R1/shadow gate experiment on Lane B with a **validated streak-crack entry** and a **multi-trigger exit stack** (opposing fires, hard stop, backstop crack, optional giveback trail). One Omega signal fan-out can still produce two `bridge_trade_log` rows (Lane A + Lane B); only Lane B uses ALPHAOMEGA decisions.
+ALPHAOMEGA replaces the early July Phase-2 R1/shadow gate experiment on Lane B with a **validated streak-crack entry** and a **multi-trigger exit stack** (opposing fires, hard stop, backstop crack, giveback trail). One Omega signal fan-out can still produce two `bridge_trade_log` rows (Lane A + Lane B); only Lane B uses ALPHAOMEGA decisions.
+
+**Live posture (2026-07-18, migration `062`):** pure sizing ON, giveback trail ON, shared `bridge_engines.omega.weight = 0.25` (also scales Lane A RAW).
 
 ---
 
@@ -98,7 +101,7 @@ Checked in combination of fire-path updates and the 30s hard-stop monitor. Giveb
 | Giveback trail | Peak ≥6p then give back 3p from peak | `alphaomega_peak_giveback_trail` |
 
 Giveback constants: `ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS = 6`, `ALPHAOMEGA_GIVEBACK_PIPS = 3`.  
-Config: `alpha_omega_giveback_trail_enabled` default **false** (migration `060`). **Apply `060` before enabling** — monitor selects `peak_favorable_pips`.
+Config: `alpha_omega_giveback_trail_enabled` — **live ON** (migration `062`; schema from `060`).
 
 ---
 
@@ -106,8 +109,17 @@ Config: `alpha_omega_giveback_trail_enabled` default **false** (migration `060`)
 
 | Mode | Config | Behavior |
 |------|--------|----------|
-| Default | `alpha_omega_pure_sizing = false` | Normal risk pipeline (AMD/news/confluence/graduated may apply) |
-| Pure | `alpha_omega_pure_sizing = true` | Base risk only; neutral confluence band for unit calc |
+| Legacy | `alpha_omega_pure_sizing = false` | May inherit/use confluence ±, graduated, AMD/news overlays |
+| **Live** | `alpha_omega_pure_sizing = true` | `equity × weight × riskPct / signal SL`; confluence forced neutral (80); no graduated/AMD/news on Lane B |
+
+| Parameter | Live value | Notes |
+|-----------|------------|-------|
+| `bridge_engines.omega.weight` | **0.25** | Shared with Lane A RAW |
+| `risk_per_trade_pct` | 0.03 | Global |
+| Risk $ @ $100k equity | **$750**/trade | `100000 × 0.25 × 0.03` |
+| SL used for units | Signal SL | Not the 10p hard-stop distance |
+
+Lane A uses separate flag `omega_raw_pure_sizing` — do not confuse with AO pure sizing.
 
 ---
 
@@ -131,12 +143,13 @@ On validated close, Lane B writes `pnl_pips`, `pnl_dollars`, and **`pnl_r`** (in
 
 ## 8. Enablement checklist
 
-1. Migrations `055` → `057` → `058` → `060` applied (and `059` only if Lane A RAW trail desired).
+1. Migrations `055` → `057` → `058` → `060` → **`062`** applied (and `059` if Lane A RAW trail desired).
 2. Env: `OANDA_PHASE2_ACCOUNT_ID` set on Railway.
 3. `bridge_links`: `oanda_phase2_demo` active for omega.
-4. Confirm `alpha_omega_enabled = true`.
-5. Optionally set `alpha_omega_pure_sizing` / `alpha_omega_giveback_trail_enabled`.
-6. Restart bridge after schema changes that affect monitors.
+4. Confirm live flags: `alpha_omega_enabled`, `alpha_omega_pure_sizing`, `alpha_omega_giveback_trail_enabled` all **true**.
+5. Confirm `bridge_engines.omega.weight = 0.25` (shared with Lane A).
+6. Next Lane B fill: `lane_advisory` contains `sizing=pure`; giveback closes use `alphaomega_peak_giveback_trail`.
+7. Restart bridge after schema migrations that affect monitors (`060` column).
 
 ### Rollback (execution only)
 
@@ -155,6 +168,6 @@ Or set `alpha_omega_enabled` to `false` (falls back to legacy Lane B behavior pe
 |----------|------|
 | Constants | `src/core/alphaOmega/alphaOmegaConstants.ts` |
 | Hard-stop + giveback monitor | `src/monitoring/alphaOmegaHardStopMonitor.ts` |
-| Migrations | `migrations/057_*.sql` … `060_*.sql` |
+| Migrations | `migrations/057_*.sql` … `062_*.sql` |
 | Ops rollout | [OMEGA_LANE_B_ROLLOUT.md](./OMEGA_LANE_B_ROLLOUT.md) |
 | July audit | [CHANGELOG_July2026.md](./CHANGELOG_July2026.md) |

@@ -16,7 +16,7 @@ Veredix is the trading operations system built around the SignalForge Bridge. Th
 
 ## Source Of Truth
 
-This documentation reflects the current repository behavior as of **July 2026 (bridge v1.2.0)**. For the July commit audit and ALPHAOMEGA/Lane B contract, start with:
+This documentation reflects the current repository behavior as of **July 2026 (bridge v1.2.1)**. For the July commit audit and ALPHAOMEGA/Lane B contract, start with:
 
 - [CHANGELOG_July2026.md](../CHANGELOG_July2026.md)
 - [ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md](../ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md)

@@ -94,6 +94,8 @@ These are research or engine-owned sources. Product docs should not assume the b
 | `058_alphaomega_pure_sizing.sql` | `alpha_omega_pure_sizing` flag. |
 | `059_omega_raw_pure_sizing_15p_trail.sql` | Lane A RAW pure sizing + 1.5p peak giveback trail. |
 | `060_alphaomega_giveback_trail.sql` | `peak_favorable_pips` + `alpha_omega_giveback_trail_enabled` (default false). |
+| `061_pdl_window_engine.sql` | PDL Window engine (separate product path). |
+| `062_alphaomega_live_posture_weight025.sql` | AO live posture: `omega.weight=0.25`, pure sizing ON, giveback ON. |
 
 See [ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md](../ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md) and [CHANGELOG_July2026.md](../CHANGELOG_July2026.md).
 
@@ -143,8 +145,8 @@ Base keys from `002_bridge_config_defaults.sql`:
 | `direction_mode` | `manual` or `auto` Omega direction mode. |
 | `presence_last_seen` | Dashboard presence heartbeat while Activity is open. |
 | `alpha_omega_enabled` | Lane B ALPHAOMEGA master kill switch. |
-| `alpha_omega_pure_sizing` | When true, Lane B sizes at base risk only. |
-| `alpha_omega_giveback_trail_enabled` | When true, Lane B 6p peak / 3p giveback trail. |
+| `alpha_omega_pure_sizing` | When true, Lane B sizes at base risk only (live **true** as of migration `062`). |
+| `alpha_omega_giveback_trail_enabled` | When true, Lane B 6p peak / 3p giveback trail (live **true** as of migration `062`). |
 
 ## Environment Variables
 

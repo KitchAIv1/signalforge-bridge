@@ -1,9 +1,9 @@
-# Changelog — July 2026 (v1.2.0)
+# Changelog — July 2026 (v1.2.1)
 
 **SignalForge / Veredix Bridge**
-**Window:** 2026-07-01 → 2026-07-17  
-**Baseline docs:** last substantive `docs/` touch before this refresh was AMD trail (`d9d7f89`, 2026-07-08). Lane B rollout doc was still W0 shadow-gate era and is superseded.  
-**Package version:** `1.0.0` → `1.2.0`
+**Window:** 2026-07-01 → 2026-07-18  
+**Baseline docs:** last substantive `docs/` touch before the Jul 17 refresh was AMD trail (`d9d7f89`, 2026-07-08).  
+**Package version:** `1.0.0` → `1.2.0` → **`1.2.1`**
 
 ---
 
@@ -43,9 +43,10 @@ Lane B (`oanda_phase2_demo`) evolved from a Phase-2 shadow-gate experiment into 
 | 07-13 | `fc1d9ea` | Pure Lane B sizing flag (`058`) + stable scoreboard metrics |
 | 07-16 | `c5681dd` | Write/display negative AO `pnl_r` (calendar was showing `+0.00`) |
 | 07-16 | `684f9f9` | Keep `*.test.ts` out of production `tsc` (Railway) |
-| 07-17 | `f266331` | Peak-favorable giveback trail (`060`); **flag off by default** |
+| 07-17 | `f266331` | Peak-favorable giveback trail (`060`); flag later enabled live |
+| 07-18 | ops + `062` | **Live posture:** pure sizing ON, giveback ON, `omega.weight` **0.25** |
 
-### ALPHAOMEGA live contract (as of 2026-07-17)
+### ALPHAOMEGA live contract (as of 2026-07-18)
 
 | Concern | Value | Notes |
 |---------|-------|-------|
@@ -56,8 +57,10 @@ Lane B (`oanda_phase2_demo`) evolved from a Phase-2 shadow-gate experiment into 
 | Opposing share | 100% after ≥4 fires | Backup |
 | Hard stop | 10 pips | M5 bar check, 30s monitor |
 | Backstop crack | Same 7/45 as entry | Own-direction reconfirm then crack |
-| Giveback trail | arm 6p / giveback 3p | `alpha_omega_giveback_trail_enabled` default **false** |
-| Pure sizing | base risk only | `alpha_omega_pure_sizing` (migration `058`) |
+| Giveback trail | arm 6p / giveback 3p | **`alpha_omega_giveback_trail_enabled = true`** |
+| Pure sizing | base risk only | **`alpha_omega_pure_sizing = true`** (Lane B only) |
+| Engine weight | **0.25** | `bridge_engines.omega.weight` — **shared with Lane A RAW** |
+| Risk @ $100k | **$750**/trade | `equity × 0.25 × 0.03` |
 
 ---
 
@@ -116,8 +119,10 @@ Also covered under ALPHAOMEGA: scoreboard, Open Risk, streak radar, dual-lane Ov
 | 058 | `058_alphaomega_pure_sizing.sql` | `alpha_omega_pure_sizing` |
 | 059 | `059_omega_raw_pure_sizing_15p_trail.sql` | Lane A RAW pure sizing + 1.5p trail |
 | 060 | `060_alphaomega_giveback_trail.sql` | `peak_favorable_pips` + giveback flag |
+| 062 | `062_alphaomega_live_posture_weight025.sql` | Weight 0.25 + pure sizing ON + giveback ON |
 
-\* Two files share the `054_` prefix — apply both if not already applied.
+\* Two files share the `054_` prefix — apply both if not already applied.  
+\* `061` is PDL Window engine (separate from AO posture).
 
 ---
 
@@ -143,8 +148,8 @@ Also covered under ALPHAOMEGA: scoreboard, Open Risk, streak radar, dual-lane Ov
 
 | Field | Value |
 |-------|-------|
-| npm `package.json` version | **1.2.0** |
-| ALPHAOMEGA reference | **v1.0.0** (July 2026) |
-| Suggested git tag | `v1.2.0` (create when you cut the release) |
+| npm `package.json` version | **1.2.1** |
+| ALPHAOMEGA reference | **v1.0.0** (July 2026; live posture 2026-07-18) |
+| Suggested git tag | `v1.2.1` |
 
-Bump rule used here: **minor** for shippable dual-lane + ALPHAOMEGA + giveback capability; patch reserved for hotfixes after tag.
+Bump rule: **1.2.0** = dual-lane + ALPHAOMEGA + giveback capability; **1.2.1** = live posture docs + migration `062` (weight 0.25, flags ON).

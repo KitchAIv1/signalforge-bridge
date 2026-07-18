@@ -1,6 +1,6 @@
 # SignalForge / Veredix Docs
 
-**Bridge version:** `1.2.0` (July 2026)
+**Bridge version:** `1.2.1` (July 2026)
 
 ## Start here
 
@@ -8,9 +8,18 @@
 |-----|-----------------|
 | [CHANGELOG_July2026.md](./CHANGELOG_July2026.md) | What shipped since last docs refresh (commit audit) |
 | [ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md](./ENGINE_ALPHAOMEGA_Reference_v1_0_0_July2026.md) | Lane B ALPHAOMEGA entry/exit/config |
-| [OMEGA_LANE_B_ROLLOUT.md](./OMEGA_LANE_B_ROLLOUT.md) | Dual-lane ops, flags, rollback |
+| [OMEGA_LANE_B_ROLLOUT.md](./OMEGA_LANE_B_ROLLOUT.md) | Dual-lane ops, **live posture**, rollback |
 | [SYSTEM_Architecture_May2026.md](./SYSTEM_Architecture_May2026.md) | Crons, engines, tables, env |
 | [veredix/README.md](./veredix/README.md) | Product doc set (PRD → runbook) |
+
+## ALPHAOMEGA live posture (2026-07-18)
+
+| Flag / setting | Value |
+|----------------|-------|
+| Pure sizing | ON |
+| Giveback trail 6p/3p | ON |
+| `omega.weight` | **0.25** (shared Lane A + B) |
+| Migration | `062_alphaomega_live_posture_weight025.sql` |
 
 ## Engine / service references
 
@@ -22,6 +31,6 @@
 
 ## Versioning
 
-- npm: `package.json` → `1.2.0`
-- Suggested git tag when you cut release: `v1.2.0`
+- npm: `package.json` → `1.2.1`
+- Suggested git tag: `v1.2.1`
 - Domain refs keep their own `vX.Y.Z` (e.g. ALPHAOMEGA `v1.0.0`)
