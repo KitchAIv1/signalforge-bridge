@@ -1,12 +1,14 @@
 /**
- * ALPHAOMEGA fire observer — counts every Omega Bridge signal toward streak /
- * opposing-pressure state BEFORE validateSignal (incl. the 4-pip floor).
- * Matches the validated research fire stream (EXECUTED + BLOCKED alike).
+ * ALPHAOMEGA fire observer — counts open-session Omega Bridge signals toward
+ * streak / opposing-pressure BEFORE validateSignal (incl. the 4-pip floor).
+ * Closed-market (weekend) inserts are ignored so ghost fires cannot arm/crack.
+ * Open-session EXECUTED + BLOCKED alike still match the research fire stream.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SignalInsertPayload } from '../../connectors/supabase.js';
 import { logWarn } from '../../utils/logger.js';
+import { isForexMarketOpen } from '../../utils/time.js';
 import { ALPHAOMEGA_ENABLED_CONFIG_KEY } from './alphaOmegaConstants.js';
 import { trackFireAgainstOpenPositions } from './alphaOmegaPositionTracking.js';
 import {
@@ -19,6 +21,17 @@ import {
   readOmegaFireTimestamp,
   readOmegaSignalId,
 } from './alphaOmegaFireIdentity.js';
+
+/** Matches bridgeConfig default for weekendCloseBufferMinutes. */
+const DEFAULT_OBSERVE_MARKET_BUFFER_MINUTES = 30;
+
+/** True only when FX session is open — closed-session ghosts must not touch streak. */
+export function shouldObserveAlphaOmegaFire(
+  now: Date = new Date(),
+  bufferMinutes: number = DEFAULT_OBSERVE_MARKET_BUFFER_MINUTES,
+): boolean {
+  return isForexMarketOpen(now, bufferMinutes);
+}
 
 export interface AlphaOmegaFireOutcome {
   crackEvent: CrackEvent | null;
@@ -52,6 +65,7 @@ export async function observeAlphaOmegaFire(
   payload: SignalInsertPayload,
 ): Promise<AlphaOmegaFireOutcome> {
   if (!isOmegaEnginePayload(payload)) return EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
+  if (!shouldObserveAlphaOmegaFire()) return EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
   try {
     if (!(await isAlphaOmegaEnabled(supabase))) return EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
     return await recordObservedOmegaFire(supabase, payload);

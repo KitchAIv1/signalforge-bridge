@@ -386,9 +386,20 @@ export async function processSignal(
   const { config, engines, getCachedAccount, getOpenTradesFromLog, supabase } = deps;
   const signalId = (payload.id ?? '').toString();
 
-  // ALPHAOMEGA: count EVERY Omega fire at the soonest router entry — before
-  // stale / 4-pip / other gates — matching validated research fire stream.
+  // ALPHAOMEGA: count open-session Omega fires at router entry (before 4-pip).
+  // Closed-market ghosts are no-ops inside observe (streak frozen / retained).
   const alphaOmegaFireOutcome = await observeOmegaFireIfNeeded(supabase, payload);
+
+  // Omega: reject closed-session inserts before rSize / Lane B crack side paths.
+  if (
+    payload.engine_id === 'omega' &&
+    !isForexMarketOpen(new Date(), config.weekendCloseBufferMinutes)
+  ) {
+    await supabase.from('bridge_trade_log').insert(
+      buildTradeLogRow(payload, 'BLOCKED', 'Forex market closed', null, null, 0, undefined),
+    );
+    return;
+  }
 
   const staleAge = Date.now() - new Date((payload.created_at ?? 0).toString()).getTime();
   if (staleAge > config.staleSignalMaxAgeMs) {
