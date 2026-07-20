@@ -51,6 +51,11 @@ export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
 export const ALPHAOMEGA_PURE_SIZING_CONFIG_KEY = 'alpha_omega_pure_sizing';
 /** Confluence score that leaves calculateUnits riskPct unscaled (bands are <75 and >=85). */
 export const ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE = 80;
+/**
+ * Fillability guard for pure signal-SL sizing: tiny SLs can request multi‑million
+ * units and hit INSUFFICIENT_MARGIN. Cap preserves ~$7k-style book; Lane B AO only.
+ */
+export const ALPHAOMEGA_PURE_MAX_ABS_UNITS = 3_000_000;
 
 export const ALPHAOMEGA_BLOCK_NO_CRACK = 'ALPHAOMEGA_NO_QUALIFYING_CRACK';
 export const ALPHAOMEGA_BLOCK_SPEED_FLOOR = 'ALPHAOMEGA_SPEED_FLOOR';

@@ -1,11 +1,14 @@
 /**
- * Lane B ALPHAOMEGA-only position size: equity × weight × riskPct / SL.
+ * Lane B ALPHAOMEGA-only position size: equity × weight × riskPct / signal SL.
  * Ignores AMD, news, confluence ±, and graduated consecutive-loss cuts.
+ * Abs units capped (ALPHAOMEGA_PURE_MAX_ABS_UNITS) so sub‑4p cracks still fill.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateUnits } from '../positionSizer.js';
+import { logWarn } from '../../utils/logger.js';
 import {
+  ALPHAOMEGA_PURE_MAX_ABS_UNITS,
   ALPHAOMEGA_PURE_SIZING_CONFIG_KEY,
   ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE,
 } from './alphaOmegaConstants.js';
@@ -36,6 +39,16 @@ export async function isAlphaOmegaPureSizingEnabled(
   return data.config_value === true || data.config_value === 'true';
 }
 
+/** Cap absolute units; preserves sign. Pure Lane B AO only (callers of this module). */
+export function clampAlphaOmegaPureUnits(
+  signedUnits: number,
+  maxAbsUnits: number = ALPHAOMEGA_PURE_MAX_ABS_UNITS,
+): number {
+  const absUnits = Math.abs(signedUnits);
+  if (absUnits <= maxAbsUnits) return signedUnits;
+  return signedUnits < 0 ? -maxAbsUnits : maxAbsUnits;
+}
+
 export function sizeAlphaOmegaPureUnits(params: AlphaOmegaPureSizeParams): number {
   const alloc = params.capitalAllocationPct > 0 ? params.capitalAllocationPct : 1;
   const unitCount = calculateUnits({
@@ -51,7 +64,17 @@ export function sizeAlphaOmegaPureUnits(params: AlphaOmegaPureSizeParams): numbe
     conversionRate: params.conversionRate,
     slPipsOverride: params.slPipsOverride,
   });
-  return params.direction.toUpperCase() === 'LONG' ? unitCount : -unitCount;
+  const signed =
+    params.direction.toUpperCase() === 'LONG' ? unitCount : -unitCount;
+  const clamped = clampAlphaOmegaPureUnits(signed);
+  if (clamped !== signed) {
+    logWarn('[AlphaOmega] Pure units capped for fillability', {
+      uncappedUnits: signed,
+      cappedUnits: clamped,
+      maxAbsUnits: ALPHAOMEGA_PURE_MAX_ABS_UNITS,
+    });
+  }
+  return clamped;
 }
 
 export function withPureSizingAdvisory(laneAdvisory: string): string {

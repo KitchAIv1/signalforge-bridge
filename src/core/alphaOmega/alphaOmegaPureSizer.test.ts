@@ -6,11 +6,15 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { calculateUnits } from '../positionSizer.js';
 import {
+  clampAlphaOmegaPureUnits,
   isAlphaOmegaEntryAdvisory,
   sizeAlphaOmegaPureUnits,
   withPureSizingAdvisory,
 } from './alphaOmegaPureSizer.js';
-import { ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE } from './alphaOmegaConstants.js';
+import {
+  ALPHAOMEGA_PURE_MAX_ABS_UNITS,
+  ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE,
+} from './alphaOmegaConstants.js';
 
 const BASE = {
   routeEquity: 96000,
@@ -68,6 +72,34 @@ describe('sizeAlphaOmegaPureUnits', () => {
       sizeAlphaOmegaPureUnits({ ...BASE, direction: 'LONG', capitalAllocationPct: 0.5 }),
     );
     assert.ok(Math.abs(half / full - 0.5) < 0.02);
+  });
+
+  it('caps abs units at ALPHAOMEGA_PURE_MAX_ABS_UNITS (tonight-style tiny SL)', () => {
+    // ~1.3p SL @ weight 0.25 / ~98k equity uncapped ~5.6M → must clamp
+    const capped = sizeAlphaOmegaPureUnits({
+      routeEquity: 97961,
+      engineWeight: 0.25,
+      riskPct: 0.03,
+      entry: 0.69762,
+      stopLoss: 0.69775,
+      instrument: 'AUD_USD',
+      direction: 'SHORT',
+      capitalAllocationPct: 1,
+      slPipsOverride: 1.3,
+    });
+    assert.equal(capped, -ALPHAOMEGA_PURE_MAX_ABS_UNITS);
+  });
+});
+
+describe('clampAlphaOmegaPureUnits', () => {
+  it('leaves units under the cap unchanged', () => {
+    assert.equal(clampAlphaOmegaPureUnits(2_500_000), 2_500_000);
+    assert.equal(clampAlphaOmegaPureUnits(-2_500_000), -2_500_000);
+  });
+
+  it('clamps above the cap and keeps sign', () => {
+    assert.equal(clampAlphaOmegaPureUnits(5_651_613), ALPHAOMEGA_PURE_MAX_ABS_UNITS);
+    assert.equal(clampAlphaOmegaPureUnits(-5_651_613), -ALPHAOMEGA_PURE_MAX_ABS_UNITS);
   });
 });
 
