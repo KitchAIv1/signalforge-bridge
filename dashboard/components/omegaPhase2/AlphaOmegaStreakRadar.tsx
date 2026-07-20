@@ -14,7 +14,7 @@ import {
 import {
   armWindowFillPercent,
   describeArmingStatus,
-  minutesSinceIso,
+  foundingSpanMinutes,
   streakThresholdSlots,
 } from '@/lib/alphaOmegaStreakDisplay';
 
@@ -50,9 +50,13 @@ function StreakRadarBody({ streak }: { streak: AlphaOmegaStreakSnapshot }) {
 
   const length = streak.currentStreakLength;
   const dirLabel = streak.currentStreakDirection?.toUpperCase() ?? '—';
-  const streakAgeMin = minutesSinceIso(streak.currentStreakStartAt, nowMs);
+  // Arm window = founding span (start→last fire), matching live processFireForStreak.
+  const foundingMin = foundingSpanMinutes(
+    streak.currentStreakStartAt,
+    streak.lastFireAt,
+  );
   const { filledSlots, overflow } = streakThresholdSlots(length, ALPHAOMEGA_ENTRY_STREAK_LENGTH);
-  const status = describeArmingStatus(streak, streakAgeMin);
+  const status = describeArmingStatus(streak, foundingMin);
   const railAccent = streak.armed ? 'amber' : status.tone === 'too_slow' ? 'rose' : 'sky';
 
   return (
@@ -67,7 +71,7 @@ function StreakRadarBody({ streak }: { streak: AlphaOmegaStreakSnapshot }) {
           label={`Streak ${filledSlots} of ${ALPHAOMEGA_ENTRY_STREAK_LENGTH}`}
         />
       </div>
-      <ArmWindowMeter streakAgeMin={streakAgeMin} armed={streak.armed} tooSlow={status.tone === 'too_slow'} />
+      <ArmWindowMeter foundingMin={foundingMin} armed={streak.armed} tooSlow={status.tone === 'too_slow'} />
       {status.reason ? (
         <p
           className={`mt-2 text-xs ${
@@ -116,20 +120,20 @@ function StreakHeader({
 }
 
 function ArmWindowMeter({
-  streakAgeMin,
+  foundingMin,
   armed,
   tooSlow,
 }: {
-  streakAgeMin: number | null;
+  foundingMin: number | null;
   armed: boolean;
   tooSlow: boolean;
 }) {
-  const fill = armWindowFillPercent(streakAgeMin);
-  const ageLabel = streakAgeMin != null ? `${streakAgeMin.toFixed(0)}m` : '—';
+  const fill = armWindowFillPercent(foundingMin);
+  const ageLabel = foundingMin != null ? `${foundingMin.toFixed(0)}m` : '—';
   return (
     <div className="mt-3">
       <div className="mb-1 flex justify-between text-[11px] text-slate-500">
-        <span>Arm window</span>
+        <span>Arm window (start→last fire)</span>
         <span className="tabular-nums">
           {ageLabel} / {ALPHAOMEGA_ENTRY_SPEED_CEILING_MIN}m
         </span>

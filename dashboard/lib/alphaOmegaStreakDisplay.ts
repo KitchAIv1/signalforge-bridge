@@ -9,6 +9,7 @@ import {
   ALPHAOMEGA_ENTRY_SPEED_CEILING_MIN,
   ALPHAOMEGA_ENTRY_STREAK_LENGTH,
 } from '@/lib/omegaLaneBConstants';
+export { foundingSpanMinutes } from '@/lib/foundingSpanMinutes';
 
 export function minutesSinceIso(isoTimestamp: string | null | undefined, nowMs: number): number | null {
   if (!isoTimestamp) return null;
