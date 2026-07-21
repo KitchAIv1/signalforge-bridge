@@ -160,6 +160,10 @@ export async function runTradeMonitor(
           storedTakeProfit,
         );
       }
+      // Lane B AO closes often race tradeMonitor; never leave close_reason blank.
+      if (!closeReason && isOmegaLaneBBroker(brokerId)) {
+        closeReason = 'external_close';
+      }
       if (legType === 'tp2') {
         await deleteTp2FloorState(supabase, tid);
       }
