@@ -7,7 +7,7 @@ export type PnlTradeRow = {
   direction: string;
   result: string;
   pnl_r: number | null;
-  /** Used to derive R for Lane B AO rows that closed before pnl_r was written. */
+  /** Canonical Lane B AO calendar R uses pnl_pips / hard-stop (not stored pnl_r). */
   pnl_pips: number | null;
   pnl_dollars: number | null;
   close_reason: string | null;
