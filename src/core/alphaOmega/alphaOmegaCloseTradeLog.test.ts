@@ -65,7 +65,6 @@ const openLogRow = {
   stop_loss: 0.70174,
   units: 3_000_000,
   direction: 'LONG',
-  r_size_raw: 0.00014,
 };
 
 describe('isAlphaOmegaCloseReason', () => {

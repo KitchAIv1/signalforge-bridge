@@ -15,7 +15,6 @@ export interface AlphaOmegaCloseLogRow {
   stop_loss: number | null;
   units: number | null;
   direction: string | null;
-  r_size_raw: number | null;
 }
 
 export interface PersistAlphaOmegaClosedTradeLogParams {
@@ -28,8 +27,9 @@ export interface PersistAlphaOmegaClosedTradeLogParams {
   pnlPips: number | null;
 }
 
+/** bridge_trade_log has no r_size_raw — selecting it 404s the whole row lookup. */
 const LOG_ROW_SELECT =
-  'id, status, close_reason, fill_price, stop_loss, units, direction, r_size_raw';
+  'id, status, close_reason, fill_price, stop_loss, units, direction';
 
 export function isAlphaOmegaCloseReason(closeReason: string | null | undefined): boolean {
   return (closeReason ?? '').startsWith('alphaomega_');
@@ -143,7 +143,7 @@ function buildClosedTradeLogPayload(
     exitPrice: params.exitPriceNum,
     fillPrice: logRow.fill_price != null ? Number(logRow.fill_price) : null,
     direction: logRow.direction,
-    rSizeRaw: logRow.r_size_raw != null ? Number(logRow.r_size_raw) : null,
+    rSizeRaw: null,
     pnlPips: params.pnlPips,
     pnlDollars,
     stopLoss: logRow.stop_loss != null ? Number(logRow.stop_loss) : null,

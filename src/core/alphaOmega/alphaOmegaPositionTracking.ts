@@ -102,20 +102,20 @@ export async function closeAlphaOmegaPosition(
       position.oanda_trade_id,
     );
     const pnlPips = computePnlPips(position, exitPriceNum);
-    await persistAlphaOmegaClosedTradeLog(supabase, {
-      oandaTradeId: position.oanda_trade_id,
-      brokerId: position.broker_id,
+    const logTagged = await persistAndClearPositionState({
+      supabase,
+      position,
       reason,
       closedAt,
       exitPriceNum,
       pnlDollars,
       pnlPips,
     });
-    await supabase.from('alpha_omega_position_state').delete().eq('oanda_trade_id', position.oanda_trade_id);
     logInfo('[AlphaOmega] Closed Lane B position', {
       oandaTradeId: position.oanda_trade_id,
       reason,
       pnlDollars,
+      logTagged,
     });
     void sendAlphaOmegaClosedAlert({
       supabase,
@@ -134,6 +134,37 @@ export async function closeAlphaOmegaPosition(
       error: String(err),
     });
   }
+}
+
+/** Persist close tag first; only then drop position_state (avoids Flat-vs-open ghost). */
+async function persistAndClearPositionState(params: {
+  supabase: SupabaseClient;
+  position: AlphaOmegaPositionRow;
+  reason: string;
+  closedAt: string;
+  exitPriceNum: number | null;
+  pnlDollars: number | null;
+  pnlPips: number | null;
+}): Promise<boolean> {
+  const { supabase, position, reason, closedAt, exitPriceNum, pnlDollars, pnlPips } = params;
+  const logTagged = await persistAlphaOmegaClosedTradeLog(supabase, {
+    oandaTradeId: position.oanda_trade_id,
+    brokerId: position.broker_id,
+    reason,
+    closedAt,
+    exitPriceNum,
+    pnlDollars,
+    pnlPips,
+  });
+  if (logTagged) {
+    await supabase.from('alpha_omega_position_state').delete().eq('oanda_trade_id', position.oanda_trade_id);
+    return true;
+  }
+  logWarn('[AlphaOmega] Broker closed but log tag failed — keeping position_state', {
+    oandaTradeId: position.oanda_trade_id,
+    reason,
+  });
+  return false;
 }
 
 function computePnlPips(

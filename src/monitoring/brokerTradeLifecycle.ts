@@ -3,6 +3,7 @@
  */
 
 import type { BrokerClient } from '../connectors/broker/types.js';
+import { getClosedTradeDetails } from '../connectors/oanda.js';
 import { normalizeBrokerTimestamp } from '../connectors/broker/normalizeBrokerTimestamp.js';
 
 export interface ClosedTradeSnapshot {
@@ -24,11 +25,30 @@ export async function closeTradeViaBroker(
   };
 }
 
+/**
+ * Resolve close details for a trade missing from the open list.
+ * OANDA: use getClosedTradeDetails (trade-by-id + transactions fallback) so
+ * purged CLOSED trades (404 on /trades/{id}) still finalize — Lane B #210.
+ * MT5: keep getTradeById only.
+ */
 export async function fetchClosedTradeSnapshotViaBroker(
   broker: BrokerClient,
   tradeId: string,
-  _openTime: string,
+  openTime: string,
 ): Promise<ClosedTradeSnapshot> {
+  if (broker.brokerType === 'oanda') {
+    const details = await getClosedTradeDetails(
+      tradeId,
+      openTime,
+      oandaAccountIdForBroker(broker.brokerId),
+    );
+    return {
+      closedTime: details.closedTime,
+      exitPrice: details.exitPrice,
+      pnlDollars: details.pnlDollars,
+    };
+  }
+
   const trade = await broker.getTradeById(tradeId);
   if (!trade || trade.state !== 'CLOSED') {
     return { closedTime: null, exitPrice: null, pnlDollars: null };
@@ -38,4 +58,11 @@ export async function fetchClosedTradeSnapshotViaBroker(
     exitPrice: trade.averageClosePrice,
     pnlDollars: trade.realizedPL,
   };
+}
+
+function oandaAccountIdForBroker(brokerId: string): string | undefined {
+  if (brokerId === 'oanda_phase2_demo') {
+    return process.env.OANDA_PHASE2_ACCOUNT_ID?.trim() || undefined;
+  }
+  return undefined;
 }
