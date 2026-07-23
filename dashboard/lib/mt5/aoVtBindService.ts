@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { OMEGA_AO_VT_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { normalizeMt5SymbolSuffix } from '@/lib/mt5/mt5SymbolSuffix';
 
 export interface AoVtBrokerSnapshot {
   brokerId: string;
@@ -13,6 +14,7 @@ export interface AoVtBrokerSnapshot {
   connectionStatus: string | null;
   lastHeartbeatAt: string | null;
   linkActive: boolean;
+  symbolSuffix: string | null;
 }
 
 function mapBrokerSnapshot(
@@ -27,15 +29,19 @@ function mapBrokerSnapshot(
     connectionStatus: (broker.connection_status as string | null) ?? null,
     lastHeartbeatAt: (broker.last_heartbeat_at as string | null) ?? null,
     linkActive,
+    symbolSuffix: (broker.symbol_suffix as string | null) ?? null,
   };
 }
+
+const BROKER_SELECT =
+  'broker_id, display_name, account_id, is_active, connection_status, last_heartbeat_at, symbol_suffix';
 
 export async function loadAoVtBrokerSnapshot(
   supabase: SupabaseClient,
 ): Promise<AoVtBrokerSnapshot | null> {
   const { data: broker, error } = await supabase
     .from('bridge_brokers')
-    .select('broker_id, display_name, account_id, is_active, connection_status, last_heartbeat_at')
+    .select(BROKER_SELECT)
     .eq('broker_id', OMEGA_AO_VT_BROKER_ID)
     .maybeSingle();
   if (error || !broker) return null;
@@ -53,12 +59,17 @@ export async function loadAoVtBrokerSnapshot(
 export async function persistAoVtBindSuccess(
   supabase: SupabaseClient,
   metaApiAccountId: string,
+  symbolSuffix: string,
 ): Promise<void> {
+  const normalized = normalizeMt5SymbolSuffix(symbolSuffix);
+  if (!normalized) throw new Error('Invalid symbol suffix — use -STD, -VIP, or -ECN');
+
   const now = new Date().toISOString();
   const { error: brokerError } = await supabase
     .from('bridge_brokers')
     .update({
       account_id: metaApiAccountId,
+      symbol_suffix: normalized,
       is_active: true,
       connection_status: 'connected',
       last_heartbeat_at: now,
@@ -73,6 +84,21 @@ export async function persistAoVtBindSuccess(
     .eq('engine_id', 'omega')
     .eq('broker_id', OMEGA_AO_VT_BROKER_ID);
   if (linkError) throw new Error(linkError.message);
+}
+
+export async function persistAoVtSymbolSuffix(
+  supabase: SupabaseClient,
+  symbolSuffix: string,
+): Promise<void> {
+  const normalized = normalizeMt5SymbolSuffix(symbolSuffix);
+  if (!normalized) throw new Error('Invalid symbol suffix — use -STD, -VIP, or -ECN');
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('bridge_brokers')
+    .update({ symbol_suffix: normalized, updated_at: now })
+    .eq('broker_id', OMEGA_AO_VT_BROKER_ID);
+  if (error) throw new Error(error.message);
 }
 
 export async function persistAoVtProbeStatus(

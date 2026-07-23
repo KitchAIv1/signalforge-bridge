@@ -15,7 +15,7 @@ export async function resolveBrokerForFadeTrade(
   const resolvedId = brokerId ?? 'oanda_practice';
   const { data } = await supabase
     .from('bridge_brokers')
-    .select('broker_id, broker_type, account_id, is_active')
+    .select('broker_id, broker_type, account_id, is_active, symbol_suffix')
     .eq('broker_id', resolvedId)
     .maybeSingle();
 

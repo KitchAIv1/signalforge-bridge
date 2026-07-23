@@ -9,6 +9,8 @@ export interface AoVtProbePayload {
   equity: number | null;
   balance: number | null;
   openPositions: number | null;
+  audusdSymbols?: string[];
+  inferredSuffix?: string | null;
   error: string | null;
 }
 
@@ -38,17 +40,29 @@ export async function fetchAoVtStatus(): Promise<AoVtStatusResponse> {
   return readJson<AoVtStatusResponse>(response);
 }
 
-export async function bindAoVtAccount(metaApiAccountId: string): Promise<AoVtBindResponse> {
+export async function bindAoVtAccount(
+  metaApiAccountId: string,
+  symbolSuffix: string,
+): Promise<AoVtBindResponse> {
   const response = await fetch('/api/mt5/bind', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ metaApiAccountId }),
+    body: JSON.stringify({ metaApiAccountId, symbolSuffix }),
   });
   return readJson<AoVtBindResponse>(response);
 }
 
 export async function probeAoVtAccount(): Promise<AoVtBindResponse> {
   const response = await fetch('/api/mt5/probe', { method: 'POST' });
+  return readJson<AoVtBindResponse>(response);
+}
+
+export async function saveAoVtSymbolSuffix(symbolSuffix: string): Promise<AoVtBindResponse> {
+  const response = await fetch('/api/mt5/suffix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbolSuffix }),
+  });
   return readJson<AoVtBindResponse>(response);
 }
 

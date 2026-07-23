@@ -76,13 +76,22 @@ See [MT5_BROKER_OUTAGE_RUNBOOK.md](./MT5_BROKER_OUTAGE_RUNBOOK.md).
 
 AO stays on OANDA (`oanda_phase2_demo`) and can also trade a dedicated VT live book (`vtmarkets_ao_live`).
 
-**Schema:** INSERT-only migration `063_vtmarkets_ao_live.sql` (no new tables/columns). Uses existing `bridge_brokers` / `bridge_links`.
+**Schema:**
+- `063_vtmarkets_ao_live.sql` — seed inactive AO VT broker + link.
+- `064_bridge_brokers_symbol_suffix.sql` — per-broker `bridge_brokers.symbol_suffix` (e.g. `-STD`, `-VIP`, `-ECN`).
+
+**Symbol suffix (multi-account):**
+- Each MT5 broker row stores its own suffix. Bridge maps `AUD_USD` → `AUDUSD{suffix}` (hyphen form: `AUDUSD-STD`).
+- Resolution: **DB `symbol_suffix` → env `VT_SYMBOL_SUFFIX` → default `-STD`**.
+- Live Standard STP books use `-STD`. Demo VIP books use `-VIP`. Do **not** rely on a single global env when mixing account types.
+- VT bare `AUDUSD` is reference-only; always use the suffixed tradable symbol in Market Watch.
 
 **Guided bind (Settings → Connect VT Markets):**
 1. Add the live VT MT5 account in MetaApi (London). Keep login/server/password in MetaApi only.
 2. Ensure dashboard server has `METAAPI_TOKEN` (and bridge has `MT5_ENABLED=true`).
-3. Paste the MetaApi **account UUID** into the Connect panel → Bind & probe.
-4. On success: UUID saved to `bridge_brokers.account_id`, broker + `(omega, vtmarkets_ao_live)` link activated, `connection_status=connected`.
+3. In MT5, enable the tradable symbol (e.g. `AUDUSD-STD`).
+4. Paste the MetaApi **account UUID**, select the matching suffix → Bind & probe.
+5. On success: UUID + `symbol_suffix` saved on `bridge_brokers`, `(omega, vtmarkets_ao_live)` link activated.
 
 Optional env override: `METAAPI_AO_ACCOUNT_ID` (wins over DB UUID when set).
 

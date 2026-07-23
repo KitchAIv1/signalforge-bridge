@@ -5,6 +5,7 @@ import {
   bindAoVtAccount,
   disconnectAoVtAccount,
   probeAoVtAccount,
+  saveAoVtSymbolSuffix,
 } from '@/services/AoVtConnectService';
 
 type SetSnapshot = Dispatch<SetStateAction<AoVtBrokerSnapshot | null>>;
@@ -14,12 +15,13 @@ type SetWarnings = Dispatch<SetStateAction<string[]>>;
 
 export async function runAoVtBind(
   metaApiAccountId: string,
+  symbolSuffix: string,
   setSnapshot: SetSnapshot,
   setLastProbe: SetProbe,
   setWarnings: SetWarnings,
   setErrorMessage: SetString,
 ): Promise<boolean> {
-  const result = await bindAoVtAccount(metaApiAccountId);
+  const result = await bindAoVtAccount(metaApiAccountId, symbolSuffix);
   if (result.error || !result.ok) {
     setErrorMessage(result.error ?? 'Bind failed');
     return false;
@@ -43,6 +45,22 @@ export async function runAoVtProbe(
   setLastProbe(result.probe ?? null);
   setSnapshot(result.snapshot ?? null);
   if (!result.ok) setErrorMessage(result.error ?? result.probe?.error ?? 'Probe failed');
+}
+
+export async function runAoVtSaveSuffix(
+  symbolSuffix: string,
+  setSnapshot: SetSnapshot,
+  setErrorMessage: SetString,
+  setNote: SetString,
+): Promise<boolean> {
+  const result = await saveAoVtSymbolSuffix(symbolSuffix);
+  if (result.error || !result.ok) {
+    setErrorMessage(result.error ?? 'Failed to save symbol suffix');
+    return false;
+  }
+  setSnapshot(result.snapshot ?? null);
+  setNote(`Symbol suffix saved: ${result.snapshot?.symbolSuffix ?? symbolSuffix}`);
+  return true;
 }
 
 export async function runAoVtDisconnect(

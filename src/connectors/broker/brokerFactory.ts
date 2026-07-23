@@ -4,6 +4,7 @@
 
 import { createMt5Broker } from './mt5Broker.js';
 import { createOandaBroker } from './oandaBroker.js';
+import { resolveMt5SymbolSuffix } from './mt5SymbolSuffix.js';
 import type { BrokerClient, BrokerClientConfig, BrokerType } from './types.js';
 import { OMEGA_AO_VT_BROKER_ID } from '../../core/alphaOmega/alphaOmegaConstants.js';
 
@@ -12,6 +13,8 @@ export interface BridgeBrokerRow {
   broker_type: string;
   account_id: string | null;
   is_active: boolean;
+  /** Per-book MT5 suffix e.g. -STD / -VIP. Null → env then default. */
+  symbol_suffix?: string | null;
 }
 
 const MT5_BROKER_ACCOUNT_ENV: Record<string, string> = {
@@ -87,7 +90,10 @@ export function createBrokerClient(
       brokerId: brokerRow.broker_id,
       brokerType: 'mt5',
       accountId,
-      symbolSuffix: process.env.VT_SYMBOL_SUFFIX ?? '-STD',
+      symbolSuffix: resolveMt5SymbolSuffix({
+        dbSuffix: brokerRow.symbol_suffix,
+        envSuffix: process.env.VT_SYMBOL_SUFFIX,
+      }),
       magicNumber: resolveMagicNumber(engineId, brokerRow.broker_id),
     };
     return createMt5Broker(config);

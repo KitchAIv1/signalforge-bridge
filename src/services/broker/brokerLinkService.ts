@@ -33,7 +33,7 @@ async function fetchBrokerRows(
   if (!brokerIds.length) return [];
   const { data, error } = await supabase
     .from('bridge_brokers')
-    .select('broker_id, broker_type, account_id, is_active')
+    .select('broker_id, broker_type, account_id, is_active, symbol_suffix')
     .in('broker_id', brokerIds)
     .eq('is_active', true);
   if (error) throw new Error(`loadExecutionRoutes brokers: ${error.message}`);

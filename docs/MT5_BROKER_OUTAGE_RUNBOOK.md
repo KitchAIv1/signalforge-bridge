@@ -27,7 +27,7 @@ When VT Markets / MetaApi is down or misbehaving, restore OANDA-only execution w
 |--------|--------|
 | `test:mt5-connection` fails | Verify `METAAPI_TOKEN`, account IDs, London region |
 | Broker card shows disconnected | Check MetaApi dashboard account deployment state |
-| Orders reject (invalid symbol) | Confirm `VT_SYMBOL_SUFFIX` matches VT account type (Standard STP → `-STD`, ECN → `-ECN`, VIP → `-VIP`) |
+| Orders reject (invalid symbol) | Confirm `bridge_brokers.symbol_suffix` for that book (Standard STP → `-STD`, ECN → `-ECN`, VIP → `-VIP`). Env `VT_SYMBOL_SUFFIX` is only a fallback when DB is null. |
 | Fill but no trail | Trail uses OANDA M5 candles; close path uses broker client — check `broker_id` on log row |
 
 ## Re-enable VT

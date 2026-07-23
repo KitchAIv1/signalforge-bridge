@@ -26,7 +26,7 @@ async function fetchBrokerOpenIds(
 
   const { data } = await supabase
     .from('bridge_brokers')
-    .select('broker_id, broker_type, account_id, is_active')
+    .select('broker_id, broker_type, account_id, is_active, symbol_suffix')
     .eq('broker_id', brokerId)
     .maybeSingle();
 

@@ -1,6 +1,8 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { ConnectAoVtConnectedCard } from '@/components/broker/ConnectAoVtConnectedCard';
+import { Mt5SymbolSuffixField } from '@/components/broker/Mt5SymbolSuffixField';
 import { OMEGA_AO_VT_BROKER_ID } from '@/lib/omegaLaneBConstants';
 import { useConnectAoVtAccount } from '@/hooks/useConnectAoVtAccount';
 
@@ -11,12 +13,13 @@ function hasBoundUuid(accountId: string | null | undefined): boolean {
 export function ConnectAoVtPanel() {
   const state = useConnectAoVtAccount();
   const [uuidInput, setUuidInput] = useState('');
+  const [suffixInput, setSuffixInput] = useState('-STD');
   const bound = hasBoundUuid(state.snapshot?.accountId);
   const routeOn = Boolean(state.snapshot?.linkActive && state.snapshot?.isActive);
 
   async function handleBind(event: FormEvent) {
     event.preventDefault();
-    const ok = await state.bind(uuidInput.trim());
+    const ok = await state.bind(uuidInput.trim(), suffixInput);
     if (ok) setUuidInput('');
   }
 
@@ -33,20 +36,16 @@ export function ConnectAoVtPanel() {
       <h2 className="text-sm font-medium text-slate-700">Connect VT Markets (ALPHAOMEGA)</h2>
       <p className="mt-1 text-xs text-slate-500">
         Guided bind for <span className="font-mono">{OMEGA_AO_VT_BROKER_ID}</span>. Paste the
-        MetaApi <strong>account UUID</strong> (not the MT5 login). VT login/server/password stay in
-        MetaApi.
+        MetaApi <strong>account UUID</strong> (not the MT5 login). Choose the account-type symbol
+        suffix so orders hit <span className="font-mono">AUDUSD-STD</span> (etc.), not VIP demo
+        symbols.
       </p>
 
       <HowToSteps />
       <EnvHints mt5Enabled={state.mt5Enabled} hasMetaApiToken={state.hasMetaApiToken} />
 
       {bound ? (
-        <ConnectedCard
-          state={state}
-          routeOn={routeOn}
-          onProbe={() => void state.probe()}
-          onDisconnect={() => void state.disconnect()}
-        />
+        <ConnectAoVtConnectedCard state={state} routeOn={routeOn} />
       ) : (
         <form onSubmit={(event) => void handleBind(event)} className="mt-4 space-y-3">
           <label className="block text-xs font-medium text-slate-600">
@@ -61,6 +60,12 @@ export function ConnectAoVtPanel() {
               required
             />
           </label>
+          <Mt5SymbolSuffixField
+            value={suffixInput}
+            onChange={setSuffixInput}
+            disabled={state.busy}
+            hint="Live Standard STP = -STD. Demo VIP books use -VIP."
+          />
           <button
             type="submit"
             disabled={state.busy || !uuidInput.trim()}
@@ -89,7 +94,8 @@ function HowToSteps() {
     <ol className="mt-3 list-decimal space-y-1 pl-5 text-xs text-slate-600">
       <li>Open / confirm your VT Markets MT5 live account (login, server, password).</li>
       <li>In MetaApi (London region), add that MT5 account and wait until Connected.</li>
-      <li>Copy the MetaApi account ID (UUID) and paste below.</li>
+      <li>In MT5 Market Watch, enable the tradable symbol (e.g. AUDUSD-STD).</li>
+      <li>Copy the MetaApi account ID (UUID), pick the matching suffix, and bind.</li>
     </ol>
   );
 }
@@ -113,55 +119,6 @@ function EnvHints({
       >
         MT5_ENABLED: {mt5Enabled ? 'true' : 'false (bridge needs true to execute)'}
       </span>
-    </div>
-  );
-}
-
-function ConnectedCard({
-  state,
-  routeOn,
-  onProbe,
-  onDisconnect,
-}: {
-  state: ReturnType<typeof useConnectAoVtAccount>;
-  routeOn: boolean;
-  onProbe: () => void;
-  onDisconnect: () => void;
-}) {
-  const probe = state.lastProbe;
-  return (
-    <div className="mt-4 rounded border border-slate-100 bg-slate-50/80 p-3">
-      <p className="text-sm font-medium text-slate-800">
-        {routeOn ? 'Route active' : 'Bound (route off)'} · {state.snapshot?.connectionStatus ?? 'unknown'}
-      </p>
-      <p className="mt-1 break-all font-mono text-xs text-slate-600">{state.snapshot?.accountId}</p>
-      {probe ? (
-        <p className="mt-2 text-xs text-slate-600">
-          Equity {probe.equity ?? '—'} · Balance {probe.balance ?? '—'} · Open {probe.openPositions ?? '—'}
-        </p>
-      ) : null}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onProbe}
-          disabled={state.busy}
-          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Re-probe
-        </button>
-        <button
-          type="button"
-          onClick={onDisconnect}
-          disabled={state.busy}
-          className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-        >
-          Disconnect VT AO
-        </button>
-      </div>
-      <p className="mt-2 text-xs text-slate-500">
-        Override terminal remains OANDA AO only. Disconnect deactivates the VT route; it does not
-        store or need your VT password.
-      </p>
     </div>
   );
 }

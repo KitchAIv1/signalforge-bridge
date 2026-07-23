@@ -3,12 +3,21 @@ import { OMEGA_AO_VT_BROKER_ID } from '@/lib/omegaLaneBConstants';
 import { persistAoVtBindSuccess, loadAoVtBrokerSnapshot } from '@/lib/mt5/aoVtBindService';
 import { buildMt5ApiSupabase } from '@/lib/mt5/buildMt5ApiSupabase';
 import { isMetaApiAccountUuid, probeMetaApiAccount } from '@/lib/mt5/metaApiAccountProbe';
+import { normalizeMt5SymbolSuffix } from '@/lib/mt5/mt5SymbolSuffix';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 interface BindBody {
   metaApiAccountId?: string;
+  symbolSuffix?: string;
+}
+
+function resolveBindSuffix(
+  bodySuffix: string | undefined,
+  inferredSuffix: string | null,
+): string | null {
+  return normalizeMt5SymbolSuffix(bodySuffix) ?? normalizeMt5SymbolSuffix(inferredSuffix);
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -41,7 +50,19 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    await persistAoVtBindSuccess(supabase, metaApiAccountId);
+    const symbolSuffix = resolveBindSuffix(body.symbolSuffix, probe.inferredSuffix);
+    if (!symbolSuffix) {
+      return NextResponse.json(
+        {
+          error:
+            'Could not detect a tradable AUDUSD suffix on this account. Choose -STD, -VIP, or -ECN explicitly.',
+          probe,
+        },
+        { status: 400 },
+      );
+    }
+
+    await persistAoVtBindSuccess(supabase, metaApiAccountId, symbolSuffix);
     const snapshot = await loadAoVtBrokerSnapshot(supabase);
     const mt5Enabled = process.env.MT5_ENABLED === 'true';
 
@@ -52,7 +73,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       snapshot,
       warnings: mt5Enabled
         ? []
-        : ['MT5_ENABLED is not true on this server — set MT5_ENABLED=true on the bridge process for live execution.'],
+        : [
+            'MT5_ENABLED is not true on this server — set MT5_ENABLED=true on the bridge process for live execution.',
+          ],
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

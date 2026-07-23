@@ -4,11 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AoVtBrokerSnapshot } from '@/lib/mt5/aoVtBindService';
 import type { AoVtProbePayload } from '@/services/AoVtConnectService';
 import { fetchAoVtStatus } from '@/services/AoVtConnectService';
-import {
-  runAoVtBind,
-  runAoVtDisconnect,
-  runAoVtProbe,
-} from '@/hooks/aoVtConnectActions';
+import { useConnectAoVtMutations } from '@/hooks/useConnectAoVtMutations';
 
 export interface ConnectAoVtState {
   loading: boolean;
@@ -21,8 +17,9 @@ export interface ConnectAoVtState {
   warnings: string[];
   note: string | null;
   refresh: () => Promise<void>;
-  bind: (metaApiAccountId: string) => Promise<boolean>;
+  bind: (metaApiAccountId: string, symbolSuffix: string) => Promise<boolean>;
   probe: () => Promise<void>;
+  saveSuffix: (symbolSuffix: string) => Promise<boolean>;
   disconnect: () => Promise<void>;
 }
 
@@ -36,6 +33,15 @@ export function useConnectAoVtAccount(): ConnectAoVtState {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [note, setNote] = useState<string | null>(null);
+
+  const mutations = useConnectAoVtMutations({
+    setBusy,
+    setSnapshot,
+    setLastProbe,
+    setWarnings,
+    setErrorMessage,
+    setNote,
+  });
 
   const refresh = useCallback(async () => {
     setErrorMessage(null);
@@ -55,37 +61,17 @@ export function useConnectAoVtAccount(): ConnectAoVtState {
     void refresh();
   }, [refresh]);
 
-  const bind = useCallback(async (metaApiAccountId: string): Promise<boolean> => {
-    setBusy(true);
-    setErrorMessage(null);
-    setNote(null);
-    const ok = await runAoVtBind(
-      metaApiAccountId,
-      setSnapshot,
-      setLastProbe,
-      setWarnings,
-      setErrorMessage,
-    );
-    setBusy(false);
-    return ok;
-  }, []);
-
-  const probe = useCallback(async () => {
-    setBusy(true);
-    setErrorMessage(null);
-    await runAoVtProbe(setSnapshot, setLastProbe, setErrorMessage);
-    setBusy(false);
-  }, []);
-
-  const disconnect = useCallback(async () => {
-    setBusy(true);
-    setErrorMessage(null);
-    await runAoVtDisconnect(setSnapshot, setLastProbe, setNote, setWarnings, setErrorMessage);
-    setBusy(false);
-  }, []);
-
   return {
-    loading, busy, snapshot, lastProbe, mt5Enabled, hasMetaApiToken,
-    errorMessage, warnings, note, refresh, bind, probe, disconnect,
+    loading,
+    busy,
+    snapshot,
+    lastProbe,
+    mt5Enabled,
+    hasMetaApiToken,
+    errorMessage,
+    warnings,
+    note,
+    refresh,
+    ...mutations,
   };
 }

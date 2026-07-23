@@ -1,6 +1,9 @@
 /**
- * Server-only MetaApi equity probe for guided VT bind (UUID → deploy → account info).
+ * Server-only MetaApi equity + AUDUSD suffix probe for guided VT bind.
  */
+
+import { discoverAudusdSuffixFromRpc } from '@/lib/mt5/discoverMt5AudusdSuffix';
+import { openMetaApiRpc } from '@/lib/mt5/openMetaApiRpc';
 
 const PROBE_TIMEOUT_MS = 45_000;
 
@@ -9,13 +12,9 @@ export interface MetaApiProbeResult {
   equity: number | null;
   balance: number | null;
   openPositions: number | null;
+  audusdSymbols: string[];
+  inferredSuffix: string | null;
   error: string | null;
-}
-
-function resolveMetaApiToken(): string {
-  const token = process.env.METAAPI_TOKEN?.trim();
-  if (!token) throw new Error('METAAPI_TOKEN is not set on the dashboard server');
-  return token;
 }
 
 function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
@@ -36,49 +35,35 @@ function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   });
 }
 
-async function openRpcForAccount(metaApiAccountId: string): Promise<{
-  getAccountInformation(): Promise<Record<string, unknown>>;
-  getPositions(): Promise<unknown[]>;
-}> {
-  const mod = await import('metaapi.cloud-sdk/esm-node');
-  const MetaApi = mod.default as new (token: string) => {
-    metatraderAccountApi: {
-      getAccount(id: string): Promise<{
-        deploy(): Promise<void>;
-        waitConnected(): Promise<void>;
-        getRPCConnection(): {
-          connect(): Promise<void>;
-          waitSynchronized(): Promise<void>;
-          getAccountInformation(): Promise<Record<string, unknown>>;
-          getPositions(): Promise<unknown[]>;
-        };
-      }>;
-    };
+function emptyProbe(error: string): MetaApiProbeResult {
+  return {
+    ok: false,
+    equity: null,
+    balance: null,
+    openPositions: null,
+    audusdSymbols: [],
+    inferredSuffix: null,
+    error,
   };
-  const api = new MetaApi(resolveMetaApiToken());
-  const account = await api.metatraderAccountApi.getAccount(metaApiAccountId);
-  await account.deploy();
-  await account.waitConnected();
-  const rpc = account.getRPCConnection();
-  await rpc.connect();
-  await rpc.waitSynchronized();
-  return rpc;
 }
 
 export async function probeMetaApiAccount(metaApiAccountId: string): Promise<MetaApiProbeResult> {
   try {
-    const rpc = await withTimeout(openRpcForAccount(metaApiAccountId), 'MetaApi probe');
+    const rpc = await withTimeout(openMetaApiRpc(metaApiAccountId), 'MetaApi probe');
     const info = await rpc.getAccountInformation();
     const positions = await rpc.getPositions();
+    const discovery = await discoverAudusdSuffixFromRpc(rpc);
     return {
       ok: true,
       equity: typeof info.equity === 'number' ? info.equity : Number(info.equity ?? NaN) || null,
       balance: typeof info.balance === 'number' ? info.balance : Number(info.balance ?? NaN) || null,
       openPositions: Array.isArray(positions) ? positions.length : null,
+      audusdSymbols: discovery.symbols,
+      inferredSuffix: discovery.inferredSuffix,
       error: null,
     };
   } catch (err) {
-    return { ok: false, equity: null, balance: null, openPositions: null, error: String(err) };
+    return emptyProbe(String(err));
   }
 }
 

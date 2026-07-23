@@ -123,7 +123,8 @@ export async function runMt5StartupDiagnostics(
   const mt5Enabled = isMt5GloballyEnabled();
   logInfo('[MT5] Startup config', {
     enabled: mt5Enabled,
-    symbolSuffix: process.env.VT_SYMBOL_SUFFIX ?? '-STD',
+    envSymbolSuffixFallback: process.env.VT_SYMBOL_SUFFIX ?? '(unset → default -STD)',
+    note: 'Per-broker bridge_brokers.symbol_suffix wins over VT_SYMBOL_SUFFIX',
     region: process.env.METAAPI_REGION ?? 'london',
     omegaAccountConfigured: Boolean(process.env.METAAPI_OMEGA_ACCOUNT_ID?.trim()),
     fadeAccountConfigured: Boolean(process.env.METAAPI_FADE_ACCOUNT_ID?.trim()),
