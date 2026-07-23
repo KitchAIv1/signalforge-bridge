@@ -1,5 +1,6 @@
 /**
  * On startup: reconcile OANDA open trades vs bridge_trade_log; pre-populate dedup from last 60s.
+ * Reverse ghost-close is broker-account aware (Phase2 / AMD / practice). MT5 rows are skipped.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -8,6 +9,41 @@ import { getOpenTrades, getTradeById } from './connectors/oanda.js';
 import { prePopulateDedupFromLog } from './core/conflictResolver.js';
 import { computeDerivedFields, resultFromPnl } from './monitoring/tradeMonitorHelpers.js';
 import { resolveAmdOandaAccountId } from './services/amd/resolveAmdOandaAccountId.js';
+
+interface OpenLogRow {
+  id: string;
+  oanda_trade_id: string | null;
+  engine_id: string | null;
+  broker_id: string | null;
+}
+
+function isMt5BrokerId(brokerId: string | null | undefined): boolean {
+  return !!brokerId && brokerId.startsWith('vtmarkets_');
+}
+
+function resolvePhase2AccountId(): string | undefined {
+  return process.env.OANDA_PHASE2_ACCOUNT_ID?.trim() || undefined;
+}
+
+/**
+ * OANDA account for reverse-reconcile of a log row.
+ * - `null` = skip (MT5, or Phase2 without OANDA_PHASE2_ACCOUNT_ID — never fall back to main)
+ * - `undefined` = main practice account (SDK default)
+ * - string = explicit account id (Phase2 / AMD)
+ */
+function resolveReconcileAccountId(
+  brokerId: string | null | undefined,
+  engineId: string | null | undefined,
+  amdAccountId: string | undefined,
+): string | null | undefined {
+  if (isMt5BrokerId(brokerId)) return null;
+  if (engineId === 'engine_amd') return amdAccountId;
+  if (brokerId === 'oanda_phase2_demo') {
+    return resolvePhase2AccountId() ?? null;
+  }
+  // practice / null / other OANDA → main account (undefined = SDK default)
+  return undefined;
+}
 
 function resultFromPnlDollars(pnlDollars: number | null): string {
   return resultFromPnl(pnlDollars);
@@ -101,69 +137,87 @@ async function forwardReconcileOpenTrades(
   }
 }
 
+async function reverseReconcileOpenRow(
+  supabase: SupabaseClient,
+  row: OpenLogRow,
+  openIdsByAccount: {
+    main: Set<string>;
+    amd: Set<string>;
+    phase2: Set<string>;
+  },
+  amdAccountId: string | undefined,
+): Promise<void> {
+  const oandaTradeId = row.oanda_trade_id;
+  if (!oandaTradeId) return;
+
+  const accountId = resolveReconcileAccountId(row.broker_id, row.engine_id, amdAccountId);
+  if (accountId === null) {
+    console.log(
+      `[Reconciliation] Skipping non-OANDA open row ${oandaTradeId}` +
+        ` broker=${row.broker_id ?? 'null'}`,
+    );
+    return;
+  }
+
+  const openOnCorrectAccount =
+    row.engine_id === 'engine_amd'
+      ? openIdsByAccount.amd.has(oandaTradeId)
+      : row.broker_id === 'oanda_phase2_demo'
+        ? openIdsByAccount.phase2.has(oandaTradeId)
+        : openIdsByAccount.main.has(oandaTradeId);
+
+  if (openOnCorrectAccount) return;
+
+  try {
+    await reconcileGhostOpenRow(
+      supabase,
+      { id: row.id, oanda_trade_id: oandaTradeId },
+      accountId,
+    );
+  } catch (err: unknown) {
+    console.error(
+      `[Reconciliation] Error processing ${oandaTradeId}` +
+        ` broker=${row.broker_id ?? 'null'}:`,
+      String(err),
+    );
+  }
+}
+
 export async function runStartupReconciliation(
   supabase: SupabaseClient,
 ): Promise<void> {
   const amdAccountId = resolveAmdOandaAccountId();
-  const [mainTrades, amdTrades] = await Promise.all([
+  const phase2AccountId = resolvePhase2AccountId();
+
+  const [mainTrades, amdTrades, phase2Trades] = await Promise.all([
     getOpenTrades(),
     getOpenTrades(amdAccountId),
+    phase2AccountId ? getOpenTrades(phase2AccountId) : Promise.resolve([] as OpenTrade[]),
   ]);
 
   const { data: logOpen } = await supabase
     .from('bridge_trade_log')
-    .select('oanda_trade_id, id, engine_id')
+    .select('oanda_trade_id, id, engine_id, broker_id')
     .eq('status', 'open');
-  const logIds = new Set(
-    (logOpen ?? []).map(
-      (r: { oanda_trade_id: string }) => r.oanda_trade_id,
-    ),
-  );
-  const mainOpenIds = new Set(mainTrades.map((t) => t.id));
-  const amdOpenIds = new Set(amdTrades.map((t) => t.id));
 
+  const openRows = (logOpen ?? []) as OpenLogRow[];
+  const logIds = new Set(
+    openRows.map((r) => r.oanda_trade_id).filter((id): id is string => !!id),
+  );
+  const openIdsByAccount = {
+    main: new Set(mainTrades.map((t) => t.id)),
+    amd: new Set(amdTrades.map((t) => t.id)),
+    phase2: new Set(phase2Trades.map((t) => t.id)),
+  };
+
+  // Forward: main + AMD only (do not invent Phase2/VT bridge rows on startup).
   await forwardReconcileOpenTrades(supabase, mainTrades, logIds);
   if (amdAccountId && amdAccountId !== process.env.OANDA_ACCOUNT_ID) {
     await forwardReconcileOpenTrades(supabase, amdTrades, logIds);
   }
 
-  for (const row of logOpen ?? []) {
-    const oandaTradeId = row.oanda_trade_id as string | null;
-    if (!oandaTradeId) continue;
-
-    const engineId = row.engine_id as string | null;
-    const openOnMain = mainOpenIds.has(oandaTradeId);
-    const openOnAmd = amdOpenIds.has(oandaTradeId);
-
-    if (engineId === 'engine_amd') {
-      if (openOnAmd) continue;
-      try {
-        await reconcileGhostOpenRow(supabase, {
-          id: row.id as string,
-          oanda_trade_id: oandaTradeId,
-        }, amdAccountId);
-      } catch (err: unknown) {
-        console.error(
-          `[Reconciliation] Error processing AMD trade ${oandaTradeId}:`,
-          String(err),
-        );
-      }
-      continue;
-    }
-
-    if (openOnMain) continue;
-
-    try {
-      await reconcileGhostOpenRow(supabase, {
-        id: row.id as string,
-        oanda_trade_id: oandaTradeId,
-      });
-    } catch (err: unknown) {
-      console.error(
-        `[Reconciliation] Error processing ${oandaTradeId}:`,
-        String(err),
-      );
-    }
+  for (const row of openRows) {
+    await reverseReconcileOpenRow(supabase, row, openIdsByAccount, amdAccountId);
   }
 
   const { data: recent } = await supabase
