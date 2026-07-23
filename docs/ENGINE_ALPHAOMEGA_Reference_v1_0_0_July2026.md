@@ -12,6 +12,8 @@ Lane A (`oanda_practice`) is **not** governed by this document. See RAW Omega / 
 
 | Date | Change |
 |------|--------|
+| 2026-07-22 | Asia size: after 3M fillability cap, scale Lane B pure units by **0.10/omega.weight** in 21:00–08:00 UTC (so capped tickets still shrink) |
+| 2026-07-22 | Asia session weight (first cut): **0.10** in formula during 21:00–08:00 UTC — superseded same day by post-cap scale |
 | 2026-07-18 | Live posture: pure sizing ON, giveback ON, `omega.weight` 0.15→**0.25** — migration `062` |
 | 2026-07-17 | Giveback trail (6p / 3p) shipped — migration `060`, commit `f266331` (flag later enabled) |
 | 2026-07-16 | Negative `pnl_r` write + calendar display — `c5681dd` |
@@ -24,7 +26,8 @@ Lane A (`oanda_practice`) is **not** governed by this document. See RAW Omega / 
 
 ALPHAOMEGA replaces the early July Phase-2 R1/shadow gate experiment on Lane B with a **validated streak-crack entry** and a **multi-trigger exit stack** (opposing fires, hard stop, backstop crack, giveback trail). One Omega signal fan-out can still produce two `bridge_trade_log` rows (Lane A + Lane B); only Lane B uses ALPHAOMEGA decisions.
 
-**Live posture (2026-07-18, migration `062`):** pure sizing ON, giveback trail ON, shared `bridge_engines.omega.weight = 0.25` (also scales Lane A RAW).
+**Live posture (2026-07-18, migration `062`):** pure sizing ON, giveback trail ON, shared `bridge_engines.omega.weight = 0.25` (also scales Lane A RAW).  
+**Asia size posture (2026-07-22):** during **21:00–08:00 UTC**, Lane B AO pure sizing sizes at `omega.weight`, clamps to 3M, then scales units by **0.10/omega.weight** (typically ×0.40 → Asia max **1.2M**). Outside Asia, no post-cap scale. Lane A unchanged.
 
 ---
 
@@ -114,10 +117,16 @@ Config: `alpha_omega_giveback_trail_enabled` — **live ON** (migration `062`; s
 
 | Parameter | Live value | Notes |
 |-----------|------------|-------|
-| `bridge_engines.omega.weight` | **0.25** | Shared with Lane A RAW |
+| `bridge_engines.omega.weight` | **0.25** | Shared with Lane A RAW; baseline for AO pure formula |
+| Asia session weight | **0.10** | Target risk weight; applied as **post-cap scale** `0.10/omega.weight` in **21:00–08:00 UTC** |
+| Pure max abs units | **3,000,000** | Fillability cap before Asia scale |
+| Asia max abs units (at cap) | **1,200,000** | `3,000,000 × (0.10/0.25)` |
 | `risk_per_trade_pct` | 0.03 | Global |
-| Risk $ @ $100k equity | **$750**/trade | `100000 × 0.25 × 0.03` |
+| Risk $ @ $100k equity (non-Asia) | **$750**/trade | `100000 × 0.25 × 0.03` |
+| Risk $ @ $100k equity (Asia, under cap) | **$300**/trade | equivalent to weight 0.10 after ×0.40 scale |
 | SL used for units | Signal SL | Not the 10p hard-stop distance |
+
+Lane B advisory tags: `sizing=pure`; in Asia also `asiaW=0.10`.  
 
 Lane A uses separate flag `omega_raw_pure_sizing` — do not confuse with AO pure sizing.
 

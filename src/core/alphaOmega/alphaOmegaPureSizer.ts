@@ -2,16 +2,22 @@
  * Lane B ALPHAOMEGA-only position size: equity × weight × riskPct / signal SL.
  * Ignores AMD, news, confluence ±, and graduated consecutive-loss cuts.
  * Abs units capped (ALPHAOMEGA_PURE_MAX_ABS_UNITS) so sub‑4p cracks still fill.
+ * Asian window (21:00–08:00 UTC): AFTER cap, scale by (0.10 / engineWeight).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateUnits } from '../positionSizer.js';
-import { logWarn } from '../../utils/logger.js';
+import { logInfo, logWarn } from '../../utils/logger.js';
 import {
+  ALPHAOMEGA_ASIAN_SESSION_WEIGHT,
   ALPHAOMEGA_PURE_MAX_ABS_UNITS,
   ALPHAOMEGA_PURE_SIZING_CONFIG_KEY,
   ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE,
 } from './alphaOmegaConstants.js';
+import {
+  isAlphaOmegaAsianSessionUtc,
+  resolveAlphaOmegaAsiaPostCapScale,
+} from './resolveAlphaOmegaSessionWeight.js';
 
 export interface AlphaOmegaPureSizeParams {
   routeEquity: number;
@@ -24,6 +30,8 @@ export interface AlphaOmegaPureSizeParams {
   capitalAllocationPct: number;
   conversionRate?: number;
   slPipsOverride?: number;
+  /** Defaults to now; inject fixed UTC in tests. */
+  asOf?: Date;
 }
 
 /** Safe default: missing/invalid config → false (legacy Omega-inherited sizing). */
@@ -49,7 +57,19 @@ export function clampAlphaOmegaPureUnits(
   return signedUnits < 0 ? -maxAbsUnits : maxAbsUnits;
 }
 
+/** Scale signed units after cap; round to whole units; keep sign; min 1 if non-zero. */
+export function applyAsiaPostCapUnitScale(
+  signedUnits: number,
+  scale: number,
+): number {
+  if (scale === 1 || signedUnits === 0) return signedUnits;
+  const sign = signedUnits < 0 ? -1 : 1;
+  const scaled = Math.round(Math.abs(signedUnits) * scale);
+  return sign * Math.max(scaled, 1);
+}
+
 export function sizeAlphaOmegaPureUnits(params: AlphaOmegaPureSizeParams): number {
+  const asOf = params.asOf ?? new Date();
   const alloc = params.capitalAllocationPct > 0 ? params.capitalAllocationPct : 1;
   const unitCount = calculateUnits({
     equity: params.routeEquity,
@@ -74,12 +94,41 @@ export function sizeAlphaOmegaPureUnits(params: AlphaOmegaPureSizeParams): numbe
       maxAbsUnits: ALPHAOMEGA_PURE_MAX_ABS_UNITS,
     });
   }
-  return clamped;
+  return applyAsiaSessionPostCap(clamped, params.engineWeight, asOf);
 }
 
-export function withPureSizingAdvisory(laneAdvisory: string): string {
-  if (laneAdvisory.includes('sizing=pure')) return laneAdvisory;
-  return `${laneAdvisory}:sizing=pure`;
+function applyAsiaSessionPostCap(
+  clampedUnits: number,
+  engineWeight: number,
+  asOf: Date,
+): number {
+  const scale = resolveAlphaOmegaAsiaPostCapScale(engineWeight, asOf);
+  if (scale === 1) return clampedUnits;
+  const scaled = applyAsiaPostCapUnitScale(clampedUnits, scale);
+  logInfo('[AlphaOmega] Asian session post-cap scale applied', {
+    engineWeight,
+    asianWeight: ALPHAOMEGA_ASIAN_SESSION_WEIGHT,
+    scale,
+    utcHour: asOf.getUTCHours(),
+    cappedUnits: clampedUnits,
+    scaledUnits: scaled,
+  });
+  return scaled;
+}
+
+/** Append sizing=pure; in Asia also asiaW=0.10 (idempotent). */
+export function withPureSizingAdvisory(
+  laneAdvisory: string,
+  asOf: Date = new Date(),
+): string {
+  let advisory = laneAdvisory;
+  if (!advisory.includes('sizing=pure')) {
+    advisory = `${advisory}:sizing=pure`;
+  }
+  if (isAlphaOmegaAsianSessionUtc(asOf) && !advisory.includes('asiaW=')) {
+    advisory = `${advisory}:asiaW=${ALPHAOMEGA_ASIAN_SESSION_WEIGHT}`;
+  }
+  return advisory;
 }
 
 export function isAlphaOmegaEntryAdvisory(

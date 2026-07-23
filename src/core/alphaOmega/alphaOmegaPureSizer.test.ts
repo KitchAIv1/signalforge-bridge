@@ -16,6 +16,9 @@ import {
   ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE,
 } from './alphaOmegaConstants.js';
 
+/** Fixed non-Asia UTC so session weight 0.10 cannot flake unit tests. */
+const NON_ASIA_AS_OF = new Date('2026-07-14T12:00:00.000Z');
+
 const BASE = {
   routeEquity: 96000,
   engineWeight: 0.15,
@@ -24,6 +27,7 @@ const BASE = {
   stopLoss: 0.69474,
   instrument: 'AUD_USD',
   capitalAllocationPct: 1,
+  asOf: NON_ASIA_AS_OF,
 };
 
 describe('sizeAlphaOmegaPureUnits', () => {
@@ -86,6 +90,7 @@ describe('sizeAlphaOmegaPureUnits', () => {
       direction: 'SHORT',
       capitalAllocationPct: 1,
       slPipsOverride: 1.3,
+      asOf: NON_ASIA_AS_OF,
     });
     assert.equal(capped, -ALPHAOMEGA_PURE_MAX_ABS_UNITS);
   });
@@ -110,10 +115,10 @@ describe('AO pure sizing advisory helpers', () => {
     assert.equal(isAlphaOmegaEntryAdvisory(null), false);
   });
 
-  it('appends sizing=pure once', () => {
+  it('appends sizing=pure once (non-Asia)', () => {
     const base = 'ALPHAOMEGA_ENTRY:len=7:speed=35.0m';
-    const once = withPureSizingAdvisory(base);
+    const once = withPureSizingAdvisory(base, NON_ASIA_AS_OF);
     assert.equal(once, `${base}:sizing=pure`);
-    assert.equal(withPureSizingAdvisory(once), once);
+    assert.equal(withPureSizingAdvisory(once, NON_ASIA_AS_OF), once);
   });
 });

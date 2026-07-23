@@ -56,6 +56,11 @@ export const ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE = 80;
  * units and hit INSUFFICIENT_MARGIN. Cap preserves ~$7k-style book; Lane B AO only.
  */
 export const ALPHAOMEGA_PURE_MAX_ABS_UNITS = 3_000_000;
+/**
+ * Target Asia risk weight (21:00–08:00 UTC). Applied on Lane B AO pure sizing
+ * as a post-cap scale: units *= asianWeight / engineWeight (e.g. 0.10/0.25).
+ */
+export const ALPHAOMEGA_ASIAN_SESSION_WEIGHT = 0.1;
 
 export const ALPHAOMEGA_BLOCK_NO_CRACK = 'ALPHAOMEGA_NO_QUALIFYING_CRACK';
 export const ALPHAOMEGA_BLOCK_SPEED_FLOOR = 'ALPHAOMEGA_SPEED_FLOOR';
