@@ -6,7 +6,7 @@
  * (broker_id = oanda_phase2_demo). "omega" filter = other omega brokers.
  */
 
-import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { isOmegaLaneBBroker } from '@/lib/omegaLaneBConstants';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 
 export const PNL_CALENDAR_FILTER_KEYS = [
@@ -47,9 +47,7 @@ export const PNL_CALENDAR_FILTER_OPTIONS: readonly PnlCalendarFilterOption[] = [
 ];
 
 export function isOmegaLaneBTrade(trade: PnlTradeRow): boolean {
-  return (
-    trade.engine_id === 'omega' && trade.broker_id === OMEGA_LANE_B_BROKER_ID
-  );
+  return trade.engine_id === 'omega' && isOmegaLaneBBroker(trade.broker_id);
 }
 
 export function tradeMatchesCalendarFilter(

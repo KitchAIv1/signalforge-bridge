@@ -1,5 +1,5 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
-import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { OMEGA_AO_BROKER_IDS } from '@/lib/omegaLaneBConstants';
 
 export const ACTIVITY_TRADE_LOG_PAGE_SIZE = 50;
 
@@ -11,6 +11,21 @@ export const EXPANDED_TRADE_LOG_SELECT =
   'signal_session, close_tag, manual_tag, lane_advisory, ' +
   'layer4_result, layer4_bullish_count, layer4_bearish_count, ' +
   'layer5_result, layer5_pip_diff, layer6_position_pct, choppy_extended, amd_tag, direction_source, amd_size_multiplier, leg_type';
+
+function aoBrokerListCsv(): string {
+  return OMEGA_AO_BROKER_IDS.join(',');
+}
+
+/** PostgREST filter: exclude all ALPHAOMEGA venue ids (keep null broker rows). */
+function excludeAoExecutedOrFilter(): string {
+  return `broker_id.is.null,broker_id.not.in.(${aoBrokerListCsv()})`;
+}
+
+/** All-view: shared ledger + AO non-fills — never AO EXECUTED. */
+function allViewExcludeAoExecutedOrFilter(): string {
+  const csv = aoBrokerListCsv();
+  return `broker_id.is.null,broker_id.not.in.(${csv}),and(broker_id.in.(${csv}),decision.neq.EXECUTED)`;
+}
 
 export function applyActivityDecisionFilter<T extends { eq: Function; in: Function }>(
   query: T,
@@ -27,22 +42,26 @@ export function applyActivityDecisionFilter<T extends { eq: Function; in: Functi
 
 /**
  * Activity broker scope:
- * - Explicit brokerId → that broker only (/omega-phase2).
- * - EXECUTED → exclude Lane B fills; keep broker_id NULL pre-exec rows.
- * - BLOCKED / SKIPPED / DEDUPLICATED → include Lane B (ALPHAOMEGA reasons).
- * - All ('') → shared ledger + Lane B non-fills only (no Lane B EXECUTED).
+ * - Explicit brokerId → that broker only.
+ * - Explicit brokerIds → .in() (ALPHAOMEGA dual books).
+ * - EXECUTED → exclude AO fills; keep broker_id NULL pre-exec rows.
+ * - BLOCKED / SKIPPED / DEDUPLICATED → include AO (ALPHAOMEGA reasons).
+ * - All ('') → shared ledger + AO non-fills only (no AO EXECUTED).
  */
-export function applyActivityBrokerScope<T extends { eq: Function; or: Function }>(
+export function applyActivityBrokerScope<T extends { eq: Function; or: Function; in: Function }>(
   query: T,
   brokerIdFilter: string,
   decisionFilter: string = 'EXECUTED',
+  brokerIdsFilter?: readonly string[],
 ): T {
+  if (brokerIdsFilter && brokerIdsFilter.length > 0) {
+    return query.in('broker_id', [...brokerIdsFilter]) as T;
+  }
   if (brokerIdFilter) {
     return query.eq('broker_id', brokerIdFilter) as T;
   }
   if (decisionFilter === 'EXECUTED') {
-    // Pre-execution rows store broker_id NULL — neq alone would drop them.
-    return query.or(`broker_id.is.null,broker_id.neq.${OMEGA_LANE_B_BROKER_ID}`) as T;
+    return query.or(excludeAoExecutedOrFilter()) as T;
   }
   if (
     decisionFilter === 'BLOCKED' ||
@@ -51,16 +70,15 @@ export function applyActivityBrokerScope<T extends { eq: Function; or: Function 
   ) {
     return query;
   }
-  // All: Lane A + null-broker + Lane B blocks/skips — never Lane B fills.
-  return query.or(
-    `broker_id.is.null,broker_id.neq.${OMEGA_LANE_B_BROKER_ID},and(broker_id.eq.${OMEGA_LANE_B_BROKER_ID},decision.neq.EXECUTED)`,
-  ) as T;
+  return query.or(allViewExcludeAoExecutedOrFilter()) as T;
 }
 
 export interface ActivityTradeLogFilters {
   decision: string;
   engineId: string;
   brokerId: string;
+  /** When set, filters with .in(broker_id) instead of single eq. */
+  brokerIds?: readonly string[];
 }
 
 export function buildActivityTradeLogQuery(
@@ -78,7 +96,7 @@ export function buildActivityTradeLogQuery(
     );
   q = applyActivityDecisionFilter(q, filters.decision);
   if (filters.engineId) q = q.eq('engine_id', filters.engineId);
-  q = applyActivityBrokerScope(q, filters.brokerId, filters.decision);
+  q = applyActivityBrokerScope(q, filters.brokerId, filters.decision, filters.brokerIds);
   return q;
 }
 

@@ -7,6 +7,8 @@ import {
   ALPHAOMEGA_CLOSE_HARD_STOP,
   ALPHAOMEGA_CLOSE_OPPOSING_COUNT,
   ALPHAOMEGA_CLOSE_OPPOSING_SHARE,
+  OMEGA_AO_VT_BROKER_ID,
+  OMEGA_LANE_B_BROKER_ID,
   isOmegaLaneBBroker,
 } from '../../core/alphaOmega/alphaOmegaConstants.js';
 
@@ -20,7 +22,10 @@ const CLOSE_REASON_LABELS: Record<string, string> = {
 export const ALPHAOMEGA_LANE_LABEL = 'ALPHAOMEGA';
 
 export function alphaOmegaLaneLabelForBroker(brokerId: string | null | undefined): string | null {
-  return isOmegaLaneBBroker(brokerId) ? ALPHAOMEGA_LANE_LABEL : null;
+  if (!isOmegaLaneBBroker(brokerId)) return null;
+  if (brokerId === OMEGA_AO_VT_BROKER_ID) return 'ALPHAOMEGA · VT';
+  if (brokerId === OMEGA_LANE_B_BROKER_ID) return 'ALPHAOMEGA · OANDA';
+  return ALPHAOMEGA_LANE_LABEL;
 }
 
 export function formatAlphaOmegaCloseReasonForTelegram(closeReason: string): string {

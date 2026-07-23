@@ -196,6 +196,7 @@ async function registerFillIfPresent(
   if (!direction) return;
   await registerAlphaOmegaPosition(supabase, {
     oandaTradeId: String(data.oanda_trade_id),
+    brokerId,
     direction,
     entryFiredAt: readOmegaFireTimestamp(payload),
     entryPrice: data.fill_price != null ? Number(data.fill_price) : null,

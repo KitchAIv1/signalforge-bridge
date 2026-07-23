@@ -112,6 +112,9 @@ function OpenRiskBody({
   return (
     <RiskShell accent={nearExit ? 'rose' : 'sky'}>
       <OpenRiskHeader dirLabel={dirLabel} entryFiredAt={openPosition.entryFiredAt} nowMs={nowMs} />
+      {openPosition.brokerId ? (
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{openPosition.brokerId}</p>
+      ) : null}
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
         Opposing{' '}
         <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">

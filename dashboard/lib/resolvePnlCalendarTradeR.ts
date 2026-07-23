@@ -1,8 +1,8 @@
-import { ALPHAOMEGA_HARD_STOP_PIPS, OMEGA_LANE_B_BROKER_ID } from './omegaLaneBConstants';
+import { ALPHAOMEGA_HARD_STOP_PIPS, isOmegaLaneBBroker } from './omegaLaneBConstants';
 import type { PnlTradeRow } from './pnlCalendarTypes';
 
 function isLaneBAlphaOmegaTrade(trade: PnlTradeRow): boolean {
-  return trade.engine_id === 'omega' && trade.broker_id === OMEGA_LANE_B_BROKER_ID;
+  return trade.engine_id === 'omega' && isOmegaLaneBBroker(trade.broker_id);
 }
 
 function hardStopRFromPips(pnlPips: number): number {

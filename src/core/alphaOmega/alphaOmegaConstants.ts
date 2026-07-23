@@ -5,7 +5,19 @@
  * consumed by Lane B (oanda_phase2_demo) code paths.
  */
 
+/** Canonical OANDA AO book (Lane B). Kept for Override / OANDA-scoped UI. */
 export const OMEGA_LANE_B_BROKER_ID = 'oanda_phase2_demo';
+
+/** Live VT Markets MT5 AO book — dual-venue alongside OANDA Lane B. */
+export const OMEGA_AO_VT_BROKER_ID = 'vtmarkets_ao_live';
+
+/**
+ * All brokers that run ALPHAOMEGA entry/exit (not RAW Omega trail).
+ * Dual books share streak; already-open and position_state are per broker_id.
+ */
+export const OMEGA_AO_BROKER_IDS = [OMEGA_LANE_B_BROKER_ID, OMEGA_AO_VT_BROKER_ID] as const;
+
+export type OmegaAoBrokerId = (typeof OMEGA_AO_BROKER_IDS)[number];
 
 /** Entry: founding streak must reach this length within ENTRY_SPEED_CEILING_MIN. */
 export const ENTRY_STREAK_LENGTH = 7;
@@ -73,5 +85,6 @@ export const ALPHAOMEGA_CLOSE_BACKSTOP_CRACK = 'alphaomega_backstop_crack';
 export const ALPHAOMEGA_CLOSE_PEAK_GIVEBACK_TRAIL = 'alphaomega_peak_giveback_trail';
 
 export function isOmegaLaneBBroker(brokerId: string | null | undefined): boolean {
-  return brokerId === OMEGA_LANE_B_BROKER_ID;
+  if (!brokerId) return false;
+  return (OMEGA_AO_BROKER_IDS as readonly string[]).includes(brokerId);
 }

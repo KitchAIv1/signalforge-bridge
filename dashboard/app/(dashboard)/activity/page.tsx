@@ -18,7 +18,7 @@ import { PresenceIndicator } from '@/components/PresenceIndicator';
 import { useBrokerFilterOptions } from '@/hooks/useBrokerFilterOptions';
 import { OandaConnectionStatus } from '@/components/OandaConnectionStatus';
 import { applyActivityBrokerScope } from '@/lib/activityTradeLogQuery';
-import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { OMEGA_AO_BROKER_IDS } from '@/lib/omegaLaneBConstants';
 import { engineDisplayLabel } from '@/lib/engineDisplayLabel';
 
 const PAGE_SIZE = 50;
@@ -112,7 +112,7 @@ export default function ActivityPage() {
   const [broker, setBroker] = useState('');
   const [engines, setEngines] = useState<string[]>([]);
   const { brokerOptions } = useBrokerFilterOptions({
-    excludeBrokerIds: [OMEGA_LANE_B_BROKER_ID],
+    excludeBrokerIds: [...OMEGA_AO_BROKER_IDS],
   });
   const rebuildHourGateCtrl = useRebuildHourGate();
   const amdAsianCloseCtrl = useAmdAsianCloseFilter();

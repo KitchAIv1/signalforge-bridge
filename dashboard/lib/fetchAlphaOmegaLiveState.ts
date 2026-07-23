@@ -3,7 +3,7 @@
  */
 
 import { getSupabase } from '@/lib/supabase';
-import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { OMEGA_AO_BROKER_IDS } from '@/lib/omegaLaneBConstants';
 import {
   mapAlphaOmegaPositionRow,
   mapAlphaOmegaStreakRow,
@@ -23,6 +23,13 @@ export interface AlphaOmegaLiveFetchResult {
   errorMessage: string | null;
 }
 
+function pickMostUrgentPosition(
+  rows: AlphaOmegaOpenPositionSnapshot[],
+): AlphaOmegaOpenPositionSnapshot | null {
+  if (rows.length === 0) return null;
+  return [...rows].sort((a, b) => b.opposingFireCount - a.opposingFireCount)[0] ?? null;
+}
+
 export async function fetchAlphaOmegaLiveState(): Promise<AlphaOmegaLiveFetchResult> {
   const supabase = getSupabase();
   const [streakResult, positionResult, lastExitResult] = await Promise.all([
@@ -30,14 +37,12 @@ export async function fetchAlphaOmegaLiveState(): Promise<AlphaOmegaLiveFetchRes
     supabase
       .from('alpha_omega_position_state')
       .select('*')
-      .eq('broker_id', OMEGA_LANE_B_BROKER_ID)
-      .order('entry_fired_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .in('broker_id', [...OMEGA_AO_BROKER_IDS])
+      .order('entry_fired_at', { ascending: false }),
     supabase
       .from('bridge_trade_log')
       .select('oanda_trade_id, direction, close_reason, closed_at, pnl_pips')
-      .eq('broker_id', OMEGA_LANE_B_BROKER_ID)
+      .in('broker_id', [...OMEGA_AO_BROKER_IDS])
       .eq('engine_id', 'omega')
       .eq('status', 'closed')
       .order('closed_at', { ascending: false })
@@ -58,10 +63,14 @@ export async function fetchAlphaOmegaLiveState(): Promise<AlphaOmegaLiveFetchRes
     };
   }
 
-  const mappedPosition = mapAlphaOmegaPositionRow(
-    positionResult.data as Record<string, unknown> | null,
+  const mappedPositions = ((positionResult.data ?? []) as Record<string, unknown>[])
+    .map((row) => mapAlphaOmegaPositionRow(row))
+    .filter((row): row is AlphaOmegaOpenPositionSnapshot => row != null);
+  const mappedPosition = pickMostUrgentPosition(mappedPositions);
+  const tradeStatus = await fetchTradeLogStatus(
+    mappedPosition?.oandaTradeId ?? null,
+    mappedPosition?.brokerId ?? null,
   );
-  const tradeStatus = await fetchTradeLogStatus(mappedPosition?.oandaTradeId ?? null);
   return {
     streak: mapAlphaOmegaStreakRow(streakResult.data as Record<string, unknown> | null),
     openPosition: reconcileOpenPositionAgainstTradeLog(mappedPosition, tradeStatus),
@@ -70,16 +79,19 @@ export async function fetchAlphaOmegaLiveState(): Promise<AlphaOmegaLiveFetchRes
   };
 }
 
-async function fetchTradeLogStatus(oandaTradeId: string | null): Promise<string | null> {
+async function fetchTradeLogStatus(
+  oandaTradeId: string | null,
+  brokerId: string | null,
+): Promise<string | null> {
   if (!oandaTradeId) return null;
-  const { data, error } = await getSupabase()
+  let query = getSupabase()
     .from('bridge_trade_log')
     .select('status')
     .eq('oanda_trade_id', oandaTradeId)
-    .eq('broker_id', OMEGA_LANE_B_BROKER_ID)
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  if (brokerId) query = query.eq('broker_id', brokerId);
+  const { data, error } = await query.maybeSingle();
   if (error) return null;
   return (data?.status as string | undefined) ?? null;
 }

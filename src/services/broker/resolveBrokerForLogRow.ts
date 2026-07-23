@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createBrokerClient } from '../../connectors/broker/brokerFactory.js';
 import type { BrokerClient } from '../../connectors/broker/types.js';
 import { createOandaBroker } from '../../connectors/broker/oandaBroker.js';
+import { logWarn } from '../../utils/logger.js';
 
 export async function resolveBrokerForLogRow(
   supabase: SupabaseClient,
@@ -25,6 +26,20 @@ export async function resolveBrokerForLogRow(
       engineId,
     );
     if (client) return client;
+
+    // Fail closed for MT5 — never attempt OANDA close with an MT5 ticket id.
+    if (data.broker_type === 'mt5') {
+      const message =
+        `MT5 broker ${resolvedId} unavailable (MT5_ENABLED / account UUID / METAAPI_TOKEN)`;
+      logWarn('[resolveBrokerForLogRow] ' + message, { brokerId: resolvedId, engineId });
+      throw new Error(message);
+    }
+  }
+
+  if (resolvedId.startsWith('vtmarkets_')) {
+    const message = `MT5 broker ${resolvedId} row missing or inactive`;
+    logWarn('[resolveBrokerForLogRow] ' + message, { brokerId: resolvedId, engineId });
+    throw new Error(message);
   }
 
   return createOandaBroker({

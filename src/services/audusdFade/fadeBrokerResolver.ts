@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createBrokerClient } from '../../connectors/broker/brokerFactory.js';
 import type { BrokerClient } from '../../connectors/broker/types.js';
 import { createOandaBroker } from '../../connectors/broker/oandaBroker.js';
+import { logWarn } from '../../utils/logger.js';
 
 export async function resolveBrokerForFadeTrade(
   supabase: SupabaseClient,
@@ -24,6 +25,18 @@ export async function resolveBrokerForFadeTrade(
       'audusd_fade',
     );
     if (client) return client;
+    if (data.broker_type === 'mt5') {
+      const message =
+        `MT5 broker ${resolvedId} unavailable (MT5_ENABLED / account UUID / METAAPI_TOKEN)`;
+      logWarn('[resolveBrokerForFadeTrade] ' + message, { brokerId: resolvedId });
+      throw new Error(message);
+    }
+  }
+
+  if (resolvedId.startsWith('vtmarkets_')) {
+    const message = `MT5 broker ${resolvedId} row missing or inactive`;
+    logWarn('[resolveBrokerForFadeTrade] ' + message, { brokerId: resolvedId });
+    throw new Error(message);
   }
 
   return createOandaBroker({

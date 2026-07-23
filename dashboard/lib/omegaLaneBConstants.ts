@@ -1,5 +1,12 @@
-/** Dashboard mirror of backend Lane B broker id. */
+/** Dashboard mirror of backend Lane B / AO broker ids. */
 export const OMEGA_LANE_B_BROKER_ID = 'oanda_phase2_demo';
+export const OMEGA_AO_VT_BROKER_ID = 'vtmarkets_ao_live';
+export const OMEGA_AO_BROKER_IDS = [OMEGA_LANE_B_BROKER_ID, OMEGA_AO_VT_BROKER_ID] as const;
+
+export function isOmegaLaneBBroker(brokerId: string | null | undefined): boolean {
+  if (!brokerId) return false;
+  return (OMEGA_AO_BROKER_IDS as readonly string[]).includes(brokerId);
+}
 
 /** Mirror of src/core/omegaLaneB/omegaLaneBConstants.ts block reasons (legacy R1/Phase2 — no longer enforced, kept for historical row display). */
 export const LANE_B_BLOCK_R1_FLIP = 'OMEGA_LANE_B_R1_FLIP';

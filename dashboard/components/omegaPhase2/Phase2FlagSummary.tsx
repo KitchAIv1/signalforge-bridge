@@ -6,6 +6,7 @@ import {
   ALPHAOMEGA_ENTRY_STREAK_LENGTH,
   ALPHAOMEGA_HARD_STOP_PIPS,
   ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD,
+  OMEGA_AO_VT_BROKER_ID,
   OMEGA_LANE_B_BROKER_ID,
 } from '@/lib/omegaLaneBConstants';
 
@@ -45,8 +46,10 @@ function BannerCopy({ enabled }: { enabled: boolean }) {
         {ALPHAOMEGA_BANNER_LABEL} — {modeLabel}
       </p>
       <p className="mt-1 text-slate-500 dark:text-slate-400">
-        Broker: <span className="text-slate-700 dark:text-slate-200">{OMEGA_LANE_B_BROKER_ID}</span>{' '}
-        (AUD_NEWWWW)
+        Brokers:{' '}
+        <span className="text-slate-700 dark:text-slate-200">{OMEGA_LANE_B_BROKER_ID}</span> (OANDA)
+        {' · '}
+        <span className="text-slate-700 dark:text-slate-200">{OMEGA_AO_VT_BROKER_ID}</span> (VT)
       </p>
       <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
         {ALPHAOMEGA_ENTRY_STREAK_LENGTH}/45 crack · ≥30m floor · exit @

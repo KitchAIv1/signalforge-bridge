@@ -115,6 +115,4 @@ export async function evaluateLaneBEntryGate(
   return { blocked: false, blockReason: null, shadowAdvisory: null };
 }
 
-export function isOmegaLaneBBroker(brokerId: string): boolean {
-  return brokerId === OMEGA_LANE_B_BROKER_ID;
-}
+export { isOmegaLaneBBroker } from '../alphaOmega/alphaOmegaConstants.js';

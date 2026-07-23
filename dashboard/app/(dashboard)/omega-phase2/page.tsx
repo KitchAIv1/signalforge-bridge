@@ -14,7 +14,11 @@ import {
 import { usePhase2TradeLog } from '@/hooks/usePhase2TradeLog';
 import { usePhase2ScoreboardRows } from '@/hooks/usePhase2ScoreboardRows';
 import { downloadAlphaOmegaTradeCsv } from '@/lib/alphaOmegaTradeCsv';
-import { ALPHAOMEGA_PAGE_TITLE, OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import {
+  ALPHAOMEGA_PAGE_TITLE,
+  OMEGA_AO_VT_BROKER_ID,
+  OMEGA_LANE_B_BROKER_ID,
+} from '@/lib/omegaLaneBConstants';
 import type { BridgeTradeLogRow } from '@/lib/types';
 
 export default function OmegaPhase2ActivityPage() {
@@ -35,8 +39,8 @@ export default function OmegaPhase2ActivityPage() {
             {ALPHAOMEGA_PAGE_TITLE}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Broker {OMEGA_LANE_B_BROKER_ID} (AUD_NEWWWW). Crack entry + speed floor + opposing /
-            hard-stop / backstop exits.
+            Dual books: {OMEGA_LANE_B_BROKER_ID} (OANDA) + {OMEGA_AO_VT_BROKER_ID} (VT). Crack entry
+            + speed floor + opposing / hard-stop / backstop exits.
           </p>
         </div>
         <button

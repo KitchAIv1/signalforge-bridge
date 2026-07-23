@@ -14,6 +14,7 @@ export interface AlphaOmegaStreakSnapshot {
 
 export interface AlphaOmegaOpenPositionSnapshot {
   oandaTradeId: string;
+  brokerId: string;
   direction: string;
   entryFiredAt: string;
   entryPrice: number | null;
@@ -45,6 +46,7 @@ export function mapAlphaOmegaPositionRow(
   if (!row) return null;
   return {
     oandaTradeId: String(row.oanda_trade_id),
+    brokerId: String(row.broker_id ?? ''),
     direction: String(row.direction),
     entryFiredAt: String(row.entry_fired_at),
     entryPrice: row.entry_price != null ? Number(row.entry_price) : null,

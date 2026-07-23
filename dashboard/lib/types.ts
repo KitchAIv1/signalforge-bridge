@@ -12,6 +12,7 @@ export interface BridgeBrokerRow {
   display_name: string;
   broker_type?: string | null;
   is_active?: boolean | null;
+  account_id?: string | null;
 }
 
 export interface BridgeEngineRow {

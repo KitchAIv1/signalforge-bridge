@@ -20,7 +20,7 @@ import { logWarn } from '../utils/logger.js';
 import {
   ALPHAOMEGA_CLOSE_HARD_STOP,
   HARD_STOP_PIPS,
-  OMEGA_LANE_B_BROKER_ID,
+  isOmegaLaneBBroker,
   PIP_SIZE,
 } from '../core/alphaOmega/alphaOmegaConstants.js';
 import {
@@ -107,5 +107,5 @@ export async function runAlphaOmegaHardStopMonitor(): Promise<void> {
 }
 
 export function isAlphaOmegaLaneBBroker(brokerId: string | null | undefined): boolean {
-  return brokerId === OMEGA_LANE_B_BROKER_ID;
+  return isOmegaLaneBBroker(brokerId);
 }

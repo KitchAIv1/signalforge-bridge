@@ -330,6 +330,7 @@ async function registerLaneBFill(params: OmegaFanOutParams, brokerId: string): P
   if (!direction) return;
   await registerAlphaOmegaPosition(params.supabase, {
     oandaTradeId: filled.oandaTradeId,
+    brokerId,
     direction,
     entryFiredAt: String(params.payload.created_at ?? new Date().toISOString()),
     entryPrice: filled.fillPrice,

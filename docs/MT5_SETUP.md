@@ -71,3 +71,24 @@ Run `npm run mt5:sizing-study` for recommended risk-% on $25k accounts.
 ## 8. Outage / rollback
 
 See [MT5_BROKER_OUTAGE_RUNBOOK.md](./MT5_BROKER_OUTAGE_RUNBOOK.md).
+
+## 9. ALPHAOMEGA dual book (OANDA + VT live)
+
+AO stays on OANDA (`oanda_phase2_demo`) and can also trade a dedicated VT live book (`vtmarkets_ao_live`).
+
+**Schema:** INSERT-only migration `063_vtmarkets_ao_live.sql` (no new tables/columns). Uses existing `bridge_brokers` / `bridge_links`.
+
+**Guided bind (Settings → Connect VT Markets):**
+1. Add the live VT MT5 account in MetaApi (London). Keep login/server/password in MetaApi only.
+2. Ensure dashboard server has `METAAPI_TOKEN` (and bridge has `MT5_ENABLED=true`).
+3. Paste the MetaApi **account UUID** into the Connect panel → Bind & probe.
+4. On success: UUID saved to `bridge_brokers.account_id`, broker + `(omega, vtmarkets_ao_live)` link activated, `connection_status=connected`.
+
+Optional env override: `METAAPI_AO_ACCOUNT_ID` (wins over DB UUID when set).
+
+**Runtime notes:**
+- AO magic on VT: `88004` (classic omega RAW VT remains `88001`).
+- Hard-stop / giveback still use OANDA M5 (parity with Fade/Omega VT pilot).
+- Disconnect deactivates the VT route; open VT tickets are fail-closed (no OANDA fallback close).
+- Override terminal remains OANDA AO only.
+- Full self-serve VT password provisioning (2B) is deferred.

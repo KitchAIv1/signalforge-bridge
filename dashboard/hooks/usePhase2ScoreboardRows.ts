@@ -12,7 +12,7 @@ import {
   buildActivityTradeLogQuery,
   type BridgeTradeLogRow,
 } from '@/lib/activityTradeLogQuery';
-import { OMEGA_LANE_B_BROKER_ID } from '@/lib/omegaLaneBConstants';
+import { OMEGA_AO_BROKER_IDS } from '@/lib/omegaLaneBConstants';
 import { isPhase2ShadowFlagged } from '@/lib/phase2LaneAdvisoryFormat';
 
 const MAX_SCOREBOARD_PAGES = 20;
@@ -25,7 +25,8 @@ async function fetchLaneBPage(
   const { data, error } = await buildActivityTradeLogQuery(supabase, pageNum, {
     decision,
     engineId: 'omega',
-    brokerId: OMEGA_LANE_B_BROKER_ID,
+    brokerId: '',
+    brokerIds: OMEGA_AO_BROKER_IDS,
   });
   if (error) return [];
   return (data ?? []) as unknown as BridgeTradeLogRow[];

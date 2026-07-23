@@ -15,7 +15,7 @@ import {
   ALPHAOMEGA_CLOSE_BACKSTOP_CRACK,
   ALPHAOMEGA_CLOSE_OPPOSING_COUNT,
   ALPHAOMEGA_CLOSE_OPPOSING_SHARE,
-  OMEGA_LANE_B_BROKER_ID,
+  OMEGA_AO_BROKER_IDS,
   OPPOSING_FIRE_COUNT_THRESHOLD,
   OPPOSING_SHARE_MIN_FIRES,
   OPPOSING_SHARE_THRESHOLD,
@@ -42,7 +42,7 @@ export async function loadOpenLaneBPositions(supabase: SupabaseClient): Promise<
     .select(
       'oanda_trade_id, broker_id, direction, entry_fired_at, entry_price, opposing_fire_count, total_fire_count, peak_favorable_pips',
     )
-    .eq('broker_id', OMEGA_LANE_B_BROKER_ID);
+    .in('broker_id', [...OMEGA_AO_BROKER_IDS]);
   if (error) {
     logWarn('[AlphaOmega] loadOpenLaneBPositions failed', { error: error.message });
     return [];
@@ -52,11 +52,17 @@ export async function loadOpenLaneBPositions(supabase: SupabaseClient): Promise<
 
 export async function registerAlphaOmegaPosition(
   supabase: SupabaseClient,
-  params: { oandaTradeId: string; direction: AlphaOmegaDirection; entryFiredAt: string; entryPrice: number | null },
+  params: {
+    oandaTradeId: string;
+    brokerId: string;
+    direction: AlphaOmegaDirection;
+    entryFiredAt: string;
+    entryPrice: number | null;
+  },
 ): Promise<void> {
   const { error } = await supabase.from('alpha_omega_position_state').insert({
     oanda_trade_id: params.oandaTradeId,
-    broker_id: OMEGA_LANE_B_BROKER_ID,
+    broker_id: params.brokerId,
     direction: params.direction,
     entry_fired_at: params.entryFiredAt,
     entry_price: params.entryPrice,
@@ -65,7 +71,11 @@ export async function registerAlphaOmegaPosition(
     peak_favorable_pips: 0,
   });
   if (error) {
-    logWarn('[AlphaOmega] registerAlphaOmegaPosition failed', { error: error.message, oandaTradeId: params.oandaTradeId });
+    logWarn('[AlphaOmega] registerAlphaOmegaPosition failed', {
+      error: error.message,
+      oandaTradeId: params.oandaTradeId,
+      brokerId: params.brokerId,
+    });
   }
 }
 

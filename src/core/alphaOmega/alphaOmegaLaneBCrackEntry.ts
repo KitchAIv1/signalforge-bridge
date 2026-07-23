@@ -117,29 +117,37 @@ async function attemptLaneBCrack(
   }
 
   const routes = await loadExecutionRoutes(params.supabase, 'omega');
-  const laneBRoute = routes.find((route) => isOmegaLaneBBroker(route.brokerId));
-  if (!laneBRoute) return false;
-  if (await hasOpenOmegaOnBroker(params.supabase, laneBRoute.brokerId)) return true;
+  const aoRoutes = routes.filter((route) => isOmegaLaneBBroker(route.brokerId));
+  if (aoRoutes.length === 0) return false;
 
   const gate = evaluateAlphaOmegaEntryGate({
     crackEvent,
     direction,
     hasOpenPosition: false,
   });
-  if (!gate.enter) {
-    await blockLaneBNoEnter(params, laneBRoute.brokerId, norm.oandaInstrument, norm.direction, gate);
-    return true;
-  }
 
-  await placeLaneBCrackOrder({
-    ...params,
-    engine: params.engine,
-    norm,
-    laneBRoute,
-    foundingLength: gate.foundingLength,
-    foundingSpeedMin: gate.foundingSpeedMin,
-  });
-  return true;
+  let handled = false;
+  for (const laneBRoute of aoRoutes) {
+    if (await hasOpenOmegaOnBroker(params.supabase, laneBRoute.brokerId)) {
+      handled = true;
+      continue;
+    }
+    if (!gate.enter) {
+      await blockLaneBNoEnter(params, laneBRoute.brokerId, norm.oandaInstrument, norm.direction, gate);
+      handled = true;
+      continue;
+    }
+    await placeLaneBCrackOrder({
+      ...params,
+      engine: params.engine,
+      norm,
+      laneBRoute,
+      foundingLength: gate.foundingLength,
+      foundingSpeedMin: gate.foundingSpeedMin,
+    });
+    handled = true;
+  }
+  return handled;
 }
 
 /**
