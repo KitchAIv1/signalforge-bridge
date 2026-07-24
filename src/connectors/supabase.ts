@@ -44,6 +44,8 @@ export type SignalInsertPayload = Record<string, unknown> & {
   stop_loss_pips?: number;
   created_at?: string;
   regime?: string;
+  /** 'full' = normal Trail path; 'ao_observe' = AO streak only (exec-dedup). */
+  execution_tier?: string;
 };
 
 export type OnSignalInsertCallback = (payload: SignalInsertPayload) => void | Promise<void>;

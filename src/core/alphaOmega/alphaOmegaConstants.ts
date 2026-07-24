@@ -78,6 +78,16 @@ export const ALPHAOMEGA_BLOCK_NO_CRACK = 'ALPHAOMEGA_NO_QUALIFYING_CRACK';
 export const ALPHAOMEGA_BLOCK_SPEED_FLOOR = 'ALPHAOMEGA_SPEED_FLOOR';
 export const ALPHAOMEGA_BLOCK_ALREADY_OPEN = 'ALPHAOMEGA_ALREADY_OPEN';
 
+/**
+ * signals.execution_tier written by engine-omega when bridge exec-dedup skips
+ * a matched fire. Bridge observes for AO streak/exits/entry only — never Trail.
+ * Must stay in sync with engine-omega signalEmitter AO_OBSERVE_EXECUTION_TIER.
+ */
+export const ALPHAOMEGA_OBSERVE_ONLY_EXECUTION_TIER = 'ao_observe';
+
+/** bridge_trade_log block_reason for observe-only (no Omega Trail attempt). */
+export const ALPHAOMEGA_OBSERVE_DEDUPED_REASON = 'AO_OBSERVE_DEDUPED';
+
 export const ALPHAOMEGA_CLOSE_OPPOSING_COUNT = 'alphaomega_opposing_count';
 export const ALPHAOMEGA_CLOSE_OPPOSING_SHARE = 'alphaomega_opposing_share';
 export const ALPHAOMEGA_CLOSE_HARD_STOP = 'alphaomega_hard_stop';

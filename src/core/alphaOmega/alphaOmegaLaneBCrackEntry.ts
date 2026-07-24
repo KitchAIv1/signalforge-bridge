@@ -10,7 +10,7 @@ import type { ActiveAmdState } from '../../services/amdDetector/amdStateService.
 import type { ActiveRegimeState } from '../../services/RegimeStateService.js';
 import { loadExecutionRoutes } from '../../services/broker/brokerLinkService.js';
 import { insertLaneBBlockedRow } from '../omegaLaneB/omegaLaneBBlockedRow.js';
-import { logWarn } from '../../utils/logger.js';
+import { logInfo, logWarn } from '../../utils/logger.js';
 import type { DecisionType } from '../../types/signals.js';
 import { evaluateAlphaOmegaEntryGate } from './alphaOmegaEntryGate.js';
 import { isOmegaLaneBBroker } from './alphaOmegaConstants.js';
@@ -22,6 +22,7 @@ import {
 import { readOmegaFireDirection } from './alphaOmegaFireIdentity.js';
 import { placeLaneBCrackOrder } from './alphaOmegaLaneBCrackPlace.js';
 import type { CrackEvent } from './alphaOmegaStreakTracker.js';
+import type { EngineBrokerRoute } from '../../services/broker/brokerLinkService.js';
 
 type TradeLogBuilder = (
   payload: SignalInsertPayload,
@@ -126,28 +127,91 @@ async function attemptLaneBCrack(
     hasOpenPosition: false,
   });
 
+  const fanOutStartedAt = Date.now();
+  logInfo('[AlphaOmega] Lane B crack fan-out start', {
+    signalId: params.signalId,
+    routeOrder: aoRoutes.map((route) => route.brokerId),
+  });
+
   let handled = false;
   for (const laneBRoute of aoRoutes) {
-    if (await hasOpenOmegaOnBroker(params.supabase, laneBRoute.brokerId)) {
-      handled = true;
-      continue;
-    }
-    if (!gate.enter) {
-      await blockLaneBNoEnter(params, laneBRoute.brokerId, norm.oandaInstrument, norm.direction, gate);
-      handled = true;
-      continue;
-    }
-    await placeLaneBCrackOrder({
-      ...params,
-      engine: params.engine,
-      norm,
-      laneBRoute,
-      foundingLength: gate.foundingLength,
-      foundingSpeedMin: gate.foundingSpeedMin,
-    });
-    handled = true;
+    handled =
+      (await placeOrSkipLaneBRoute({
+        params,
+        laneBRoute,
+        gate,
+        norm,
+        direction,
+        fanOutStartedAt,
+      })) || handled;
   }
+
+  logInfo('[AlphaOmega] Lane B crack fan-out done', {
+    signalId: params.signalId,
+    totalFanOutMs: Date.now() - fanOutStartedAt,
+  });
   return handled;
+}
+
+async function placeOrSkipLaneBRoute(input: {
+  params: AlphaOmegaLaneBCrackEntryParams;
+  laneBRoute: EngineBrokerRoute;
+  gate: ReturnType<typeof evaluateAlphaOmegaEntryGate>;
+  norm: NonNullable<ReturnType<typeof normalizeOmegaForAlphaOmegaEntry>>;
+  direction: string;
+  fanOutStartedAt: number;
+}): Promise<boolean> {
+  const { params, laneBRoute, gate, norm, fanOutStartedAt } = input;
+  if (await hasOpenOmegaOnBroker(params.supabase, laneBRoute.brokerId)) {
+    return true;
+  }
+  if (!gate.enter) {
+    await blockLaneBNoEnter(
+      params,
+      laneBRoute.brokerId,
+      norm.oandaInstrument,
+      norm.direction,
+      gate,
+    );
+    return true;
+  }
+  if (!params.engine) return false;
+
+  const routeStartedAt = Date.now();
+  const queuedBehindMs = routeStartedAt - fanOutStartedAt;
+  logInfo('[AlphaOmega] Lane B crack place start', {
+    signalId: params.signalId,
+    brokerId: laneBRoute.brokerId,
+    queuedBehindMs,
+  });
+  await placeLaneBCrackOrder({
+    ...params,
+    engine: params.engine,
+    norm,
+    laneBRoute,
+    foundingLength: gate.foundingLength,
+    foundingSpeedMin: gate.foundingSpeedMin,
+  });
+  logInfo('[AlphaOmega] Lane B crack place done', {
+    signalId: params.signalId,
+    brokerId: laneBRoute.brokerId,
+    queuedBehindMs,
+    placeElapsedMs: Date.now() - routeStartedAt,
+    sinceFanOutStartMs: Date.now() - fanOutStartedAt,
+  });
+  return true;
+}
+
+/**
+ * If this fire is an entry-eligible crack, place Lane B AO only (no Trail).
+ * Used by rSize<4 side-path and by exec-dedup observe-only signals.
+ */
+export async function maybeEnterLaneBOnCrack(
+  params: AlphaOmegaLaneBCrackEntryParams,
+): Promise<boolean> {
+  const crackEvent = crackForEntry(params.fireOutcome);
+  if (!crackEvent || !params.engine) return false;
+  return attemptLaneBCrack(params, crackEvent);
 }
 
 /**
@@ -159,7 +223,5 @@ export async function maybeEnterLaneBOnRSizeBlockedCrack(
   validationReason: string | null | undefined,
 ): Promise<boolean> {
   if (!isOmegaRSizeBlock(validationReason)) return false;
-  const crackEvent = crackForEntry(params.fireOutcome);
-  if (!crackEvent || !params.engine) return false;
-  return attemptLaneBCrack(params, crackEvent);
+  return maybeEnterLaneBOnCrack(params);
 }

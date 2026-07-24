@@ -31,6 +31,10 @@ import {
   observeOmegaFireIfNeeded,
 } from './alphaOmega/alphaOmegaRouterHooks.js';
 import {
+  handleAoObserveOnlySignal,
+  isAoObserveOnlyPayload,
+} from './alphaOmega/alphaOmegaObserveOnly.js';
+import {
   parseOmegaRawModeFlag,
   shouldBypassDirectionFlip,
   shouldBypassExecutionThreshold,
@@ -385,6 +389,22 @@ export async function processSignal(
 ): Promise<void> {
   const { config, engines, getCachedAccount, getOpenTradesFromLog, supabase } = deps;
   const signalId = (payload.id ?? '').toString();
+
+  // Exec-dedup observe-only: AO streak/exit/entry only — never Omega Trail.
+  if (isAoObserveOnlyPayload(payload)) {
+    await handleAoObserveOnlySignal({
+      supabase,
+      payload,
+      signalId,
+      config,
+      engines,
+      receivedAt,
+      cachedAccountEquity: getCachedAccount()?.equity ?? null,
+      buildTradeLogRow,
+      attachOmegaAuditFields,
+    });
+    return;
+  }
 
   // ALPHAOMEGA: count open-session Omega fires at router entry (before 4-pip).
   // Closed-market ghosts are no-ops inside observe (streak frozen / retained).
