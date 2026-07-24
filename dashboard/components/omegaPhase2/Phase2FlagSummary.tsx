@@ -52,7 +52,7 @@ function BannerCopy({ enabled }: { enabled: boolean }) {
         <span className="text-slate-700 dark:text-slate-200">{OMEGA_AO_VT_BROKER_ID}</span> (VT)
       </p>
       <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-        {ALPHAOMEGA_ENTRY_STREAK_LENGTH}/45 crack · ≥30m floor · exit @
+        {ALPHAOMEGA_ENTRY_STREAK_LENGTH}/45 crack · {'>'}35m floor · exit @
         {ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD} opp / {ALPHAOMEGA_HARD_STOP_PIPS}p / backstop /
         max hold
       </p>

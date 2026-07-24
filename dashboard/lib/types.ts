@@ -53,6 +53,8 @@ export interface BridgeTradeLogRow {
   created_at: string;
 
   fill_price: number | null;
+  entry_price?: number | null;
+  account_equity_at_signal?: number | null;
   exit_price: number | null;
   stop_loss: number | null;
   take_profit: number | null;

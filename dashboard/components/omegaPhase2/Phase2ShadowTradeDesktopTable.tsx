@@ -1,6 +1,7 @@
 'use client';
 
 import type { BridgeTradeLogRow } from '@/lib/types';
+import type { SpeedfloorPaperOutcome } from '@/lib/alphaOmegaPaper/paperSimTypes';
 import {
   PHASE2_SHADOW_DESKTOP_COLUMN_COUNT,
   Phase2ShadowTradeTableRow,
@@ -10,6 +11,8 @@ interface Phase2ShadowTradeDesktopTableProps {
   tradeRows: BridgeTradeLogRow[];
   isTradeListLoading: boolean;
   onSelectTrade?: (tradeRow: BridgeTradeLogRow) => void;
+  paperByTradeId?: Record<string, SpeedfloorPaperOutcome>;
+  paperLoading?: boolean;
 }
 
 const DESKTOP_HEADERS = [
@@ -20,7 +23,7 @@ const DESKTOP_HEADERS = [
   'Founding',
   'Exit / block',
   'Status',
-  'PnL',
+  'PnL / Paper',
   'Hold',
   'Session',
 ] as const;
@@ -29,6 +32,8 @@ export function Phase2ShadowTradeDesktopTable({
   tradeRows,
   isTradeListLoading,
   onSelectTrade,
+  paperByTradeId = {},
+  paperLoading = false,
 }: Phase2ShadowTradeDesktopTableProps) {
   return (
     <div className="hidden lg:block lg:overflow-x-auto lg:rounded-lg lg:border lg:border-slate-200 lg:bg-white lg:dark:border-slate-700 lg:dark:bg-slate-900">
@@ -47,6 +52,8 @@ export function Phase2ShadowTradeDesktopTable({
             tradeRows={tradeRows}
             isTradeListLoading={isTradeListLoading}
             onSelectTrade={onSelectTrade}
+            paperByTradeId={paperByTradeId}
+            paperLoading={paperLoading}
           />
         </tbody>
       </table>
@@ -58,6 +65,8 @@ function DesktopTableBody({
   tradeRows,
   isTradeListLoading,
   onSelectTrade,
+  paperByTradeId = {},
+  paperLoading = false,
 }: Phase2ShadowTradeDesktopTableProps) {
   if (tradeRows.length === 0 && !isTradeListLoading) {
     return (
@@ -78,6 +87,8 @@ function DesktopTableBody({
           key={tradeRow.id}
           tradeRow={tradeRow}
           onSelectTrade={onSelectTrade}
+          paperOutcome={paperByTradeId[tradeRow.id]}
+          paperLoading={paperLoading}
         />
       ))}
     </>

@@ -24,7 +24,8 @@ export const ALPHAOMEGA_BANNER_LABEL = 'ALPHAOMEGA';
 /** Dashboard mirrors of src/core/alphaOmega/alphaOmegaConstants.ts (display only). */
 export const ALPHAOMEGA_ENTRY_STREAK_LENGTH = 7;
 export const ALPHAOMEGA_ENTRY_SPEED_CEILING_MIN = 45;
-export const ALPHAOMEGA_ENTRY_SPEED_FLOOR_MIN = 30;
+/** Must match bridge ENTRY_SPEED_FLOOR_MIN — enter only when founding speed > this. */
+export const ALPHAOMEGA_ENTRY_SPEED_FLOOR_MIN = 35;
 export const ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD = 5;
 export const ALPHAOMEGA_HARD_STOP_PIPS = 10;
 export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';

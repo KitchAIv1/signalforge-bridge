@@ -3,9 +3,12 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { Phase2LaneAdvisoryBadge } from '@/components/omegaPhase2/Phase2LaneAdvisoryBadge';
+import { Phase2PaperPnlCell } from '@/components/omegaPhase2/Phase2PaperPnlCell';
 import { resolvePhase2AdvisoryDisplay } from '@/lib/phase2LaneAdvisoryFormat';
 import { formatCloseReason } from '@/lib/formatCloseReason';
 import { formatAlphaOmegaBlockReason } from '@/lib/alphaOmegaAdvisoryParse';
+import { isSpeedfloorShadowRow } from '@/lib/alphaOmegaPaper/isSpeedfloorShadowRow';
+import type { SpeedfloorPaperOutcome } from '@/lib/alphaOmegaPaper/paperSimTypes';
 import {
   formatDurationMinutes,
   formatSignedDollars,
@@ -17,6 +20,8 @@ import {
 interface Phase2ShadowTradeMobileCardProps {
   tradeRow: BridgeTradeLogRow;
   onSelectTrade?: (tradeRow: BridgeTradeLogRow) => void;
+  paperOutcome?: SpeedfloorPaperOutcome;
+  paperLoading?: boolean;
 }
 
 function exitOrBlockLabel(tradeRow: BridgeTradeLogRow): string {
@@ -29,6 +34,8 @@ function exitOrBlockLabel(tradeRow: BridgeTradeLogRow): string {
 export function Phase2ShadowTradeMobileCard({
   tradeRow,
   onSelectTrade,
+  paperOutcome,
+  paperLoading = false,
 }: Phase2ShadowTradeMobileCardProps) {
   const isLong = tradeRow.direction === 'long' || tradeRow.direction === 'LONG';
   return (
@@ -39,7 +46,11 @@ export function Phase2ShadowTradeMobileCard({
       onClick={onSelectTrade ? () => onSelectTrade(tradeRow) : undefined}
     >
       <MobileCardHeader tradeRow={tradeRow} isLong={isLong} />
-      <MobileCardBody tradeRow={tradeRow} />
+      <MobileCardBody
+        tradeRow={tradeRow}
+        paperOutcome={paperOutcome}
+        paperLoading={paperLoading}
+      />
     </article>
   );
 }
@@ -66,13 +77,22 @@ function MobileCardHeader({
   );
 }
 
-function MobileCardBody({ tradeRow }: { tradeRow: BridgeTradeLogRow }) {
+function MobileCardBody({
+  tradeRow,
+  paperOutcome,
+  paperLoading,
+}: {
+  tradeRow: BridgeTradeLogRow;
+  paperOutcome?: SpeedfloorPaperOutcome;
+  paperLoading: boolean;
+}) {
   const advisoryDisplay = resolvePhase2AdvisoryDisplay(
     tradeRow.lane_advisory,
     tradeRow.decision,
     tradeRow.block_reason,
   );
   const toneClass = pnlToneClass(tradeRow.result, tradeRow.pnl_pips);
+  const speedfloor = isSpeedfloorShadowRow(tradeRow);
   return (
     <>
       <div className="mt-3">
@@ -87,18 +107,35 @@ function MobileCardBody({ tradeRow }: { tradeRow: BridgeTradeLogRow }) {
         </div>
         <div>
           <dt className="text-slate-500">Exit / block</dt>
-          <dd className="text-slate-800 dark:text-slate-200">{exitOrBlockLabel(tradeRow)}</dd>
+          <dd className="text-slate-800 dark:text-slate-200">
+            {speedfloor && paperOutcome?.exitTrigger
+              ? paperOutcome.status === 'paper_open'
+                ? 'Paper open'
+                : `Paper · ${paperOutcome.exitTrigger}`
+              : exitOrBlockLabel(tradeRow)}
+          </dd>
         </div>
         <div>
-          <dt className="text-slate-500">PnL</dt>
+          <dt className="text-slate-500">{speedfloor ? 'Paper PnL' : 'PnL'}</dt>
           <dd className={`font-mono tabular-nums ${toneClass}`}>
-            {formatSignedPips(tradeRow.pnl_pips)} · {formatSignedDollars(tradeRow.pnl_dollars)}
+            {speedfloor ? (
+              <Phase2PaperPnlCell outcome={paperOutcome} loading={paperLoading} />
+            ) : (
+              <>
+                {formatSignedPips(tradeRow.pnl_pips)} ·{' '}
+                {formatSignedDollars(tradeRow.pnl_dollars)}
+              </>
+            )}
           </dd>
         </div>
         <div>
           <dt className="text-slate-500">Hold</dt>
           <dd className="tabular-nums text-slate-800 dark:text-slate-200">
-            {formatDurationMinutes(tradeRow.duration_minutes)}
+            {speedfloor
+              ? paperOutcome?.holdMinutes != null
+                ? formatDurationMinutes(paperOutcome.holdMinutes)
+                : '—'
+              : formatDurationMinutes(tradeRow.duration_minutes)}
           </dd>
         </div>
       </dl>

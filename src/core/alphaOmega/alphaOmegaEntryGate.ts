@@ -2,8 +2,8 @@
  * ALPHAOMEGA entry gate — replaces the legacy R1/Phase2 gates
  * (omegaPhase2EntryGate.ts) for Lane B. Enters only on a validated
  * "founding streak crack" whose direction matches the incoming signal, with
- * no position already open, and whose founding streak took at least
- * ENTRY_SPEED_FLOOR_MIN to form.
+ * no position already open, and whose founding streak took longer than
+ * ENTRY_SPEED_FLOOR_MIN to form (≤ floor → SPEEDFLOOR shadow, no fill).
  *
  * Legacy R1/Phase2 files are left in place (not deleted) for easy rollback;
  * they are simply no longer called from the Lane B fan-out branch.
@@ -52,7 +52,8 @@ export function evaluateAlphaOmegaEntryGate(input: AlphaOmegaEntryGateInput): Al
     };
   }
 
-  if (crackEvent.foundingSpeedMin < ENTRY_SPEED_FLOOR_MIN) {
+  // Inclusive: speed=35.0 (common advisory) must not fill — CF drop was [30,35].
+  if (crackEvent.foundingSpeedMin <= ENTRY_SPEED_FLOOR_MIN) {
     return {
       enter: false,
       blockReason: ALPHAOMEGA_BLOCK_SPEED_FLOOR,

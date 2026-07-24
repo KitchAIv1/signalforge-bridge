@@ -5,8 +5,8 @@ export const ACTIVITY_TRADE_LOG_PAGE_SIZE = 50;
 
 export const EXPANDED_TRADE_LOG_SELECT =
   'id, signal_id, engine_id, broker_id, pair, direction, decision, block_reason, status, result, ' +
-  'confluence_score, units, risk_amount, pnl_dollars, fill_price, exit_price, stop_loss, ' +
-  'take_profit, pnl_pips, pnl_r, lot_size, close_reason, duration_minutes, ' +
+  'confluence_score, units, risk_amount, pnl_dollars, fill_price, entry_price, exit_price, stop_loss, ' +
+  'take_profit, pnl_pips, pnl_r, lot_size, close_reason, duration_minutes, account_equity_at_signal, ' +
   'signal_received_at, created_at, regime_direction, regime_confidence, regime_evaluated_at, ' +
   'signal_session, close_tag, manual_tag, lane_advisory, ' +
   'layer4_result, layer4_bullish_count, layer4_bearish_count, ' +

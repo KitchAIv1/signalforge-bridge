@@ -26,9 +26,13 @@ export const ENTRY_SPEED_CEILING_MIN = 45;
 /** A gap this long or longer between same-direction fires breaks the streak (weekend/quiet-hours guard). */
 export const MAX_INTRA_RUN_GAP_MINUTES = 60;
 
-/** Entry: additionally require the founding streak to have taken at least this long to form
- * (fast, sub-30min bursts back-tested weaker; validated net improvement +14p over 69 trades). */
-export const ENTRY_SPEED_FLOOR_MIN = 30;
+/**
+ * Entry: founding streak must take LONGER than this many minutes to form.
+ * Gate uses `speed <= ENTRY_SPEED_FLOOR_MIN` → block (+ SPEEDFLOOR shadow).
+ * Raised 30 → 35 (Jul 24 2026 live autopsy): speed band [30,35] was 1/6 win,
+ * −$4.1k actual / pure-book CF +$4.7k if skipped. Arming ceiling stays 45m.
+ */
+export const ENTRY_SPEED_FLOOR_MIN = 35;
 
 /** Exit: close as soon as this many opposing-direction fires accumulate since entry. */
 export const OPPOSING_FIRE_COUNT_THRESHOLD = 5;

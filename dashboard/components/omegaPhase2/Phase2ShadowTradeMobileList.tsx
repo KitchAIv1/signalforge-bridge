@@ -1,18 +1,23 @@
 'use client';
 
 import type { BridgeTradeLogRow } from '@/lib/types';
+import type { SpeedfloorPaperOutcome } from '@/lib/alphaOmegaPaper/paperSimTypes';
 import { Phase2ShadowTradeMobileCard } from '@/components/omegaPhase2/Phase2ShadowTradeMobileCard';
 
 interface Phase2ShadowTradeMobileListProps {
   tradeRows: BridgeTradeLogRow[];
   isTradeListLoading: boolean;
   onSelectTrade?: (tradeRow: BridgeTradeLogRow) => void;
+  paperByTradeId?: Record<string, SpeedfloorPaperOutcome>;
+  paperLoading?: boolean;
 }
 
 export function Phase2ShadowTradeMobileList({
   tradeRows,
   isTradeListLoading,
   onSelectTrade,
+  paperByTradeId = {},
+  paperLoading = false,
 }: Phase2ShadowTradeMobileListProps) {
   if (tradeRows.length === 0 && !isTradeListLoading) {
     return (
@@ -29,6 +34,8 @@ export function Phase2ShadowTradeMobileList({
           key={tradeRow.id}
           tradeRow={tradeRow}
           onSelectTrade={onSelectTrade}
+          paperOutcome={paperByTradeId[tradeRow.id]}
+          paperLoading={paperLoading}
         />
       ))}
     </div>

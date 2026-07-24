@@ -3,7 +3,10 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
 import { Phase2LaneAdvisoryBadge } from '@/components/omegaPhase2/Phase2LaneAdvisoryBadge';
+import { AlphaOmegaPaperEconomicsSection } from '@/components/omegaPhase2/AlphaOmegaPaperEconomicsSection';
 import { formatAlphaOmegaBlockReason } from '@/lib/alphaOmegaAdvisoryParse';
+import { isSpeedfloorShadowRow } from '@/lib/alphaOmegaPaper/isSpeedfloorShadowRow';
+import type { SpeedfloorPaperOutcome } from '@/lib/alphaOmegaPaper/paperSimTypes';
 import { formatCloseReason } from '@/lib/formatCloseReason';
 import { resolvePhase2AdvisoryDisplay } from '@/lib/phase2LaneAdvisoryFormat';
 import {
@@ -17,11 +20,15 @@ import {
 interface AlphaOmegaTradeDetailDrawerProps {
   tradeRow: BridgeTradeLogRow | null;
   onClose: () => void;
+  paperOutcome?: SpeedfloorPaperOutcome;
+  paperLoading?: boolean;
 }
 
 export function AlphaOmegaTradeDetailDrawer({
   tradeRow,
   onClose,
+  paperOutcome,
+  paperLoading = false,
 }: AlphaOmegaTradeDetailDrawerProps) {
   if (!tradeRow) return null;
   return (
@@ -31,7 +38,11 @@ export function AlphaOmegaTradeDetailDrawer({
         onClick={(event) => event.stopPropagation()}
       >
         <DrawerHeader tradeRow={tradeRow} onClose={onClose} />
-        <DrawerBody tradeRow={tradeRow} />
+        <DrawerBody
+          tradeRow={tradeRow}
+          paperOutcome={paperOutcome}
+          paperLoading={paperLoading}
+        />
       </aside>
     </div>
   );
@@ -64,7 +75,15 @@ function DrawerHeader({
   );
 }
 
-function DrawerBody({ tradeRow }: { tradeRow: BridgeTradeLogRow }) {
+function DrawerBody({
+  tradeRow,
+  paperOutcome,
+  paperLoading,
+}: {
+  tradeRow: BridgeTradeLogRow;
+  paperOutcome?: SpeedfloorPaperOutcome;
+  paperLoading: boolean;
+}) {
   const advisoryDisplay = resolvePhase2AdvisoryDisplay(
     tradeRow.lane_advisory,
     tradeRow.decision,
@@ -80,6 +99,12 @@ function DrawerBody({ tradeRow }: { tradeRow: BridgeTradeLogRow }) {
       </section>
       <DecisionDetailGrid tradeRow={tradeRow} />
       <EconomicsSection tradeRow={tradeRow} />
+      {isSpeedfloorShadowRow(tradeRow) ? (
+        <AlphaOmegaPaperEconomicsSection
+          outcome={paperOutcome}
+          loading={paperLoading}
+        />
+      ) : null}
       <IdsSection tradeRow={tradeRow} />
     </div>
   );

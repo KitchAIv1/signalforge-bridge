@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AlphaOmegaLiveMachinePanel } from '@/components/omegaPhase2/AlphaOmegaLiveMachinePanel';
 import { AlphaOmegaScoreboard } from '@/components/omegaPhase2/AlphaOmegaScoreboard';
 import { AlphaOmegaTradeDetailDrawer } from '@/components/omegaPhase2/AlphaOmegaTradeDetailDrawer';
@@ -13,6 +13,8 @@ import {
 } from '@/components/omegaPhase2/Phase2ViewFilterBar';
 import { usePhase2TradeLog } from '@/hooks/usePhase2TradeLog';
 import { usePhase2ScoreboardRows } from '@/hooks/usePhase2ScoreboardRows';
+import { useSpeedfloorPaperOutcomes } from '@/hooks/useSpeedfloorPaperOutcomes';
+import { aggregatePaperOutcomes } from '@/lib/alphaOmegaPaper/aggregatePaperOutcomes';
 import { downloadAlphaOmegaTradeCsv } from '@/lib/alphaOmegaTradeCsv';
 import {
   ALPHAOMEGA_PAGE_TITLE,
@@ -26,6 +28,16 @@ export default function OmegaPhase2ActivityPage() {
   const [selectedTrade, setSelectedTrade] = useState<BridgeTradeLogRow | null>(null);
   const { rows, rawRows, loading, hasMore, loadMore } = usePhase2TradeLog(viewFilter);
   const { tradeRows: scoreboardRows } = usePhase2ScoreboardRows();
+  const paperSourceRows = useMemo(
+    () => [...rows, ...scoreboardRows],
+    [rows, scoreboardRows],
+  );
+  const { byTradeId: paperByTradeId, loading: paperLoading } =
+    useSpeedfloorPaperOutcomes(paperSourceRows);
+  const paperScore = useMemo(
+    () => aggregatePaperOutcomes(paperByTradeId),
+    [paperByTradeId],
+  );
 
   const handleExportCsv = useCallback(() => {
     downloadAlphaOmegaTradeCsv(rows);
@@ -55,18 +67,26 @@ export default function OmegaPhase2ActivityPage() {
 
       <Phase2FlagSummary />
       <AlphaOmegaLiveMachinePanel />
-      <AlphaOmegaScoreboard tradeRows={scoreboardRows} />
+      <AlphaOmegaScoreboard
+        tradeRows={scoreboardRows}
+        paperScore={paperScore}
+        paperLoading={paperLoading}
+      />
       <Phase2ViewFilterBar activeFilter={viewFilter} onFilterChange={setViewFilter} />
 
       <Phase2ShadowTradeMobileList
         tradeRows={rows}
         isTradeListLoading={loading}
         onSelectTrade={setSelectedTrade}
+        paperByTradeId={paperByTradeId}
+        paperLoading={paperLoading}
       />
       <Phase2ShadowTradeDesktopTable
         tradeRows={rows}
         isTradeListLoading={loading}
         onSelectTrade={setSelectedTrade}
+        paperByTradeId={paperByTradeId}
+        paperLoading={paperLoading}
       />
 
       {hasMore && rawRows.length > 0 && (
@@ -85,6 +105,8 @@ export default function OmegaPhase2ActivityPage() {
       <AlphaOmegaTradeDetailDrawer
         tradeRow={selectedTrade}
         onClose={() => setSelectedTrade(null)}
+        paperOutcome={selectedTrade ? paperByTradeId[selectedTrade.id] : undefined}
+        paperLoading={paperLoading}
       />
     </div>
   );

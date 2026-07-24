@@ -47,7 +47,7 @@ function resolveBlockedAlphaOmega(
     return {
       kind: 'speedfloor_shadow',
       label: 'SPEED FLOOR',
-      detail: foundingDetail(advisoryText) ?? 'Would enter — too fast',
+      detail: foundingDetail(advisoryText) ?? 'Would enter — founding ≤35m',
     };
   }
   if (blockReason === ALPHAOMEGA_BLOCK_NO_CRACK) {
@@ -71,7 +71,7 @@ function resolveAdvisoryAlphaOmega(laneAdvisory: string | null): Phase2AdvisoryD
     return {
       kind: 'speedfloor_shadow',
       label: 'SPEED FLOOR',
-      detail: foundingDetail(advisoryText) ?? 'Would enter — too fast',
+      detail: foundingDetail(advisoryText) ?? 'Would enter — founding ≤35m',
     };
   }
   if (advisoryText === ALPHAOMEGA_ADVISORY_DISABLED) {

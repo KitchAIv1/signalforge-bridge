@@ -1,6 +1,8 @@
 'use client';
 
 import type { BridgeTradeLogRow } from '@/lib/types';
+import { AlphaOmegaPaperScoreCard } from '@/components/omegaPhase2/AlphaOmegaPaperScoreCard';
+import type { SpeedfloorPaperScore } from '@/lib/alphaOmegaPaper/aggregatePaperOutcomes';
 import { computeAlphaOmegaScoreboard } from '@/lib/alphaOmegaScoreboardStats';
 import {
   formatSignedDollars,
@@ -9,14 +11,24 @@ import {
 
 interface AlphaOmegaScoreboardProps {
   tradeRows: BridgeTradeLogRow[];
+  paperScore?: SpeedfloorPaperScore | null;
+  paperLoading?: boolean;
 }
 
-export function AlphaOmegaScoreboard({ tradeRows }: AlphaOmegaScoreboardProps) {
+export function AlphaOmegaScoreboard({
+  tradeRows,
+  paperScore = null,
+  paperLoading = false,
+}: AlphaOmegaScoreboardProps) {
   const metrics = computeAlphaOmegaScoreboard(tradeRows);
   return (
     <div className="space-y-3">
       <PrimaryMetricRow metrics={metrics} />
-      <SecondaryMetricRow metrics={metrics} />
+      <SecondaryMetricRow
+        metrics={metrics}
+        paperScore={paperScore}
+        paperLoading={paperLoading}
+      />
     </div>
   );
 }
@@ -57,11 +69,15 @@ function PrimaryMetricRow({
 
 function SecondaryMetricRow({
   metrics,
+  paperScore,
+  paperLoading,
 }: {
   metrics: ReturnType<typeof computeAlphaOmegaScoreboard>;
+  paperScore: SpeedfloorPaperScore | null;
+  paperLoading: boolean;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <ScoreCard
         label="Entries taken"
         value={String(metrics.entriesTaken)}
@@ -71,9 +87,10 @@ function SecondaryMetricRow({
       <ScoreCard
         label="Speed-floor shadows"
         value={String(metrics.speedFloorShadows)}
-        hint="Would-enter, too fast"
+        hint="Would-enter, founding ≤35m"
         valueClass="text-violet-600 dark:text-violet-300"
       />
+      <AlphaOmegaPaperScoreCard paperScore={paperScore} loading={paperLoading} />
       <ExitMixCard
         opposing={metrics.exitOpposing}
         hardStop={metrics.exitHardStop}
