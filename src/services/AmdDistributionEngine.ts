@@ -8,19 +8,24 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../connectors/supabase.js';
 import {
   fetchCandleRange,
-  getAccountSummary,
-  getPricing,
   placeMarketOrder,
 } from '../connectors/oanda.js';
-import { calculateUnits } from '../core/positionSizer.js';
 import { logInfo, logError } from '../utils/logger.js';
 import { sendTradeExecutedAlert } from './telegram/alertTradeExecution.js';
+import {
+  buildAmdDistributionOrderPlan,
+  type AmdDistributionOrderPlan,
+} from './amd/buildAmdDistributionOrderPlan.js';
 import { loadAmdAsianCloseFilterEnabled } from './amd/loadAmdAsianCloseFilterEnabled.js';
 import {
   AMD_BROKER_ID,
   resolveAmdOandaAccountId,
 } from './amd/resolveAmdOandaAccountId.js';
 import { AMD_HARD_SL_PIPS, AMD_PIP_TRAIL_PIPS } from './amd/amdTrailConstants.js';
+import {
+  computeAmdRiskAmount,
+  resolveAmdSizeMultiplier,
+} from './amd/resolveAmdSizeMultiplier.js';
 
 const TAG_ENTRY_HOUR: Record<string, number> = {
   AMD_COMPRESSION_BREAKOUT: 10,
@@ -211,9 +216,15 @@ async function persistOpenTrade(
   exitStrategy: string,
   equity: number,
   weight: number,
+  sizeMultiplier: number,
 ): Promise<void> {
   const receivedAt = new Date().toISOString();
-  const riskAmount = equity * weight * BASELINE_RISK_PCT;
+  const riskAmount = computeAmdRiskAmount(
+    equity,
+    weight,
+    sizeMultiplier,
+    BASELINE_RISK_PCT,
+  );
   await supabaseDb().from('bridge_trade_log').insert({
     signal_id: randomUUID(),
     engine_id: ENGINE_ID,
@@ -237,7 +248,7 @@ async function persistOpenTrade(
     direction_source: 'amd_auto_direction',
     reversal_confirmed: amdRow.reversal_confirmed,
     auto_direction_reason: amdRow.auto_direction_reason,
-    amd_size_multiplier: amdRow.amd_size_multiplier ?? null,
+    amd_size_multiplier: sizeMultiplier,
     amd_entry_hour: new Date().getUTCHours(),
     amd_exit_strategy: exitStrategy,
     amd_pip_trail: AMD_PIP_TRAIL_PIPS,
@@ -270,56 +281,11 @@ async function persistTrailState(
   });
 }
 
-type OrderPlan = {
-  entryPrice: number;
-  hardSlPrice: number;
-  signedUnits: number;
-  exitStrategy: string;
-  equity: number;
-  weight: number;
-};
-
-async function buildOrderPlan(direction: TradeDirection, weight: number): Promise<OrderPlan | null> {
-  const amdAccountId = resolveAmdOandaAccountId();
-  const account = await getAccountSummary(amdAccountId);
-  const pricing = await getPricing(INSTRUMENT, amdAccountId);
-  if (!pricing.length) {
-    logError('[AmdDistribution] getPricing returned empty');
-    return null;
-  }
-  const askPrice = parseFloat(pricing[0].ask);
-  const bidPrice = parseFloat(pricing[0].bid);
-  const entryPrice = direction === 'long' ? askPrice : bidPrice;
-  const slDistance = HARD_SL_PIPS * 0.0001;
-  const hardSlPrice =
-    direction === 'long' ? entryPrice - slDistance : entryPrice + slDistance;
-  const units = calculateUnits({
-    equity: account.equity,
-    engineWeight: weight,
-    riskPct: BASELINE_RISK_PCT,
-    entry: entryPrice,
-    stopLoss: hardSlPrice,
-    instrument: INSTRUMENT,
-    consecutiveLosses: 0,
-    graduatedThreshold: 999,
-    confluenceScore: 75,
-    slPipsOverride: HARD_SL_PIPS,
-  });
-  return {
-    entryPrice,
-    hardSlPrice,
-    signedUnits: direction === 'long' ? units : -units,
-    exitStrategy: 'S0',
-    equity: account.equity,
-    weight,
-  };
-}
-
 async function submitAmdOrder(
   tag: string,
   direction: TradeDirection,
   amdRow: AmdStateRow,
-  plan: OrderPlan,
+  plan: AmdDistributionOrderPlan,
   todayStr: string,
 ): Promise<void> {
   const amdAccountId = resolveAmdOandaAccountId();
@@ -330,6 +296,7 @@ async function submitAmdOrder(
     entryPrice: plan.entryPrice,
     hardSlPrice: plan.hardSlPrice,
     units: plan.signedUnits,
+    sizeMultiplier: plan.sizeMultiplier,
     exitStrategy,
   });
   const orderResult = await placeMarketOrder(
@@ -366,6 +333,7 @@ async function submitAmdOrder(
     exitStrategy,
     plan.equity,
     plan.weight,
+    plan.sizeMultiplier,
   );
   void sendTradeExecutedAlert({
     oandaInstrument: INSTRUMENT,
@@ -375,7 +343,7 @@ async function submitAmdOrder(
     takeProfit: null,
     filledUnits: Math.abs(plan.signedUnits),
     amdTag: tag,
-    amdSizeMultiplier: plan.weight,
+    amdSizeMultiplier: plan.sizeMultiplier,
     directionSource: 'auto',
     engineId: ENGINE_ID,
   }).catch(() => {});
@@ -409,7 +377,12 @@ async function runExecution(
   weight: number,
   todayStr: string,
 ): Promise<void> {
-  const plan = await buildOrderPlan(direction, weight);
+  const sizeMultiplier = resolveAmdSizeMultiplier(amdRow.amd_size_multiplier);
+  const plan = await buildAmdDistributionOrderPlan(
+    direction,
+    weight,
+    sizeMultiplier,
+  );
   if (!plan) return;
   await submitAmdOrder(tag, direction, amdRow, plan, todayStr);
 }
