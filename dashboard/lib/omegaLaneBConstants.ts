@@ -24,7 +24,10 @@ export const ALPHAOMEGA_BANNER_LABEL = 'ALPHAOMEGA';
 /** Dashboard mirrors of src/core/alphaOmega/alphaOmegaConstants.ts (display only). */
 export const ALPHAOMEGA_ENTRY_STREAK_LENGTH = 7;
 export const ALPHAOMEGA_ENTRY_SPEED_CEILING_MIN = 45;
-/** Must match bridge ENTRY_SPEED_FLOOR_MIN — enter only when founding speed > this. */
+/**
+ * Must match bridge ENTRY_SPEED_FLOOR_MIN.
+ * Live gate compares 1-decimal advisory speed: Number(speed.toFixed(1)) <= floor → block.
+ */
 export const ALPHAOMEGA_ENTRY_SPEED_FLOOR_MIN = 35;
 export const ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD = 5;
 export const ALPHAOMEGA_HARD_STOP_PIPS = 10;

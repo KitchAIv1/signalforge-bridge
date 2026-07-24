@@ -3,7 +3,7 @@
  * (omegaPhase2EntryGate.ts) for Lane B. Enters only on a validated
  * "founding streak crack" whose direction matches the incoming signal, with
  * no position already open, and whose founding streak took longer than
- * ENTRY_SPEED_FLOOR_MIN to form (≤ floor → SPEEDFLOOR shadow, no fill).
+ * ENTRY_SPEED_FLOOR_MIN to form (advisory-rounded ≤ floor → SPEEDFLOOR shadow).
  *
  * Legacy R1/Phase2 files are left in place (not deleted) for easy rollback;
  * they are simply no longer called from the Lane B fan-out branch.
@@ -13,7 +13,8 @@ import {
   ALPHAOMEGA_BLOCK_ALREADY_OPEN,
   ALPHAOMEGA_BLOCK_NO_CRACK,
   ALPHAOMEGA_BLOCK_SPEED_FLOOR,
-  ENTRY_SPEED_FLOOR_MIN,
+  isAtOrBelowEntrySpeedFloor,
+  roundAdvisorySpeedMin,
 } from './alphaOmegaConstants.js';
 import type { AlphaOmegaDirection, CrackEvent } from './alphaOmegaStreakTracker.js';
 
@@ -52,12 +53,13 @@ export function evaluateAlphaOmegaEntryGate(input: AlphaOmegaEntryGateInput): Al
     };
   }
 
-  // Inclusive: speed=35.0 (common advisory) must not fill — CF drop was [30,35].
-  if (crackEvent.foundingSpeedMin <= ENTRY_SPEED_FLOOR_MIN) {
+  // Advisory-rounded inclusive floor: raw 35.04 → 35.0 → block (CF/advisory parity).
+  if (isAtOrBelowEntrySpeedFloor(crackEvent.foundingSpeedMin)) {
+    const advisorySpeed = roundAdvisorySpeedMin(crackEvent.foundingSpeedMin);
     return {
       enter: false,
       blockReason: ALPHAOMEGA_BLOCK_SPEED_FLOOR,
-      shadowAdvisory: `ALPHAOMEGA_SPEEDFLOOR_SHADOW:would_enter:${direction}:speed=${crackEvent.foundingSpeedMin.toFixed(1)}m:len=${crackEvent.foundingLength}`,
+      shadowAdvisory: `ALPHAOMEGA_SPEEDFLOOR_SHADOW:would_enter:${direction}:speed=${advisorySpeed.toFixed(1)}m:len=${crackEvent.foundingLength}`,
       foundingLength: crackEvent.foundingLength,
       foundingSpeedMin: crackEvent.foundingSpeedMin,
     };

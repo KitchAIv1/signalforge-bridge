@@ -28,11 +28,22 @@ export const MAX_INTRA_RUN_GAP_MINUTES = 60;
 
 /**
  * Entry: founding streak must take LONGER than this many minutes to form.
- * Gate uses `speed <= ENTRY_SPEED_FLOOR_MIN` → block (+ SPEEDFLOOR shadow).
+ * Gate compares 1-decimal advisory speed (same as lane_advisory `speed=X.Ym`)
+ * via roundAdvisorySpeedMin — so raw 35.04 (displays 35.0) is blocked.
  * Raised 30 → 35 (Jul 24 2026 live autopsy): speed band [30,35] was 1/6 win,
  * −$4.1k actual / pure-book CF +$4.7k if skipped. Arming ceiling stays 45m.
  */
 export const ENTRY_SPEED_FLOOR_MIN = 35;
+
+/** Match lane_advisory / CF parsing: speed written as toFixed(1). */
+export function roundAdvisorySpeedMin(speedMin: number): number {
+  return Number(speedMin.toFixed(1));
+}
+
+/** True when advisory-rounded founding speed is at or below the entry floor. */
+export function isAtOrBelowEntrySpeedFloor(speedMin: number): boolean {
+  return roundAdvisorySpeedMin(speedMin) <= ENTRY_SPEED_FLOOR_MIN;
+}
 
 /** Exit: close as soon as this many opposing-direction fires accumulate since entry. */
 export const OPPOSING_FIRE_COUNT_THRESHOLD = 5;
