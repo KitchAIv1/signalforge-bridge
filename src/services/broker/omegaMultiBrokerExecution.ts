@@ -37,6 +37,10 @@ import {
   isOmegaRawPureSizingEnabled,
   sizeOmegaRawPureUnits,
 } from '../../core/omegaRawPolicy/omegaRawPureSizer.js';
+import {
+  partitionAoFanOutRoutes,
+  settleBrokerFanOutTasks,
+} from '../../core/alphaOmega/runAoFanOutParallel.js';
 
 type RouterNormalizedSignal = NonNullable<ValidationResult['normalized']>;
 
@@ -136,8 +140,30 @@ export async function executeOmegaOnAllBrokers(params: OmegaFanOutParams): Promi
     ? await resolveFireOutcome(params)
     : EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
   const crackEvent = crackForEntry(fireOutcome);
+  const { aoRoutes, otherRoutes } = partitionAoFanOutRoutes(routes);
 
-  for (const route of routes) {
+  // AO dual books concurrently (VT not queued behind OANDA). Trail stays sequential.
+  logInfo('[Omega] Fan-out route plan', {
+    signalId: params.signalId,
+    aoParallel: aoRoutes.map((route) => route.brokerId),
+    otherSequential: otherRoutes.map((route) => route.brokerId),
+  });
+  await settleBrokerFanOutTasks(
+    'Omega AO fan-out',
+    aoRoutes.map(
+      (route) => () =>
+        processOneBrokerRoute(
+          params,
+          route,
+          baseEquity,
+          alphaOmegaEnabled,
+          aoPureSizingEnabled,
+          omegaRawPureSizing,
+          crackEvent,
+        ),
+    ),
+  );
+  for (const route of otherRoutes) {
     await processOneBrokerRoute(
       params,
       route,

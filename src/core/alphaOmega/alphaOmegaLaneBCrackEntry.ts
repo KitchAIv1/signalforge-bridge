@@ -21,6 +21,7 @@ import {
 } from './alphaOmegaFireObserver.js';
 import { readOmegaFireDirection } from './alphaOmegaFireIdentity.js';
 import { placeLaneBCrackOrder } from './alphaOmegaLaneBCrackPlace.js';
+import { settleBrokerFanOutTasksWithFlags } from './runAoFanOutParallel.js';
 import type { CrackEvent } from './alphaOmegaStreakTracker.js';
 import type { EngineBrokerRoute } from '../../services/broker/brokerLinkService.js';
 
@@ -131,24 +132,28 @@ async function attemptLaneBCrack(
   logInfo('[AlphaOmega] Lane B crack fan-out start', {
     signalId: params.signalId,
     routeOrder: aoRoutes.map((route) => route.brokerId),
+    parallel: true,
   });
 
-  let handled = false;
-  for (const laneBRoute of aoRoutes) {
-    handled =
-      (await placeOrSkipLaneBRoute({
-        params,
-        laneBRoute,
-        gate,
-        norm,
-        direction,
-        fanOutStartedAt,
-      })) || handled;
-  }
+  const handled = await settleBrokerFanOutTasksWithFlags(
+    'Lane B crack fan-out',
+    aoRoutes.map(
+      (laneBRoute) => () =>
+        placeOrSkipLaneBRoute({
+          params,
+          laneBRoute,
+          gate,
+          norm,
+          direction,
+          fanOutStartedAt,
+        }),
+    ),
+  );
 
   logInfo('[AlphaOmega] Lane B crack fan-out done', {
     signalId: params.signalId,
     totalFanOutMs: Date.now() - fanOutStartedAt,
+    parallel: true,
   });
   return handled;
 }

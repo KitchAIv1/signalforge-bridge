@@ -132,17 +132,37 @@ async function registerTrailState(
   });
 }
 
+/** Optimistic bump so parallel AO dual-book fills do not lose a trades_today increment. */
 async function bumpOmegaTradesToday(
   supabase: SupabaseClient,
   engineId: string,
   fallbackCount: number,
 ): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: eng } = await supabase
+      .from('bridge_engines')
+      .select('trades_today')
+      .eq('engine_id', engineId)
+      .single();
+    const current =
+      (eng as { trades_today?: number } | null)?.trades_today ?? fallbackCount;
+    const newCount = current + 1;
+    const { data: updated } = await supabase
+      .from('bridge_engines')
+      .update({ trades_today: newCount, updated_at: new Date().toISOString() })
+      .eq('engine_id', engineId)
+      .eq('trades_today', current)
+      .select('trades_today')
+      .maybeSingle();
+    if (updated) return;
+  }
   const { data: eng } = await supabase
     .from('bridge_engines')
     .select('trades_today')
     .eq('engine_id', engineId)
     .single();
-  const newCount = ((eng as { trades_today?: number } | null)?.trades_today ?? fallbackCount) + 1;
+  const newCount =
+    ((eng as { trades_today?: number } | null)?.trades_today ?? fallbackCount) + 1;
   await supabase
     .from('bridge_engines')
     .update({ trades_today: newCount, updated_at: new Date().toISOString() })
