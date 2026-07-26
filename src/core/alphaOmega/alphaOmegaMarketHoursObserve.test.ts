@@ -23,11 +23,11 @@ describe('shouldObserveAlphaOmegaFire', () => {
   });
 
   it('returns false on Sunday before open (UTC)', () => {
-    assert.equal(shouldObserveAlphaOmegaFire(new Date('2026-07-19T21:59:00.000Z')), false);
+    assert.equal(shouldObserveAlphaOmegaFire(new Date('2026-07-19T20:59:00.000Z')), false);
   });
 
   it('returns true on Sunday at open (UTC)', () => {
-    assert.equal(shouldObserveAlphaOmegaFire(new Date('2026-07-19T22:00:00.000Z')), true);
+    assert.equal(shouldObserveAlphaOmegaFire(new Date('2026-07-19T21:00:00.000Z')), true);
   });
 
   it('returns true on a midweek session (UTC)', () => {

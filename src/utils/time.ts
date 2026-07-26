@@ -1,10 +1,11 @@
 /**
- * Market hours (Sun 22:00 – Fri 22:00 UTC), weekend-close buffer (e.g. 30 min before Fri close).
+ * Market hours (Sun 21:00 – Fri 22:00 UTC), weekend-close buffer (e.g. 30 min before Fri close).
+ * Sunday open is 21:00 UTC (5:00 PM EDT / 4:00 PM EST) to match typical FX Asia reopen.
  */
 
 const FRIDAY_CLOSE_UTC_HOUR = 22;
 const FRIDAY_CLOSE_UTC_MINUTE = 0;
-const SUNDAY_OPEN_UTC_HOUR = 22;
+const SUNDAY_OPEN_UTC_HOUR = 21;
 
 export function isForexMarketOpen(now: Date = new Date(), bufferMinutes: number = 30): boolean {
   const utc = new Date(now.toISOString());
