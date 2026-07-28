@@ -5,8 +5,11 @@ import {
   ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
   ALPHAOMEGA_BLOCK_NO_CRACK,
   ALPHAOMEGA_BLOCK_SPEED_FLOOR,
+  ALPHAOMEGA_BLOCK_SPEED_MID_BAND,
   ENTRY_SPEED_FLOOR_MIN,
+  ENTRY_SPEED_MID_BAND_MAX_MIN,
   isAtOrBelowEntrySpeedFloor,
+  isInAlphaOmegaDroppedSpeedMidBand,
   roundAdvisorySpeedMin,
 } from './alphaOmegaConstants.js';
 import { evaluateAlphaOmegaEntryGate } from './alphaOmegaEntryGate.js';
@@ -37,6 +40,16 @@ describe('roundAdvisorySpeedMin — 1-decimal advisory parity', () => {
     assert.equal(isAtOrBelowEntrySpeedFloor(35.0), true);
     assert.equal(isAtOrBelowEntrySpeedFloor(35.1), false);
     assert.equal(ENTRY_SPEED_FLOOR_MIN, 35);
+  });
+
+  it('mid-band drop is (45, 60] on advisory rounding', () => {
+    assert.equal(ENTRY_SPEED_MID_BAND_MAX_MIN, 60);
+    assert.equal(isInAlphaOmegaDroppedSpeedMidBand(45.0), false);
+    assert.equal(isInAlphaOmegaDroppedSpeedMidBand(45.1), true);
+    assert.equal(isInAlphaOmegaDroppedSpeedMidBand(50), true);
+    assert.equal(isInAlphaOmegaDroppedSpeedMidBand(60.0), true);
+    assert.equal(isInAlphaOmegaDroppedSpeedMidBand(60.1), false);
+    assert.equal(isInAlphaOmegaDroppedSpeedMidBand(80), false);
   });
 });
 
@@ -149,5 +162,65 @@ describe('evaluateAlphaOmegaEntryGate — Asia-open entry blackout', () => {
       asOf: new Date('2026-07-27T21:06:00.000Z'),
     });
     assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_ALREADY_OPEN);
+  });
+});
+
+describe('evaluateAlphaOmegaEntryGate — CF-C speed mid-band (45, 60]', () => {
+  it('allows keep-band edge 45.0', () => {
+    const result = evaluateAlphaOmegaEntryGate({
+      crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 45, foundingLength: 8 }),
+      direction: 'LONG',
+      hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
+    });
+    assert.equal(result.enter, true);
+    assert.equal(result.blockReason, null);
+  });
+
+  it('blocks 45.1 with SPEEDBAND shadow', () => {
+    const result = evaluateAlphaOmegaEntryGate({
+      crackEvent: crack({ enterDirection: 'SHORT', foundingSpeedMin: 45.1, foundingLength: 7 }),
+      direction: 'SHORT',
+      hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
+    });
+    assert.equal(result.enter, false);
+    assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_SPEED_MID_BAND);
+    assert.match(result.shadowAdvisory ?? '', /^ALPHAOMEGA_SPEEDBAND_SHADOW:would_enter:SHORT/);
+    assert.match(result.shadowAdvisory ?? '', /speed=45\.1m/);
+  });
+
+  it('blocks 50 and inclusive 60.0', () => {
+    for (const speed of [50, 60]) {
+      const result = evaluateAlphaOmegaEntryGate({
+        crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: speed }),
+        direction: 'LONG',
+        hasOpenPosition: false,
+        asOf: OUTSIDE_BLACKOUT,
+      });
+      assert.equal(result.enter, false, `expected block at speed=${speed}`);
+      assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_SPEED_MID_BAND);
+    }
+  });
+
+  it('allows >60 keep band', () => {
+    const result = evaluateAlphaOmegaEntryGate({
+      crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 60.1, foundingLength: 9 }),
+      direction: 'LONG',
+      hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
+    });
+    assert.equal(result.enter, true);
+    assert.equal(result.blockReason, null);
+  });
+
+  it('prefers floor over mid-band at speed 35', () => {
+    const result = evaluateAlphaOmegaEntryGate({
+      crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 35 }),
+      direction: 'LONG',
+      hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
+    });
+    assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_SPEED_FLOOR);
   });
 });

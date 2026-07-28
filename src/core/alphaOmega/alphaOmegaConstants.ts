@@ -45,6 +45,22 @@ export function isAtOrBelowEntrySpeedFloor(speedMin: number): boolean {
   return roundAdvisorySpeedMin(speedMin) <= ENTRY_SPEED_FLOOR_MIN;
 }
 
+/**
+ * CF-C drop band: advisory founding speed in (45, 60] minutes.
+ * Live keep bands are (35, 45] and >60; floor already blocks ≤35.
+ * Lower bound reuses ENTRY_SPEED_CEILING_MIN (45) for arming/CF parity.
+ */
+export const ENTRY_SPEED_MID_BAND_MAX_MIN = 60;
+
+/** True when advisory-rounded speed is in the losing mid-band (45, 60]. */
+export function isInAlphaOmegaDroppedSpeedMidBand(speedMin: number): boolean {
+  const advisorySpeed = roundAdvisorySpeedMin(speedMin);
+  return (
+    advisorySpeed > ENTRY_SPEED_CEILING_MIN &&
+    advisorySpeed <= ENTRY_SPEED_MID_BAND_MAX_MIN
+  );
+}
+
 /** Exit: close as soon as this many opposing-direction fires accumulate since entry. */
 export const OPPOSING_FIRE_COUNT_THRESHOLD = 5;
 /** Exit backup trigger: close if the opposing-fire SHARE reaches this (checked once
@@ -98,6 +114,7 @@ export const ALPHAOMEGA_ENTRY_BLACKOUT_END_UTC_MIN = 21 * 60 + 15;
 
 export const ALPHAOMEGA_BLOCK_NO_CRACK = 'ALPHAOMEGA_NO_QUALIFYING_CRACK';
 export const ALPHAOMEGA_BLOCK_SPEED_FLOOR = 'ALPHAOMEGA_SPEED_FLOOR';
+export const ALPHAOMEGA_BLOCK_SPEED_MID_BAND = 'ALPHAOMEGA_SPEED_MID_BAND';
 export const ALPHAOMEGA_BLOCK_ALREADY_OPEN = 'ALPHAOMEGA_ALREADY_OPEN';
 export const ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT = 'ALPHAOMEGA_ENTRY_BLACKOUT';
 

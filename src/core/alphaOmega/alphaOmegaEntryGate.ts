@@ -2,9 +2,10 @@
  * ALPHAOMEGA entry gate — replaces the legacy R1/Phase2 gates
  * (omegaPhase2EntryGate.ts) for Lane B. Enters only on a validated
  * "founding streak crack" whose direction matches the incoming signal, with
- * no position already open, outside the Asia-open entry blackout, and whose
- * founding streak took longer than ENTRY_SPEED_FLOOR_MIN to form
- * (advisory-rounded ≤ floor → SPEEDFLOOR shadow).
+ * no position already open, outside the Asia-open entry blackout, founding
+ * speed above ENTRY_SPEED_FLOOR_MIN, and outside the CF-C mid-band (45, 60].
+ * Keep bands: (35, 45] and >60. Floor ≤35 → SPEEDFLOOR shadow; mid-band →
+ * SPEEDBAND shadow (forensics only — not wired into SPEEDFLOOR paper sim).
  *
  * Legacy R1/Phase2 files are left in place (not deleted) for easy rollback;
  * they are simply no longer called from the Lane B fan-out branch.
@@ -15,7 +16,9 @@ import {
   ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
   ALPHAOMEGA_BLOCK_NO_CRACK,
   ALPHAOMEGA_BLOCK_SPEED_FLOOR,
+  ALPHAOMEGA_BLOCK_SPEED_MID_BAND,
   isAtOrBelowEntrySpeedFloor,
+  isInAlphaOmegaDroppedSpeedMidBand,
   roundAdvisorySpeedMin,
 } from './alphaOmegaConstants.js';
 import { isAlphaOmegaEntryBlackoutUtc } from './alphaOmegaEntryBlackout.js';
@@ -35,7 +38,7 @@ export interface AlphaOmegaEntryGateResult {
   /** Set when the speed floor is the ONLY reason blocking — counterfactual
    * for comparing real (with-filter) vs shadow (without-filter) performance
    * on new live data, directly addressing the overfitting concern flagged
-   * during research. */
+   * during research. Mid-band uses a distinct SPEEDBAND shadow (not paper). */
   shadowAdvisory: string | null;
   foundingLength: number | null;
   foundingSpeedMin: number | null;
@@ -75,6 +78,18 @@ export function evaluateAlphaOmegaEntryGate(input: AlphaOmegaEntryGateInput): Al
       enter: false,
       blockReason: ALPHAOMEGA_BLOCK_SPEED_FLOOR,
       shadowAdvisory: `ALPHAOMEGA_SPEEDFLOOR_SHADOW:would_enter:${direction}:speed=${advisorySpeed.toFixed(1)}m:len=${crackEvent.foundingLength}`,
+      foundingLength: crackEvent.foundingLength,
+      foundingSpeedMin: crackEvent.foundingSpeedMin,
+    };
+  }
+
+  // CF-C: drop advisory (45, 60] — keep (35, 45] and >60.
+  if (isInAlphaOmegaDroppedSpeedMidBand(crackEvent.foundingSpeedMin)) {
+    const advisorySpeed = roundAdvisorySpeedMin(crackEvent.foundingSpeedMin);
+    return {
+      enter: false,
+      blockReason: ALPHAOMEGA_BLOCK_SPEED_MID_BAND,
+      shadowAdvisory: `ALPHAOMEGA_SPEEDBAND_SHADOW:would_enter:${direction}:speed=${advisorySpeed.toFixed(1)}m:len=${crackEvent.foundingLength}`,
       foundingLength: crackEvent.foundingLength,
       foundingSpeedMin: crackEvent.foundingSpeedMin,
     };
