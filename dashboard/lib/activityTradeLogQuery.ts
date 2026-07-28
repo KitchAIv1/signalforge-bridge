@@ -1,5 +1,8 @@
 import type { BridgeTradeLogRow } from '@/lib/types';
-import { OMEGA_AO_BROKER_IDS } from '@/lib/omegaLaneBConstants';
+import {
+  OMEGA_AO_ACTIVITY_EXCLUDE_BROKER_IDS,
+  OMEGA_AO_BROKER_IDS,
+} from '@/lib/omegaLaneBConstants';
 
 export const ACTIVITY_TRADE_LOG_PAGE_SIZE = 50;
 
@@ -12,19 +15,25 @@ export const EXPANDED_TRADE_LOG_SELECT =
   'layer4_result, layer4_bullish_count, layer4_bearish_count, ' +
   'layer5_result, layer5_pip_diff, layer6_position_pct, choppy_extended, amd_tag, direction_source, amd_size_multiplier, leg_type';
 
+/** Live AO + Shadow paper — excluded from Activity default EXECUTED ledger. */
+function activityExcludeBrokerListCsv(): string {
+  return OMEGA_AO_ACTIVITY_EXCLUDE_BROKER_IDS.join(',');
+}
+
 function aoBrokerListCsv(): string {
   return OMEGA_AO_BROKER_IDS.join(',');
 }
 
-/** PostgREST filter: exclude all ALPHAOMEGA venue ids (keep null broker rows). */
+/** PostgREST filter: exclude live AO + Shadow paper EXECUTED venues. */
 function excludeAoExecutedOrFilter(): string {
-  return `broker_id.is.null,broker_id.not.in.(${aoBrokerListCsv()})`;
+  return `broker_id.is.null,broker_id.not.in.(${activityExcludeBrokerListCsv()})`;
 }
 
-/** All-view: shared ledger + AO non-fills — never AO EXECUTED. */
+/** All-view: shared ledger + AO non-fills — never live/shadow AO EXECUTED. */
 function allViewExcludeAoExecutedOrFilter(): string {
-  const csv = aoBrokerListCsv();
-  return `broker_id.is.null,broker_id.not.in.(${csv}),and(broker_id.in.(${csv}),decision.neq.EXECUTED)`;
+  const excludeCsv = activityExcludeBrokerListCsv();
+  const liveCsv = aoBrokerListCsv();
+  return `broker_id.is.null,broker_id.not.in.(${excludeCsv}),and(broker_id.in.(${liveCsv}),decision.neq.EXECUTED)`;
 }
 
 export function applyActivityDecisionFilter<T extends { eq: Function; in: Function }>(

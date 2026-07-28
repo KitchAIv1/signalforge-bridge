@@ -11,13 +11,16 @@ import type { ActiveAmdState } from '../../services/amdDetector/amdStateService.
 import type { ActiveRegimeState } from '../../services/RegimeStateService.js';
 import type { DecisionType } from '../../types/signals.js';
 import { logInfo, logWarn } from '../../utils/logger.js';
-import {
-  ALPHAOMEGA_OBSERVE_DEDUPED_REASON,
-  ALPHAOMEGA_OBSERVE_ONLY_EXECUTION_TIER,
-} from './alphaOmegaConstants.js';
+import { ALPHAOMEGA_OBSERVE_DEDUPED_REASON } from './alphaOmegaConstants.js';
 import { observeAlphaOmegaFire } from './alphaOmegaFireObserver.js';
-import { isOmegaEnginePayload } from './alphaOmegaFireIdentity.js';
 import { maybeEnterLaneBOnCrack } from './alphaOmegaLaneBCrackEntry.js';
+import { observeAlphaOmegaShadowFire } from './alphaOmegaShadowFireObserver.js';
+import {
+  isAoObserveOnlyPayload,
+  readSignalExecutionTier,
+} from './alphaOmegaExecutionTier.js';
+
+export { isAoObserveOnlyPayload, readSignalExecutionTier };
 
 type TradeLogBuilder = (
   payload: SignalInsertPayload,
@@ -40,22 +43,6 @@ type AuditAttacher = (
 
 const noopAuditAttach: AuditAttacher = () => undefined;
 
-export function readSignalExecutionTier(
-  payload: SignalInsertPayload,
-): string | null {
-  const raw = (payload as Record<string, unknown>).execution_tier;
-  if (raw == null || String(raw).trim() === '') return null;
-  return String(raw).trim().toLowerCase();
-}
-
-/** True when engine-omega wrote an exec-dedup observe-only row. */
-export function isAoObserveOnlyPayload(payload: SignalInsertPayload): boolean {
-  return (
-    isOmegaEnginePayload(payload) &&
-    readSignalExecutionTier(payload) === ALPHAOMEGA_OBSERVE_ONLY_EXECUTION_TIER
-  );
-}
-
 export interface HandleAoObserveOnlyArgs {
   supabase: SupabaseClient;
   payload: SignalInsertPayload;
@@ -76,6 +63,10 @@ export async function handleAoObserveOnlySignal(
   args: HandleAoObserveOnlyArgs,
 ): Promise<void> {
   const fireOutcome = await observeAlphaOmegaFire(args.supabase, args.payload);
+  // Additive: matched observe-dedup fires also feed Shadow AO streak (isolated).
+  await observeAlphaOmegaShadowFire(args.supabase, args.payload, {
+    source: 'matched',
+  });
   const engine = args.engines.find((row) => row.engine_id === 'omega');
   const decisionLatencyMs = Date.now() - args.receivedAt.getTime();
 

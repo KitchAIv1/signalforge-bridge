@@ -30,10 +30,15 @@ import {
   handleOmegaValidationFailure,
   observeOmegaFireIfNeeded,
 } from './alphaOmega/alphaOmegaRouterHooks.js';
+import { handleAoObserveOnlySignal } from './alphaOmega/alphaOmegaObserveOnly.js';
 import {
-  handleAoObserveOnlySignal,
+  ALPHAOMEGA_UNKNOWN_EXECUTION_TIER_REASON,
   isAoObserveOnlyPayload,
-} from './alphaOmega/alphaOmegaObserveOnly.js';
+  isAoShadowOverPayload,
+  isUnknownOmegaExecutionTier,
+} from './alphaOmega/alphaOmegaExecutionTier.js';
+import { handleAoShadowOverSignal } from './alphaOmega/alphaOmegaShadowObserveOnly.js';
+import { observeAlphaOmegaShadowFire } from './alphaOmega/alphaOmegaShadowFireObserver.js';
 import {
   parseOmegaRawModeFlag,
   shouldBypassDirectionFlip,
@@ -390,6 +395,35 @@ export async function processSignal(
   const { config, engines, getCachedAccount, getOpenTradesFromLog, supabase } = deps;
   const signalId = (payload.id ?? '').toString();
 
+  // Tier whitelist: unknown omega tiers never fall through to Trail/RAW.
+  if (isUnknownOmegaExecutionTier(payload)) {
+    await supabase.from('bridge_trade_log').insert(
+      buildTradeLogRow(
+        payload,
+        'SKIPPED',
+        ALPHAOMEGA_UNKNOWN_EXECUTION_TIER_REASON,
+        Date.now() - receivedAt.getTime(),
+        getCachedAccount()?.equity ?? null,
+        0,
+        undefined,
+      ),
+    );
+    return;
+  }
+
+  // Over-threshold Shadow AO: isolated streak/paper only — never Trail / Lane B.
+  if (isAoShadowOverPayload(payload)) {
+    await handleAoShadowOverSignal({
+      supabase,
+      payload,
+      signalId,
+      receivedAt,
+      cachedAccountEquity: getCachedAccount()?.equity ?? null,
+      buildTradeLogRow,
+    });
+    return;
+  }
+
   // Exec-dedup observe-only: AO streak/exit/entry only — never Omega Trail.
   if (isAoObserveOnlyPayload(payload)) {
     await handleAoObserveOnlySignal({
@@ -409,6 +443,8 @@ export async function processSignal(
   // ALPHAOMEGA: count open-session Omega fires at router entry (before 4-pip).
   // Closed-market ghosts are no-ops inside observe (streak frozen / retained).
   const alphaOmegaFireOutcome = await observeOmegaFireIfNeeded(supabase, payload);
+  // Additive fork: matched full-path fires also feed Shadow AO (isolated state).
+  await observeAlphaOmegaShadowFire(supabase, payload, { source: 'matched' });
 
   // Omega: reject closed-session inserts before rSize / Lane B crack side paths.
   if (

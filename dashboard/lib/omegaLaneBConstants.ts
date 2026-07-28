@@ -1,11 +1,25 @@
 /** Dashboard mirror of backend Lane B / AO broker ids. */
 export const OMEGA_LANE_B_BROKER_ID = 'oanda_phase2_demo';
 export const OMEGA_AO_VT_BROKER_ID = 'vtmarkets_ao_live';
+/** Live AO books only — never include Shadow paper. */
 export const OMEGA_AO_BROKER_IDS = [OMEGA_LANE_B_BROKER_ID, OMEGA_AO_VT_BROKER_ID] as const;
+/** Shadow AO paper broker — outside live fan-out / Calendar AO filter. */
+export const OMEGA_AO_SHADOW_BROKER_ID = 'ao_shadow_paper';
+/** Brokers excluded from Activity default ledger (live AO + shadow paper). */
+export const OMEGA_AO_ACTIVITY_EXCLUDE_BROKER_IDS = [
+  ...OMEGA_AO_BROKER_IDS,
+  OMEGA_AO_SHADOW_BROKER_ID,
+] as const;
+export const ALPHAOMEGA_SHADOW_ENABLED_CONFIG_KEY = 'alpha_omega_shadow_enabled';
+export const ALPHAOMEGA_SHADOW_ENTRY_ADVISORY_PREFIX = 'ALPHAOMEGA_SHADOW_ENTRY';
 
 export function isOmegaLaneBBroker(brokerId: string | null | undefined): boolean {
   if (!brokerId) return false;
   return (OMEGA_AO_BROKER_IDS as readonly string[]).includes(brokerId);
+}
+
+export function isOmegaAoShadowBroker(brokerId: string | null | undefined): boolean {
+  return brokerId === OMEGA_AO_SHADOW_BROKER_ID;
 }
 
 /** Mirror of src/core/omegaLaneB/omegaLaneBConstants.ts block reasons (legacy R1/Phase2 — no longer enforced, kept for historical row display). */

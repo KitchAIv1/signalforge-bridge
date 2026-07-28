@@ -125,8 +125,30 @@ export const ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT = 'ALPHAOMEGA_ENTRY_BLACKOUT';
  */
 export const ALPHAOMEGA_OBSERVE_ONLY_EXECUTION_TIER = 'ao_observe';
 
+/**
+ * signals.execution_tier for directed over-threshold (>centroid thr) shapes.
+ * Shadow AO streak only — never Trail, never live Lane B orders.
+ * Must stay in sync with engine-omega AO_SHADOW_OVER_EXECUTION_TIER.
+ */
+export const ALPHAOMEGA_SHADOW_OVER_EXECUTION_TIER = 'ao_shadow_over';
+
+/** Paper Shadow AO broker_id — never join OMEGA_AO_BROKER_IDS. */
+export const OMEGA_AO_SHADOW_BROKER_ID = 'ao_shadow_paper';
+
+/** bridge_config kill switch for Shadow AO (default false). */
+export const ALPHAOMEGA_SHADOW_ENABLED_CONFIG_KEY = 'alpha_omega_shadow_enabled';
+
 /** bridge_trade_log block_reason for observe-only (no Omega Trail attempt). */
 export const ALPHAOMEGA_OBSERVE_DEDUPED_REASON = 'AO_OBSERVE_DEDUPED';
+
+/** bridge_trade_log reason when omega execution_tier is not whitelisted. */
+export const ALPHAOMEGA_UNKNOWN_EXECUTION_TIER_REASON = 'AO_UNKNOWN_EXECUTION_TIER';
+
+/** bridge_trade_log reason for over-threshold shadow observe (no orders). */
+export const ALPHAOMEGA_SHADOW_OVER_OBSERVED_REASON = 'AO_SHADOW_OVER_OBSERVED';
+
+/** lane_advisory prefix for Shadow AO paper entries. */
+export const ALPHAOMEGA_SHADOW_ENTRY_ADVISORY_PREFIX = 'ALPHAOMEGA_SHADOW_ENTRY';
 
 export const ALPHAOMEGA_CLOSE_OPPOSING_COUNT = 'alphaomega_opposing_count';
 export const ALPHAOMEGA_CLOSE_OPPOSING_SHARE = 'alphaomega_opposing_share';
