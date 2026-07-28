@@ -2,8 +2,9 @@
  * ALPHAOMEGA entry gate — replaces the legacy R1/Phase2 gates
  * (omegaPhase2EntryGate.ts) for Lane B. Enters only on a validated
  * "founding streak crack" whose direction matches the incoming signal, with
- * no position already open, and whose founding streak took longer than
- * ENTRY_SPEED_FLOOR_MIN to form (advisory-rounded ≤ floor → SPEEDFLOOR shadow).
+ * no position already open, outside the Asia-open entry blackout, and whose
+ * founding streak took longer than ENTRY_SPEED_FLOOR_MIN to form
+ * (advisory-rounded ≤ floor → SPEEDFLOOR shadow).
  *
  * Legacy R1/Phase2 files are left in place (not deleted) for easy rollback;
  * they are simply no longer called from the Lane B fan-out branch.
@@ -11,17 +12,21 @@
 
 import {
   ALPHAOMEGA_BLOCK_ALREADY_OPEN,
+  ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
   ALPHAOMEGA_BLOCK_NO_CRACK,
   ALPHAOMEGA_BLOCK_SPEED_FLOOR,
   isAtOrBelowEntrySpeedFloor,
   roundAdvisorySpeedMin,
 } from './alphaOmegaConstants.js';
+import { isAlphaOmegaEntryBlackoutUtc } from './alphaOmegaEntryBlackout.js';
 import type { AlphaOmegaDirection, CrackEvent } from './alphaOmegaStreakTracker.js';
 
 export interface AlphaOmegaEntryGateInput {
   crackEvent: CrackEvent | null;
   direction: AlphaOmegaDirection;
   hasOpenPosition: boolean;
+  /** Injected clock for tests; defaults to now. */
+  asOf?: Date;
 }
 
 export interface AlphaOmegaEntryGateResult {
@@ -37,7 +42,7 @@ export interface AlphaOmegaEntryGateResult {
 }
 
 export function evaluateAlphaOmegaEntryGate(input: AlphaOmegaEntryGateInput): AlphaOmegaEntryGateResult {
-  const { crackEvent, direction, hasOpenPosition } = input;
+  const { crackEvent, direction, hasOpenPosition, asOf = new Date() } = input;
 
   if (!crackEvent || crackEvent.enterDirection !== direction) {
     return { enter: false, blockReason: ALPHAOMEGA_BLOCK_NO_CRACK, shadowAdvisory: null, foundingLength: null, foundingSpeedMin: null };
@@ -47,6 +52,16 @@ export function evaluateAlphaOmegaEntryGate(input: AlphaOmegaEntryGateInput): Al
     return {
       enter: false,
       blockReason: ALPHAOMEGA_BLOCK_ALREADY_OPEN,
+      shadowAdvisory: null,
+      foundingLength: crackEvent.foundingLength,
+      foundingSpeedMin: crackEvent.foundingSpeedMin,
+    };
+  }
+
+  if (isAlphaOmegaEntryBlackoutUtc(asOf)) {
+    return {
+      enter: false,
+      blockReason: ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
       shadowAdvisory: null,
       foundingLength: crackEvent.foundingLength,
       foundingSpeedMin: crackEvent.foundingSpeedMin,

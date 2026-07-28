@@ -89,9 +89,17 @@ export const ALPHAOMEGA_PURE_MAX_ABS_UNITS = 3_000_000;
  */
 export const ALPHAOMEGA_ASIAN_SESSION_WEIGHT = 0.1;
 
+/**
+ * AO new-entry blackout: [21:00, 21:15) UTC daily (Asia reopen / rollover).
+ * Blocks place only — streak observe and exits stay live.
+ */
+export const ALPHAOMEGA_ENTRY_BLACKOUT_START_UTC_MIN = 21 * 60;
+export const ALPHAOMEGA_ENTRY_BLACKOUT_END_UTC_MIN = 21 * 60 + 15;
+
 export const ALPHAOMEGA_BLOCK_NO_CRACK = 'ALPHAOMEGA_NO_QUALIFYING_CRACK';
 export const ALPHAOMEGA_BLOCK_SPEED_FLOOR = 'ALPHAOMEGA_SPEED_FLOOR';
 export const ALPHAOMEGA_BLOCK_ALREADY_OPEN = 'ALPHAOMEGA_ALREADY_OPEN';
+export const ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT = 'ALPHAOMEGA_ENTRY_BLACKOUT';
 
 /**
  * signals.execution_tier written by engine-omega when bridge exec-dedup skips

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ALPHAOMEGA_BLOCK_ALREADY_OPEN,
+  ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
   ALPHAOMEGA_BLOCK_NO_CRACK,
   ALPHAOMEGA_BLOCK_SPEED_FLOOR,
   ENTRY_SPEED_FLOOR_MIN,
@@ -10,6 +11,9 @@ import {
 } from './alphaOmegaConstants.js';
 import { evaluateAlphaOmegaEntryGate } from './alphaOmegaEntryGate.js';
 import type { CrackEvent } from './alphaOmegaStreakTracker.js';
+
+/** Mid-session UTC — outside [21:00, 21:15) blackout so speed-floor tests stay deterministic. */
+const OUTSIDE_BLACKOUT = new Date('2026-07-15T15:00:00.000Z');
 
 function crack(partial: Partial<CrackEvent> & Pick<CrackEvent, 'enterDirection'>): CrackEvent {
   return {
@@ -42,6 +46,7 @@ describe('evaluateAlphaOmegaEntryGate — speed floor ≤35 shadow', () => {
       crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 35.1, foundingLength: 8 }),
       direction: 'LONG',
       hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
     });
     assert.equal(result.enter, true);
     assert.equal(result.blockReason, null);
@@ -53,6 +58,7 @@ describe('evaluateAlphaOmegaEntryGate — speed floor ≤35 shadow', () => {
       crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 35.04, foundingLength: 8 }),
       direction: 'LONG',
       hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
     });
     assert.equal(result.enter, false);
     assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_SPEED_FLOOR);
@@ -64,6 +70,7 @@ describe('evaluateAlphaOmegaEntryGate — speed floor ≤35 shadow', () => {
       crackEvent: crack({ enterDirection: 'SHORT', foundingSpeedMin: 35, foundingLength: 8 }),
       direction: 'SHORT',
       hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
     });
     assert.equal(result.enter, false);
     assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_SPEED_FLOOR);
@@ -77,6 +84,7 @@ describe('evaluateAlphaOmegaEntryGate — speed floor ≤35 shadow', () => {
       crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 30, foundingLength: 7 }),
       direction: 'LONG',
       hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
     });
     assert.equal(result.enter, false);
     assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_SPEED_FLOOR);
@@ -88,6 +96,7 @@ describe('evaluateAlphaOmegaEntryGate — speed floor ≤35 shadow', () => {
       crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 32 }),
       direction: 'LONG',
       hasOpenPosition: true,
+      asOf: OUTSIDE_BLACKOUT,
     });
     assert.equal(result.enter, false);
     assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_ALREADY_OPEN);
@@ -99,9 +108,46 @@ describe('evaluateAlphaOmegaEntryGate — speed floor ≤35 shadow', () => {
       crackEvent: null,
       direction: 'LONG',
       hasOpenPosition: false,
+      asOf: OUTSIDE_BLACKOUT,
     });
     assert.equal(result.enter, false);
     assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_NO_CRACK);
     assert.equal(result.shadowAdvisory, null);
+  });
+});
+
+describe('evaluateAlphaOmegaEntryGate — Asia-open entry blackout', () => {
+  it('blocks qualifying crack during [21:00, 21:15) before speed floor', () => {
+    const result = evaluateAlphaOmegaEntryGate({
+      crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 40, foundingLength: 8 }),
+      direction: 'LONG',
+      hasOpenPosition: false,
+      asOf: new Date('2026-07-27T21:06:00.000Z'),
+    });
+    assert.equal(result.enter, false);
+    assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT);
+    assert.equal(result.shadowAdvisory, null);
+    assert.equal(result.foundingLength, 8);
+  });
+
+  it('allows same crack at 21:15 UTC', () => {
+    const result = evaluateAlphaOmegaEntryGate({
+      crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 40, foundingLength: 8 }),
+      direction: 'LONG',
+      hasOpenPosition: false,
+      asOf: new Date('2026-07-27T21:15:00.000Z'),
+    });
+    assert.equal(result.enter, true);
+    assert.equal(result.blockReason, null);
+  });
+
+  it('prefers already-open over blackout', () => {
+    const result = evaluateAlphaOmegaEntryGate({
+      crackEvent: crack({ enterDirection: 'LONG', foundingSpeedMin: 40 }),
+      direction: 'LONG',
+      hasOpenPosition: true,
+      asOf: new Date('2026-07-27T21:06:00.000Z'),
+    });
+    assert.equal(result.blockReason, ALPHAOMEGA_BLOCK_ALREADY_OPEN);
   });
 });
