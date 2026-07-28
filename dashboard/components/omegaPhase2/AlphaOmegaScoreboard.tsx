@@ -76,8 +76,9 @@ function SecondaryMetricRow({
   paperScore: SpeedfloorPaperScore | null;
   paperLoading: boolean;
 }) {
+  const gateBlockTotal = metrics.speedMidBandBlocks + metrics.entryBlackoutBlocks;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       <ScoreCard
         label="Entries taken"
         value={String(metrics.entriesTaken)}
@@ -87,8 +88,14 @@ function SecondaryMetricRow({
       <ScoreCard
         label="Speed-floor shadows"
         value={String(metrics.speedFloorShadows)}
-        hint="Would-enter, founding ≤35m"
+        hint="Would-enter, founding ≤35m (paper)"
         valueClass="text-violet-600 dark:text-violet-300"
+      />
+      <ScoreCard
+        label="Gate blocks"
+        value={String(gateBlockTotal)}
+        hint={`Mid-band ${metrics.speedMidBandBlocks} · Blackout ${metrics.entryBlackoutBlocks}`}
+        valueClass="text-sky-700 dark:text-sky-300"
       />
       <AlphaOmegaPaperScoreCard paperScore={paperScore} loading={paperLoading} />
       <ExitMixCard

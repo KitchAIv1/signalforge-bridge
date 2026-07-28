@@ -3,7 +3,10 @@
  */
 
 import type { BridgeTradeLogRow } from '@/lib/types';
-import { isPhase2ShadowFlagged } from '@/lib/phase2LaneAdvisoryFormat';
+import {
+  isPhase2ShadowFlagged,
+  resolvePhase2AdvisoryDisplay,
+} from '@/lib/phase2LaneAdvisoryFormat';
 
 export interface AlphaOmegaScoreboardMetrics {
   todayNetPips: number;
@@ -18,6 +21,9 @@ export interface AlphaOmegaScoreboardMetrics {
   avgLossPips: number | null;
   entriesTaken: number;
   speedFloorShadows: number;
+  /** Hard gate blocks — not SPEEDFLOOR paper. */
+  speedMidBandBlocks: number;
+  entryBlackoutBlocks: number;
   exitOpposing: number;
   exitHardStop: number;
   exitBackstop: number;
@@ -60,6 +66,8 @@ function emptyMetrics(): AlphaOmegaScoreboardMetrics {
     avgLossPips: null,
     entriesTaken: 0,
     speedFloorShadows: 0,
+    speedMidBandBlocks: 0,
+    entryBlackoutBlocks: 0,
     exitOpposing: 0,
     exitHardStop: 0,
     exitBackstop: 0,
@@ -138,6 +146,13 @@ export function computeAlphaOmegaScoreboard(
   for (const row of tradeRows) {
     if (row.decision === 'EXECUTED') metrics.entriesTaken += 1;
     if (isPhase2ShadowFlagged(row)) metrics.speedFloorShadows += 1;
+    const advisoryKind = resolvePhase2AdvisoryDisplay(
+      row.lane_advisory,
+      row.decision,
+      row.block_reason,
+    ).kind;
+    if (advisoryKind === 'speed_mid_band') metrics.speedMidBandBlocks += 1;
+    if (advisoryKind === 'entry_blackout') metrics.entryBlackoutBlocks += 1;
     accumulateClosedTrade(metrics, row, todayStart, weekStart, winPips, lossPips);
   }
 

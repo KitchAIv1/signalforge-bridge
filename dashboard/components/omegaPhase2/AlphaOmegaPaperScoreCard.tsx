@@ -41,7 +41,7 @@ export function AlphaOmegaPaperScoreCard({
       <p className={`mt-1 text-xl font-semibold tabular-nums ${tone}`}>{value}</p>
       <p className="mt-0.5 text-[11px] text-violet-700/80 dark:text-violet-300/80">{hint}</p>
       <p className="mt-1 text-[10px] text-violet-600/70 dark:text-violet-400/70">
-        Display-only · not in Today/7d live nets
+        Display-only · floor ≤35m only · not mid-band/blackout
       </p>
     </div>
   );

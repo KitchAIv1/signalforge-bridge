@@ -51,8 +51,9 @@ export default function OmegaPhase2ActivityPage() {
             {ALPHAOMEGA_PAGE_TITLE}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Dual books: {OMEGA_LANE_B_BROKER_ID} (OANDA) + {OMEGA_AO_VT_BROKER_ID} (VT). Crack entry
-            + speed floor + opposing / hard-stop / backstop exits.
+            Dual books: {OMEGA_LANE_B_BROKER_ID} (OANDA) + {OMEGA_AO_VT_BROKER_ID} (VT). Crack entry;
+            speed keep (35–45m and {'>'}60m), drop ≤35m and 45–60m; Asia blackout 21:00–21:15 UTC;
+            opposing / hard-stop / backstop exits.
           </p>
         </div>
         <button

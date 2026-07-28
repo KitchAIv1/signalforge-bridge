@@ -29,6 +29,11 @@ export const ALPHAOMEGA_ENTRY_SPEED_CEILING_MIN = 45;
  * Live gate compares 1-decimal advisory speed: Number(speed.toFixed(1)) <= floor → block.
  */
 export const ALPHAOMEGA_ENTRY_SPEED_FLOOR_MIN = 35;
+/** CF-C drop band upper bound — advisory (45, 60] blocked; keep (35, 45] and >60. */
+export const ALPHAOMEGA_ENTRY_SPEED_MID_BAND_MAX_MIN = 60;
+/** AO new-entry blackout [21:00, 21:15) UTC — place only; observe/exits stay live. */
+export const ALPHAOMEGA_ENTRY_BLACKOUT_START_UTC_MIN = 21 * 60;
+export const ALPHAOMEGA_ENTRY_BLACKOUT_END_UTC_MIN = 21 * 60 + 15;
 export const ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD = 5;
 export const ALPHAOMEGA_HARD_STOP_PIPS = 10;
 export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';

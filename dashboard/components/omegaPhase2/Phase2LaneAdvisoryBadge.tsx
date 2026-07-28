@@ -5,6 +5,8 @@ import type { Phase2AdvisoryDisplay } from '@/lib/phase2LaneAdvisoryFormat';
 const BADGE_CLASS_BY_KIND: Record<Phase2AdvisoryDisplay['kind'], string> = {
   crack_entry: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200',
   speedfloor_shadow: 'bg-violet-100 text-violet-900 dark:bg-violet-950/45 dark:text-violet-200',
+  speed_mid_band: 'bg-sky-100 text-sky-900 dark:bg-sky-950/45 dark:text-sky-200',
+  entry_blackout: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200',
   no_crack: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
   already_open: 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200',
   invalid_direction: 'bg-rose-100 text-rose-900 dark:bg-rose-950/45 dark:text-rose-200',

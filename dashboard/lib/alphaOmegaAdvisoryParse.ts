@@ -69,6 +69,11 @@ export function isAlphaOmegaSpeedFloorAdvisory(laneAdvisory: string | null | und
   return (laneAdvisory ?? '').trim().startsWith(ALPHAOMEGA_ADVISORY_SPEEDFLOOR_PREFIX);
 }
 
+/** CF-C mid-band forensics shadow — not SPEEDFLOOR paper. */
+export function isAlphaOmegaSpeedBandAdvisory(laneAdvisory: string | null | undefined): boolean {
+  return (laneAdvisory ?? '').trim().startsWith(ALPHAOMEGA_ADVISORY_SPEEDBAND_PREFIX);
+}
+
 export function isAlphaOmegaEntryAdvisory(laneAdvisory: string | null | undefined): boolean {
   return (laneAdvisory ?? '').trim().startsWith(ALPHAOMEGA_ADVISORY_ENTRY_PREFIX);
 }

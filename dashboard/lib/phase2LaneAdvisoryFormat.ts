@@ -5,12 +5,16 @@ import {
 import {
   ALPHAOMEGA_ADVISORY_DISABLED,
   ALPHAOMEGA_ADVISORY_ENTRY_PREFIX,
+  ALPHAOMEGA_ADVISORY_SPEEDBAND_PREFIX,
   ALPHAOMEGA_ADVISORY_SPEEDFLOOR_PREFIX,
   ALPHAOMEGA_BLOCK_ALREADY_OPEN,
+  ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
   ALPHAOMEGA_BLOCK_INVALID_DIRECTION,
   ALPHAOMEGA_BLOCK_NO_CRACK,
   ALPHAOMEGA_BLOCK_SPEED_FLOOR,
+  ALPHAOMEGA_BLOCK_SPEED_MID_BAND,
   formatFoundingSummary,
+  isAlphaOmegaSpeedBandAdvisory,
   isAlphaOmegaSpeedFloorAdvisory,
   parseAlphaOmegaFoundingMeta,
 } from '@/lib/alphaOmegaAdvisoryParse';
@@ -18,6 +22,8 @@ import {
 export type Phase2AdvisoryKind =
   | 'crack_entry'
   | 'speedfloor_shadow'
+  | 'speed_mid_band'
+  | 'entry_blackout'
   | 'no_crack'
   | 'already_open'
   | 'invalid_direction'
@@ -43,11 +49,29 @@ function resolveBlockedAlphaOmega(
   blockReason: string | null | undefined,
 ): Phase2AdvisoryDisplay | null {
   const advisoryText = (laneAdvisory ?? '').trim();
+  // SPEEDFLOOR paper path — must stay distinct from mid-band / blackout.
   if (blockReason === ALPHAOMEGA_BLOCK_SPEED_FLOOR || isAlphaOmegaSpeedFloorAdvisory(advisoryText)) {
     return {
       kind: 'speedfloor_shadow',
       label: 'SPEED FLOOR',
       detail: foundingDetail(advisoryText) ?? 'Would enter — founding ≤35m',
+    };
+  }
+  if (
+    blockReason === ALPHAOMEGA_BLOCK_SPEED_MID_BAND ||
+    isAlphaOmegaSpeedBandAdvisory(advisoryText)
+  ) {
+    return {
+      kind: 'speed_mid_band',
+      label: 'SPEED MID',
+      detail: foundingDetail(advisoryText) ?? 'Would enter — speed 45–60m',
+    };
+  }
+  if (blockReason === ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT) {
+    return {
+      kind: 'entry_blackout',
+      label: 'BLACKOUT',
+      detail: 'No new entries 21:00–21:15 UTC',
     };
   }
   if (blockReason === ALPHAOMEGA_BLOCK_NO_CRACK) {
@@ -72,6 +96,13 @@ function resolveAdvisoryAlphaOmega(laneAdvisory: string | null): Phase2AdvisoryD
       kind: 'speedfloor_shadow',
       label: 'SPEED FLOOR',
       detail: foundingDetail(advisoryText) ?? 'Would enter — founding ≤35m',
+    };
+  }
+  if (advisoryText.startsWith(ALPHAOMEGA_ADVISORY_SPEEDBAND_PREFIX)) {
+    return {
+      kind: 'speed_mid_band',
+      label: 'SPEED MID',
+      detail: foundingDetail(advisoryText) ?? 'Would enter — speed 45–60m',
     };
   }
   if (advisoryText === ALPHAOMEGA_ADVISORY_DISABLED) {
@@ -139,6 +170,7 @@ export function resolvePhase2AdvisoryDisplay(
   return resolveLegacyDisplay(laneAdvisory, decision, blockReason);
 }
 
+/** Violet paper / Speed-floor shadow filter — floor-only (not mid-band, not blackout). */
 export function isPhase2ShadowFlagged(row: {
   lane_advisory?: string | null;
   decision: string;
@@ -156,6 +188,7 @@ export function isPhase2ShadowFlagged(row: {
   );
 }
 
+/** Blocked filter — hard AO gate rejects (excludes SPEEDFLOOR paper shadows). */
 export function isAlphaOmegaLiveBlock(row: {
   lane_advisory?: string | null;
   decision: string;
@@ -171,6 +204,8 @@ export function isAlphaOmegaLiveBlock(row: {
     display.kind === 'no_crack' ||
     display.kind === 'already_open' ||
     display.kind === 'invalid_direction' ||
+    display.kind === 'speed_mid_band' ||
+    display.kind === 'entry_blackout' ||
     display.kind === 'r1_live' ||
     display.kind === 'phase2_live'
   );
