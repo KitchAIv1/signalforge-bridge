@@ -2,11 +2,16 @@
 
 import { usePdlSweepSignals } from '@/hooks/usePdlSweepSignals';
 import { usePdlWindowLiveStatus } from '@/hooks/usePdlWindowLiveStatus';
+import { usePdlWindowTrades } from '@/hooks/usePdlWindowTrades';
 import { PdlSweepPageHeader } from '@/components/pdlSweep/PdlSweepPageHeader';
 import { PdlSweepForwardGate } from '@/components/pdlSweep/PdlSweepForwardGate';
 import { PdlSweepLiveConditions } from '@/components/pdlSweep/PdlSweepLiveConditions';
 import { PdlSweepHistoryTable } from '@/components/pdlSweep/PdlSweepHistoryTable';
 import type { PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
+import {
+  PDL_WINDOW_HARD_SL_PIPS,
+  PDL_WINDOW_VT_SPREAD_PIPS,
+} from '@/lib/pdlSweepConstants';
 
 function TodayMissingBanner({ todayUtc }: { todayUtc: string }) {
   return (
@@ -31,7 +36,7 @@ function LiveStatusBanner({
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Live engine <strong>pdl_window</strong> not registered / inactive. Research shadow
           detection still runs. Set <code className="text-xs">PDL_WINDOW_ENABLED=true</code> and
-          apply migration 061 to arm.
+          apply migration 067 to arm.
         </p>
       </div>
     );
@@ -48,8 +53,9 @@ function LiveStatusBanner({
   return (
     <div className="rounded-lg border border-emerald-600/40 bg-emerald-950/20 px-4 py-3">
       <p className="text-sm text-emerald-300">
-        Live engine armed — LONG 12:00–15:00 unless all-3-false · SL 20p · shares Fade OANDA/MT5
-        (OANDA blocks if Fade open).
+        Live engine armed — always trade 12:00–13:00 UTC · SHORT if all✗ or all✓ · else LONG ·
+        SL {PDL_WINDOW_HARD_SL_PIPS}p · spread {PDL_WINDOW_VT_SPREAD_PIPS}p · shares Fade
+        OANDA/MT5 (OANDA blocks if Fade open).
       </p>
     </div>
   );
@@ -65,7 +71,8 @@ function shouldShowTodayBanner(rows: PdlSweepSignalRow[]): boolean {
 }
 
 export default function PdlSweepPage() {
-  const { rows, todayRow, firedRows, nonFiredRows, loading, error } = usePdlSweepSignals();
+  const { rows, todayRow, firedRows, loading, error } = usePdlSweepSignals();
+  const { tradesByDate, error: tradesError } = usePdlWindowTrades();
   const { engineActive, paused, loading: statusLoading } = usePdlWindowLiveStatus();
 
   if (loading) {
@@ -101,6 +108,10 @@ export default function PdlSweepPage() {
 
         {showTodayBanner ? <TodayMissingBanner todayUtc={todayUtc} /> : null}
 
+        {tradesError ? (
+          <p className="text-sm text-amber-500">Live trades: {tradesError}</p>
+        ) : null}
+
         <PdlSweepLiveConditions
           todayRow={todayRow}
           liveArmed={liveArmed}
@@ -109,13 +120,12 @@ export default function PdlSweepPage() {
 
         <section>
           <h2 className="mb-3 text-sm font-medium text-slate-500 uppercase tracking-wide">
-            Signal history
+            Signal + live trade history
           </h2>
           <p className="mb-2 text-xs text-slate-500">
-            Live fills appear in Activity (filter PDL Window). Calendar chip is optional / off by
-            default.
+            Live fills from pdl_window_trades. Calendar chip is optional / off by default.
           </p>
-          <PdlSweepHistoryTable firedRows={firedRows} nonFiredRows={nonFiredRows} />
+          <PdlSweepHistoryTable rows={rows} tradesByDate={tradesByDate} />
         </section>
       </div>
     </div>

@@ -1,6 +1,6 @@
 /**
  * PDL Window engine orchestrator.
- * Entry after shadow detection; exit poll + 15:00 hard flatten.
+ * Entry after shadow detection; exit poll + 13:00 hard flatten.
  * Does not call into audusd_fade modules.
  */
 
@@ -30,11 +30,16 @@ export class PdlWindowEngine {
     }
   }
 
+  /** @deprecated Use hardFlatten1300 — kept for call-site compatibility. */
   static async hardFlatten1500(): Promise<void> {
+    await PdlWindowEngine.hardFlatten1300();
+  }
+
+  static async hardFlatten1300(): Promise<void> {
     if (!isPdlWindowEnabled()) return;
     try {
       await hardFlattenAllPdlTrades();
-      console.log('[PdlWindow] 15:00 hard flatten complete');
+      console.log('[PdlWindow] 13:00 hard flatten complete');
     } catch (err) {
       console.error('[PdlWindow] HardFlatten error:', err);
     }

@@ -5,6 +5,8 @@ export type PdlWindowTradeResult =
   | 'time_exit'
   | 'force_close';
 
+export type PdlWindowDirection = 'long' | 'short';
+
 export type PdlWindowConditionsMet = {
   pdl_breach: boolean;
   london_down: boolean;
@@ -18,7 +20,7 @@ export type PdlWindowTrade = {
   broker_id: string;
   oanda_trade_id: string | null;
   units: number | null;
-  direction: 'long';
+  direction: PdlWindowDirection;
   entry_price: number;
   sl_price: number;
   exit_price: number | null;
@@ -40,7 +42,7 @@ export type PdlWindowTradeInsert = {
   broker_id: string;
   oanda_trade_id: string | null;
   units: number;
-  direction: 'long';
+  direction: PdlWindowDirection;
   entry_price: number;
   sl_price: number;
   conditions_met: PdlWindowConditionsMet | null;

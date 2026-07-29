@@ -1,8 +1,9 @@
 export const PDL_WINDOW_ENGINE_ID = 'pdl_window';
 export const PDL_WINDOW_PAIR = 'AUD_USD';
 export const PDL_WINDOW_TABLE = 'pdl_window_trades';
-export const PDL_WINDOW_HARD_SL_PIPS = 20;
-export const PDL_WINDOW_EXIT_HOUR_UTC = 15;
+export const PDL_WINDOW_HARD_SL_PIPS = 5;
+export const PDL_WINDOW_EXIT_HOUR_UTC = 13;
+export const PDL_WINDOW_VT_SPREAD_PIPS = 1.5;
 export const PDL_WINDOW_DEFAULT_RISK_PCT = 0.02;
 export const PDL_WINDOW_OANDA_BROKER_ID = 'oanda_practice';
 

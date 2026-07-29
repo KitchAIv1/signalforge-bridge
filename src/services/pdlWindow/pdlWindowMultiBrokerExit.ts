@@ -1,5 +1,5 @@
 /**
- * PDL Window exit — broker SL reconcile + hard flatten at 15:00 UTC.
+ * PDL Window exit — broker SL reconcile + hard flatten at 13:00 UTC.
  * Always close-by-trade-id. Never touches Fade positions.
  */
 
@@ -9,7 +9,6 @@ import { syncPdlTradeToBridgeLog } from './pdlWindowBridgeSync.js';
 import { resolveBrokerForPdlTrade } from './pdlWindowBrokerResolver.js';
 import {
   PDL_WINDOW_EXIT_HOUR_UTC,
-  PDL_WINDOW_HARD_SL_PIPS,
   PDL_WINDOW_PAIR,
 } from './pdlWindowConstants.js';
 import {
@@ -17,19 +16,19 @@ import {
   loadOpenPdlTrades,
   updatePdlTrade,
 } from './pdlWindowDayState.js';
+import {
+  computePnlDollars,
+  computePnlR,
+  inferSlHit,
+  netPipsAfterSpread,
+  resultFromClose,
+  signedTraderPips,
+} from './pdlWindowPnl.js';
 import type { PdlWindowTrade, PdlWindowTradeResult } from './pdlWindowTypes.js';
 import type { BrokerClient } from '../../connectors/broker/types.js';
 
 function todayUtcString(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function signedLongPips(entry: number, exit: number): number {
-  return Math.round((exit - entry) * 10000 * 10) / 10;
-}
-
-function computePnlDollars(units: number | null, pnlPips: number): number {
-  return Math.round((units ?? 0) * 0.0001 * pnlPips * 100) / 100;
 }
 
 async function persistClose(
@@ -38,9 +37,11 @@ async function persistClose(
   closeReason: string,
   result: PdlWindowTradeResult,
 ): Promise<void> {
-  const pnlPips = signedLongPips(trade.entry_price, exitPrice);
-  const pnlDollars = computePnlDollars(trade.units, pnlPips);
-  const pnlR = Math.round((pnlPips / PDL_WINDOW_HARD_SL_PIPS) * 1000) / 1000;
+  const gross = signedTraderPips(trade.direction, trade.entry_price, exitPrice);
+  const pnlPips = netPipsAfterSpread(gross);
+  const unitsAbs = Math.abs(trade.units ?? 0);
+  const pnlDollars = computePnlDollars(unitsAbs, pnlPips);
+  const pnlR = computePnlR(pnlPips);
   const fields = {
     exit_price: exitPrice,
     pnl_pips: pnlPips,
@@ -55,7 +56,7 @@ async function persistClose(
   void sendTradeClosedAlert({
     engineId: 'pdl_window',
     instrument: PDL_WINDOW_PAIR,
-    direction: 'long',
+    direction: trade.direction === 'short' ? 'SHORT' : 'LONG',
     entryPrice: trade.entry_price,
     exitPrice,
     pnlPips,
@@ -67,20 +68,16 @@ async function persistClose(
   }).catch(() => {});
 }
 
-function inferCloseReason(exitPrice: number, trade: PdlWindowTrade): string {
-  if (exitPrice <= trade.sl_price + 0.00005) return 'sl_hit';
-  return 'external_close';
-}
-
 async function handleBrokerClosure(
   trade: PdlWindowTrade,
   exitPrice: number,
 ): Promise<void> {
-  const reason = inferCloseReason(exitPrice, trade);
-  const pnlPips = signedLongPips(trade.entry_price, exitPrice);
-  const result: PdlWindowTradeResult =
-    reason === 'sl_hit' ? 'loss' : pnlPips > 0 ? 'win' : pnlPips < 0 ? 'loss' : 'breakeven';
-  await persistClose(trade, exitPrice, reason, result);
+  const reason = inferSlHit(trade.direction, exitPrice, trade.sl_price)
+    ? 'sl_hit'
+    : 'external_close';
+  const gross = signedTraderPips(trade.direction, trade.entry_price, exitPrice);
+  const netPips = netPipsAfterSpread(gross);
+  await persistClose(trade, exitPrice, reason, resultFromClose(reason, netPips));
 }
 
 async function forceCloseTrade(
@@ -123,7 +120,7 @@ async function processOpenTrade(trade: PdlWindowTrade): Promise<void> {
   }
 
   if (new Date().getUTCHours() >= PDL_WINDOW_EXIT_HOUR_UTC) {
-    await forceCloseTrade(trade, broker, 'time_exit_1500', 'time_exit');
+    await forceCloseTrade(trade, broker, 'time_exit_1300', 'time_exit');
   }
 }
 
@@ -135,13 +132,13 @@ export async function runPdlWindowExitForAllBrokers(): Promise<void> {
   }
 }
 
-/** Hard flatten all open PDL trades (15:00 cron / recovery). */
+/** Hard flatten all open PDL trades (13:00 cron / recovery). */
 export async function hardFlattenAllPdlTrades(): Promise<void> {
   const openTrades = await loadAllOpenPdlTrades(PDL_WINDOW_PAIR);
   const supabase = getSupabaseClient();
   for (const trade of openTrades) {
     if (!trade.oanda_trade_id) continue;
     const broker = await resolveBrokerForPdlTrade(supabase, trade.broker_id);
-    await forceCloseTrade(trade, broker, 'time_exit_1500', 'time_exit');
+    await forceCloseTrade(trade, broker, 'time_exit_1300', 'time_exit');
   }
 }

@@ -1,5 +1,5 @@
 /**
- * PDL Window multi-broker entry — LONG only, SL 20p, no TP.
+ * PDL Window multi-broker entry — LONG or SHORT, SL 5p, no TP.
  * OANDA: blocked if Fade has open AUD_USD. MT5: no Fade gate.
  */
 
@@ -9,7 +9,6 @@ import { loadExecutionRoutes, type EngineBrokerRoute } from '../broker/brokerLin
 import { loadTodayPdlWindowSignal } from './pdlWindowConditions.js';
 import {
   PDL_WINDOW_ENGINE_ID,
-  PDL_WINDOW_HARD_SL_PIPS,
   PDL_WINDOW_PAIR,
 } from './pdlWindowConstants.js';
 import {
@@ -22,18 +21,18 @@ import {
   isOandaBrokerId,
 } from './pdlWindowFadeOandaGuard.js';
 import { isPdlWindowPaused } from './pdlWindowPauseGuard.js';
+import { hardSlPrice } from './pdlWindowPnl.js';
 import {
   calculatePdlWindowUnits,
   loadPdlWindowEngineWeight,
 } from './pdlWindowSizer.js';
-import type { PdlWindowConditionsMet } from './pdlWindowTypes.js';
+import type {
+  PdlWindowConditionsMet,
+  PdlWindowDirection,
+} from './pdlWindowTypes.js';
 
 function todayUtcString(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function hardSlPrice(entryPrice: number): number {
-  return entryPrice - PDL_WINDOW_HARD_SL_PIPS * 0.0001;
 }
 
 async function entryGuardsBlock(tradeDate: string, brokerId: string): Promise<string | null> {
@@ -48,10 +47,26 @@ async function entryGuardsBlock(tradeDate: string, brokerId: string): Promise<st
   return null;
 }
 
+async function resolveEntryEstimate(route: EngineBrokerRoute): Promise<number> {
+  try {
+    const candle = await route.broker.fetchLatestM5Candle(
+      route.broker.toBrokerInstrument(PDL_WINDOW_PAIR),
+    );
+    return candle?.close ?? 0;
+  } catch (err) {
+    console.error('[PdlWindow] fetchLatestM5Candle failed', {
+      brokerId: route.brokerId,
+      err: String(err),
+    });
+    return 0;
+  }
+}
+
 async function openPdlOnBroker(
   tradeDate: string,
   route: EngineBrokerRoute,
   conditions: PdlWindowConditionsMet,
+  direction: PdlWindowDirection,
   weight: number,
 ): Promise<void> {
   const { broker, brokerId } = route;
@@ -63,28 +78,20 @@ async function openPdlOnBroker(
     return;
   }
 
-  let entryEstimate = 0;
-  try {
-    const candle = await broker.fetchLatestM5Candle(
-      broker.toBrokerInstrument(PDL_WINDOW_PAIR),
-    );
-    entryEstimate = candle?.close ?? 0;
-  } catch (err) {
-    console.error('[PdlWindow] fetchLatestM5Candle failed', { brokerId, err: String(err) });
-    return;
-  }
+  const entryEstimate = await resolveEntryEstimate(route);
   if (!(entryEstimate > 0)) return;
 
-  const sl = hardSlPrice(entryEstimate);
-  const units = calculatePdlWindowUnits(equity, weight, entryEstimate, sl);
-  if (units <= 0) return;
+  const slEstimate = hardSlPrice(entryEstimate, direction);
+  const unitsAbs = calculatePdlWindowUnits(equity, weight, entryEstimate, slEstimate);
+  if (unitsAbs <= 0) return;
+  const signedUnits = direction === 'long' ? unitsAbs : -unitsAbs;
 
   let orderResult;
   try {
     orderResult = await broker.placeMarketOrder({
       instrument: PDL_WINDOW_PAIR,
-      units,
-      stopLossPrice: sl.toFixed(5),
+      units: signedUnits,
+      stopLossPrice: slEstimate.toFixed(5),
     });
   } catch (err) {
     console.error('[PdlWindow] placeMarketOrder failed', { brokerId, err: String(err) });
@@ -104,13 +111,13 @@ async function openPdlOnBroker(
   const fillPrice = fillTx.price != null ? Number(fillTx.price) : null;
   if (!fillPrice || !tradeId) return;
 
-  const fillSl = hardSlPrice(fillPrice);
+  const fillSl = hardSlPrice(fillPrice, direction);
   await insertPdlTrade({
     trade_date: tradeDate,
     broker_id: brokerId,
     oanda_trade_id: tradeId,
-    units,
-    direction: 'long',
+    units: signedUnits,
+    direction,
     entry_price: fillPrice,
     sl_price: fillSl,
     conditions_met: conditions,
@@ -119,18 +126,18 @@ async function openPdlOnBroker(
 
   void sendTradeExecutedAlert({
     oandaInstrument: broker.toBrokerInstrument(PDL_WINDOW_PAIR),
-    direction: 'LONG',
+    direction: direction === 'long' ? 'LONG' : 'SHORT',
     fillPrice,
     stopLoss: fillSl,
     takeProfit: null,
-    filledUnits: units,
+    filledUnits: signedUnits,
     amdTag: null,
     amdSizeMultiplier: weight,
     directionSource: `pdl_window:${brokerId}`,
     engineId: PDL_WINDOW_ENGINE_ID,
   }).catch(() => {});
 
-  console.log('[PdlWindow] opened LONG', { brokerId, units, tradeId, fillPrice });
+  console.log('[PdlWindow] opened', { direction, brokerId, units: signedUnits, tradeId, fillPrice });
 }
 
 export async function runPdlWindowEntryForAllBrokers(): Promise<void> {
@@ -145,10 +152,6 @@ export async function runPdlWindowEntryForAllBrokers(): Promise<void> {
     console.warn('[PdlWindow] no pdl_sweep_signals row yet — skip entry');
     return;
   }
-  if (!signal.shouldTrade) {
-    console.log('[PdlWindow] all-3-false — NO TRADE today');
-    return;
-  }
 
   const weight = await loadPdlWindowEngineWeight();
   const routes = await loadExecutionRoutes(getSupabaseClient(), PDL_WINDOW_ENGINE_ID);
@@ -159,6 +162,12 @@ export async function runPdlWindowEntryForAllBrokers(): Promise<void> {
       console.log(`[PdlWindow] BLOCKED ${block}`, { brokerId: route.brokerId });
       continue;
     }
-    await openPdlOnBroker(tradeDate, route, signal.conditions, weight);
+    await openPdlOnBroker(
+      tradeDate,
+      route,
+      signal.conditions,
+      signal.direction,
+      weight,
+    );
   }
 }

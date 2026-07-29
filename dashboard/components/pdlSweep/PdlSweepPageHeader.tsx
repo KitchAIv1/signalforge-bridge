@@ -1,7 +1,11 @@
 'use client';
 
 import { PdlSweepShadowPill } from '@/components/pdlSweep/PdlSweepShadowPill';
-import { HISTORICAL_FIRED_DAYS } from '@/lib/pdlSweepConstants';
+import {
+  HISTORICAL_FIRED_DAYS,
+  PDL_WINDOW_HARD_SL_PIPS,
+  PDL_WINDOW_VT_SPREAD_PIPS,
+} from '@/lib/pdlSweepConstants';
 import { computePdlForwardWinRate } from '@/lib/pdlSweepStats';
 import type { PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
 
@@ -23,21 +27,22 @@ export function PdlSweepPageHeader({ rows, firedRows, liveArmed }: PageHeaderPro
         <PdlSweepShadowPill liveArmed={liveArmed} />
       </div>
       <p className="mt-1 text-sm text-slate-500">
-        {rows.length} trading days tracked — live rule: always LONG 12:00–15:00 UTC unless
-        PDL✗ · LDN✗ · H11✗ (all false). Hard SL 20p. Engine: pdl_window.
+        {rows.length} trading days tracked — live rule: always trade 12:00–13:00 UTC;
+        SHORT if all✗ or all✓ (P1L1H1), else LONG. Hard SL {PDL_WINDOW_HARD_SL_PIPS}p ·
+        VT spread {PDL_WINDOW_VT_SPREAD_PIPS}p netted. Engine: pdl_window.
       </p>
       <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
         <span>
-          Forward fired (3/3 research):{' '}
+          Research 3/3 fired:{' '}
           <strong className="text-slate-900 dark:text-slate-100">{firedRows.length}</strong>
         </span>
         <span>
           Research baseline:{' '}
-          <strong className="text-slate-900 dark:text-slate-100">{HISTORICAL_FIRED_DAYS}</strong> days
-          (75%)
+          <strong className="text-slate-900 dark:text-slate-100">{HISTORICAL_FIRED_DAYS}</strong>{' '}
+          days
         </span>
         <span>
-          Forward win rate:{' '}
+          Research H12 win rate:{' '}
           <strong className="text-slate-900 dark:text-slate-100">{forwardWinRate}</strong>
         </span>
       </div>

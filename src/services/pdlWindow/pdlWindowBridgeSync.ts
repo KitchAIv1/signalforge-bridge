@@ -33,7 +33,7 @@ function buildMirrorRow(trade: PdlWindowTrade): Record<string, unknown> {
     signal_id: randomUUID(),
     engine_id: PDL_WINDOW_ENGINE_ID,
     pair: trade.pair,
-    direction: 'LONG',
+    direction: trade.direction === 'short' ? 'SHORT' : 'LONG',
     decision: 'EXECUTED',
     status: 'closed',
     result: mapBridgeResult(trade.result!, trade.pnl_pips),

@@ -350,7 +350,7 @@ async function main(): Promise<void> {
     );
   }
 
-  // PDL Window — always LONG 12:00–15:00 unless all-3-false; SL 20p.
+  // PDL Window — always trade 12:00–13:00; SHORT on XXX or P1L1H1 else LONG; SL 5p.
   // Shares Fade OANDA/MT5 accounts. OANDA blocks if Fade open; MT5 does not.
   // Controlled by PDL_WINDOW_ENABLED. Separate interval from Fade (do not nest).
   if (process.env.PDL_WINDOW_ENABLED === 'true') {
@@ -359,8 +359,8 @@ async function main(): Promise<void> {
         console.error('[PdlWindow] Monitor error:', e),
       );
     }, 30000);
-    cron.schedule('0 15 * * 1-5', () => {
-      void PdlWindowEngine.hardFlatten1500().catch((e) =>
+    cron.schedule('0 13 * * 1-5', () => {
+      void PdlWindowEngine.hardFlatten1300().catch((e) =>
         console.error('[PdlWindow] HardFlatten error:', e),
       );
     }, { timezone: 'UTC' });
@@ -368,7 +368,7 @@ async function main(): Promise<void> {
     logInfo(
       `[PdlWindow] Engine registered — PDL_WINDOW_ENABLED=true | OANDA=${
         pdlAccount ?? 'SHARED'
-      } | magic=88003 | OANDA fade-open guard ON | MT5 fade-open guard OFF`,
+      } | magic=88003 | SL=5p | flatten=13:00 UTC | OANDA fade-open guard ON | MT5 fade-open guard OFF`,
     );
   }
 

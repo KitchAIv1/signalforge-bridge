@@ -1,10 +1,11 @@
 import { getSupabaseClient } from '../../connectors/supabase.js';
 import { PDL_SWEEP_PAIR, PDL_SWEEP_TABLE } from '../pdlSweepDetector/pdlSweepConstants.js';
-import type { PdlWindowConditionsMet } from './pdlWindowTypes.js';
+import type { PdlWindowConditionsMet, PdlWindowDirection } from './pdlWindowTypes.js';
 
 export type PdlWindowDaySignal = {
   conditions: PdlWindowConditionsMet;
   shouldTrade: boolean;
+  direction: PdlWindowDirection;
 };
 
 function parseConditions(raw: unknown): PdlWindowConditionsMet | null {
@@ -24,9 +25,22 @@ function parseConditions(raw: unknown): PdlWindowConditionsMet | null {
   };
 }
 
-/** Skip only when all three conditions are false. */
-export function shouldTradeFromConditions(conditions: PdlWindowConditionsMet): boolean {
-  return conditions.pdl_breach || conditions.london_down || conditions.h11_up;
+/** Always trade once conditions are known. */
+export function shouldTradeFromConditions(_conditions: PdlWindowConditionsMet): boolean {
+  return true;
+}
+
+/**
+ * SHORT when all-false (XXX) or all-true (P1L1H1); LONG otherwise.
+ */
+export function directionFromConditions(
+  conditions: PdlWindowConditionsMet,
+): PdlWindowDirection {
+  const allFalse =
+    !conditions.pdl_breach && !conditions.london_down && !conditions.h11_up;
+  const allTrue =
+    conditions.pdl_breach && conditions.london_down && conditions.h11_up;
+  return allFalse || allTrue ? 'short' : 'long';
 }
 
 /** Load today's shadow detection row written at 12:10 UTC. */
@@ -48,5 +62,9 @@ export async function loadTodayPdlWindowSignal(
 
   const conditions = parseConditions(data.conditions_met);
   if (!conditions) return null;
-  return { conditions, shouldTrade: shouldTradeFromConditions(conditions) };
+  return {
+    conditions,
+    shouldTrade: shouldTradeFromConditions(conditions),
+    direction: directionFromConditions(conditions),
+  };
 }
