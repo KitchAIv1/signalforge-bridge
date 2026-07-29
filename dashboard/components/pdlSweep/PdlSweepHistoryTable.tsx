@@ -3,7 +3,10 @@
 import type { ReactNode } from 'react';
 import type { ConditionsMet, PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
 import type { PdlWindowTradeRow } from '@/lib/pdlWindowTypes';
-import { pdlLiveSideFromConditions } from '@/lib/pdlWindowDirection';
+import {
+  normalizeTradeDateKey,
+  pdlLiveSideFromConditions,
+} from '@/lib/pdlWindowDirection';
 import { PdlLiveTradeCells } from '@/components/pdlSweep/PdlLiveTradeCells';
 
 type HistoryTableProps = {
@@ -68,7 +71,7 @@ function HistoryRow({
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
         {formatPips(row.h11_net_pips)} {row.h11_direction ?? ''}
       </td>
-      <PdlLiveTradeCells trades={trades} />
+      <PdlLiveTradeCells trades={trades} signalRow={row} />
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
         <ResearchOutcome row={row} />
       </td>
@@ -111,13 +114,14 @@ export function PdlSweepHistoryTable({ rows, tradesByDate }: HistoryTableProps) 
           <HistoryRow
             key={row.id}
             row={row}
-            trades={tradesByDate.get(row.trade_date)}
+            trades={tradesByDate.get(normalizeTradeDateKey(row.trade_date))}
           />
         ))}
       </HistoryTableShell>
       <p className="text-xs text-slate-400">
-        Showing {rows.length} trading day{rows.length === 1 ? '' : 's'}. Live PnL is
-        net of 1.5p VT spread. H12 research is the 12:00–13:00 body-sum label.
+        Showing {rows.length} trading day{rows.length === 1 ? '' : 's'}. Live fills
+        come from pdl_window_trades (first live days: Jul 20+). Earlier days show a
+        research proxy (intended side · H12−1.5p) labeled “no live fill”.
       </p>
     </div>
   );

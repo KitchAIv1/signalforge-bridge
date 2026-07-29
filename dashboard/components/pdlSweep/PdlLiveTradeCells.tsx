@@ -1,6 +1,11 @@
 'use client';
 
+import type { ConditionsMet, PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
 import type { PdlWindowTradeRow } from '@/lib/pdlWindowTypes';
+import {
+  pdlLiveSideFromConditions,
+  researchNetPipsForSide,
+} from '@/lib/pdlWindowDirection';
 
 function formatPips(value: number | null): string {
   if (value == null) return '—';
@@ -14,19 +19,46 @@ function formatPrice(value: number | null): string {
 
 type TradeCellsProps = {
   trades: PdlWindowTradeRow[] | undefined;
+  signalRow: PdlSweepSignalRow;
 };
 
-export function PdlLiveTradeCells({ trades }: TradeCellsProps) {
-  if (!trades || trades.length === 0) {
+function ResearchProxyCells({ row }: { row: PdlSweepSignalRow }) {
+  const conditions = row.conditions_met as ConditionsMet | null;
+  if (!conditions) {
     return (
       <>
         <td className="px-3 py-2 text-xs text-slate-500">—</td>
         <td className="px-3 py-2 text-xs text-slate-500">—</td>
         <td className="px-3 py-2 text-xs text-slate-500">—</td>
         <td className="px-3 py-2 text-xs text-slate-500">—</td>
-        <td className="px-3 py-2 text-xs text-slate-500">—</td>
+        <td className="px-3 py-2 text-xs text-slate-500">no live fill</td>
       </>
     );
+  }
+
+  const side = pdlLiveSideFromConditions(conditions);
+  const netPips = researchNetPipsForSide(side, row.outcome_h12_net_pips);
+
+  return (
+    <>
+      <td className="px-3 py-2 text-xs font-semibold text-slate-500">
+        {side.toUpperCase()}
+        <span className="ml-1 font-normal text-slate-400">(research)</span>
+      </td>
+      <td className="px-3 py-2 text-xs text-slate-400">12:00</td>
+      <td className="px-3 py-2 text-xs text-slate-400">13:00</td>
+      <td className="px-3 py-2 text-xs text-slate-500">
+        {formatPips(netPips)}
+        <span className="ml-1 text-slate-400">H12−1.5</span>
+      </td>
+      <td className="px-3 py-2 text-xs text-slate-400">no live fill</td>
+    </>
+  );
+}
+
+export function PdlLiveTradeCells({ trades, signalRow }: TradeCellsProps) {
+  if (!trades || trades.length === 0) {
+    return <ResearchProxyCells row={signalRow} />;
   }
 
   const trade = trades[0];

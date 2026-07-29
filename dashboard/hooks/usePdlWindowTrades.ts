@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { fetchPdlWindowTrades } from '@/lib/fetchPdlWindowTrades';
 import type { PdlWindowTradeRow } from '@/lib/pdlWindowTypes';
+import { normalizeTradeDateKey } from '@/lib/pdlWindowDirection';
 import {
   PDL_POLL_END_HOUR_UTC,
   PDL_POLL_END_MINUTE_UTC,
@@ -29,9 +30,10 @@ function isActivePollWindow(): boolean {
 function groupByTradeDate(trades: PdlWindowTradeRow[]): Map<string, PdlWindowTradeRow[]> {
   const map = new Map<string, PdlWindowTradeRow[]>();
   for (const trade of trades) {
-    const list = map.get(trade.trade_date) ?? [];
+    const key = normalizeTradeDateKey(trade.trade_date);
+    const list = map.get(key) ?? [];
     list.push(trade);
-    map.set(trade.trade_date, list);
+    map.set(key, list);
   }
   return map;
 }
