@@ -5,6 +5,7 @@ import { usePdlWindowLiveStatus } from '@/hooks/usePdlWindowLiveStatus';
 import { PdlSweepPageHeader } from '@/components/pdlSweep/PdlSweepPageHeader';
 import { PdlSweepForwardGate } from '@/components/pdlSweep/PdlSweepForwardGate';
 import { PdlSweepLiveConditions } from '@/components/pdlSweep/PdlSweepLiveConditions';
+import { PdlResearchBookStatsStrip } from '@/components/pdlSweep/PdlResearchBookStatsStrip';
 import { PdlSweepHistoryTable } from '@/components/pdlSweep/PdlSweepHistoryTable';
 import type { PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
 import {
@@ -111,6 +112,8 @@ export default function PdlSweepPage() {
           liveArmed={liveArmed}
           paused={paused}
         />
+
+        <PdlResearchBookStatsStrip rows={rows} />
 
         <section>
           <h2 className="mb-3 text-sm font-medium text-slate-500 uppercase tracking-wide">
