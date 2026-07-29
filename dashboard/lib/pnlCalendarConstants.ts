@@ -4,6 +4,12 @@ export const PNL_CALENDAR_EARLIEST_UTC_MS = Date.UTC(2026, 3, 1);
 /** Trades on/after this instant are included in the calendar query. */
 export const PNL_CALENDAR_QUERY_START_ISO = '2026-04-30T00:00:00Z';
 
+/**
+ * First UTC instant to show pdl_window on the P&L calendar.
+ * Pre-cutoff rows are old 15:00 hard-exit test fills — hide them.
+ */
+export const PDL_WINDOW_CALENDAR_START_ISO = '2026-07-29T00:00:00Z';
+
 export const CALENDAR_START = new Date('2026-04-30T00:00:00Z');
 
 /** Supabase default max rows per request — paginate past this. */

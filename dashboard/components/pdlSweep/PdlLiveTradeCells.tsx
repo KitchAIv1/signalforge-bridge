@@ -1,7 +1,6 @@
 'use client';
 
 import type { ConditionsMet, PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
-import type { PdlWindowTradeRow } from '@/lib/pdlWindowTypes';
 import {
   pdlLiveSideFromConditions,
   researchNetPipsForSide,
@@ -13,17 +12,16 @@ function formatPips(value: number | null): string {
   return `${sign}${value}p`;
 }
 
-function formatPrice(value: number | null): string {
-  return value != null ? value.toFixed(5) : '—';
-}
-
 type TradeCellsProps = {
-  trades: PdlWindowTradeRow[] | undefined;
   signalRow: PdlSweepSignalRow;
 };
 
-function ResearchProxyCells({ row }: { row: PdlSweepSignalRow }) {
-  const conditions = row.conditions_met as ConditionsMet | null;
+/**
+ * Fill columns show the 12:00–13:00 research book (new rule), not broker fills.
+ * Legacy live rows used 15:00 flatten and would misstate the current strategy.
+ */
+export function PdlLiveTradeCells({ signalRow }: TradeCellsProps) {
+  const conditions = signalRow.conditions_met as ConditionsMet | null;
   if (!conditions) {
     return (
       <>
@@ -31,63 +29,33 @@ function ResearchProxyCells({ row }: { row: PdlSweepSignalRow }) {
         <td className="px-3 py-2 text-xs text-slate-500">—</td>
         <td className="px-3 py-2 text-xs text-slate-500">—</td>
         <td className="px-3 py-2 text-xs text-slate-500">—</td>
-        <td className="px-3 py-2 text-xs text-slate-500">no live fill</td>
+        <td className="px-3 py-2 text-xs text-slate-500">—</td>
       </>
     );
   }
 
   const side = pdlLiveSideFromConditions(conditions);
-  const netPips = researchNetPipsForSide(side, row.outcome_h12_net_pips);
-
-  return (
-    <>
-      <td className="px-3 py-2 text-xs font-semibold text-slate-500">
-        {side.toUpperCase()}
-        <span className="ml-1 font-normal text-slate-400">(research)</span>
-      </td>
-      <td className="px-3 py-2 text-xs text-slate-400">12:00</td>
-      <td className="px-3 py-2 text-xs text-slate-400">13:00</td>
-      <td className="px-3 py-2 text-xs text-slate-500">
-        {formatPips(netPips)}
-        <span className="ml-1 text-slate-400">H12−1.5</span>
-      </td>
-      <td className="px-3 py-2 text-xs text-slate-400">no live fill</td>
-    </>
-  );
-}
-
-export function PdlLiveTradeCells({ trades, signalRow }: TradeCellsProps) {
-  if (!trades || trades.length === 0) {
-    return <ResearchProxyCells row={signalRow} />;
-  }
-
-  const trade = trades[0];
-  const open = trade.result == null;
-  const side = trade.direction.toUpperCase();
+  const netPips = researchNetPipsForSide(side, signalRow.outcome_h12_net_pips);
+  const pending = signalRow.outcome_h12_net_pips == null;
 
   return (
     <>
       <td className="px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-        {side}
-        {trades.length > 1 ? ` ×${trades.length}` : ''}
+        {side.toUpperCase()}
       </td>
-      <td className="px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">
-        {formatPrice(trade.entry_price)}
-      </td>
-      <td className="px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-400">
-        {open ? 'open' : formatPrice(trade.exit_price)}
-      </td>
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">12:00</td>
+      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">13:00</td>
       <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
-        {open ? '—' : formatPips(trade.pnl_pips)}
-        {!open && trade.pnl_dollars != null ? (
-          <span className="ml-1 text-slate-400">
-            (${trade.pnl_dollars.toFixed(2)})
-          </span>
-        ) : null}
+        {pending ? (
+          <span className="text-amber-400">Pending</span>
+        ) : (
+          <>
+            {formatPips(netPips)}
+            <span className="ml-1 text-slate-400">H12−1.5</span>
+          </>
+        )}
       </td>
-      <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
-        {open ? 'OPEN' : trade.result ?? trade.close_reason ?? '—'}
-      </td>
+      <td className="px-3 py-2 text-xs text-slate-500">research</td>
     </>
   );
 }

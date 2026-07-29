@@ -2,7 +2,6 @@
 
 import { usePdlSweepSignals } from '@/hooks/usePdlSweepSignals';
 import { usePdlWindowLiveStatus } from '@/hooks/usePdlWindowLiveStatus';
-import { usePdlWindowTrades } from '@/hooks/usePdlWindowTrades';
 import { PdlSweepPageHeader } from '@/components/pdlSweep/PdlSweepPageHeader';
 import { PdlSweepForwardGate } from '@/components/pdlSweep/PdlSweepForwardGate';
 import { PdlSweepLiveConditions } from '@/components/pdlSweep/PdlSweepLiveConditions';
@@ -72,7 +71,6 @@ function shouldShowTodayBanner(rows: PdlSweepSignalRow[]): boolean {
 
 export default function PdlSweepPage() {
   const { rows, todayRow, firedRows, loading, error } = usePdlSweepSignals();
-  const { tradesByDate, error: tradesError } = usePdlWindowTrades();
   const { engineActive, paused, loading: statusLoading } = usePdlWindowLiveStatus();
 
   if (loading) {
@@ -108,10 +106,6 @@ export default function PdlSweepPage() {
 
         {showTodayBanner ? <TodayMissingBanner todayUtc={todayUtc} /> : null}
 
-        {tradesError ? (
-          <p className="text-sm text-amber-500">Live trades: {tradesError}</p>
-        ) : null}
-
         <PdlSweepLiveConditions
           todayRow={todayRow}
           liveArmed={liveArmed}
@@ -120,12 +114,13 @@ export default function PdlSweepPage() {
 
         <section>
           <h2 className="mb-3 text-sm font-medium text-slate-500 uppercase tracking-wide">
-            Signal + live trade history
+            Signal + research book history
           </h2>
           <p className="mb-2 text-xs text-slate-500">
-            Live fills from pdl_window_trades. Calendar chip is optional / off by default.
+            Book PnL is 12:00–13:00 research under the current rule (not legacy 15:00
+            broker fills). Calendar ignores PDL test fills before 29 Jul UTC.
           </p>
-          <PdlSweepHistoryTable rows={rows} tradesByDate={tradesByDate} />
+          <PdlSweepHistoryTable rows={rows} />
         </section>
       </div>
     </div>

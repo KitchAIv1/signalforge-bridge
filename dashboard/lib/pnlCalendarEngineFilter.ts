@@ -7,7 +7,16 @@
  */
 
 import { isOmegaLaneBBroker } from '@/lib/omegaLaneBConstants';
+import { PDL_WINDOW_CALENDAR_START_ISO } from '@/lib/pnlCalendarConstants';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
+
+/** Old 15:00 flatten test fills — not the live 13:00 book. */
+export function isLegacyPdlWindowTestTrade(trade: PnlTradeRow): boolean {
+  return (
+    trade.engine_id === 'pdl_window' &&
+    trade.created_at < PDL_WINDOW_CALENDAR_START_ISO
+  );
+}
 
 export const PNL_CALENDAR_FILTER_KEYS = [
   'alphaomega',
@@ -55,6 +64,7 @@ export function tradeMatchesCalendarFilter(
   selected: ReadonlySet<PnlCalendarFilterKey>,
 ): boolean {
   if (selected.size === 0) return false;
+  if (isLegacyPdlWindowTestTrade(trade)) return false;
   if (trade.engine_id === 'omega') {
     if (isOmegaLaneBTrade(trade)) return selected.has('alphaomega');
     return selected.has('omega');
