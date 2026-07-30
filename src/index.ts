@@ -41,9 +41,9 @@ import {
   hardClose as fadeHardClose,
   runMonitors as fadeRunMonitors,
 } from './services/audusdFade/FadeEngine.js';
-import { runPdlSweepDetection } from './services/pdlSweepDetector/pdlSweepDetectorService.js';
 import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeService.js';
 import { PdlWindowEngine } from './services/pdlWindow/PdlWindowEngine.js';
+import { runPdlDetectThenEntry } from './services/pdlWindow/runPdlDetectThenEntry.js';
 import { runShadowTrailExitResolver } from './services/shadowTrailExit/shadowTrailExitService.js';
 import { runMt5StartupDiagnostics } from './services/broker/mt5StartupDiagnostics.js';
 import { resolveAmdOandaAccountId } from './services/amd/resolveAmdOandaAccountId.js';
@@ -251,20 +251,17 @@ async function main(): Promise<void> {
     }
   }, { timezone: 'UTC' });
 
-  // 12:10 UTC Mon-Fri — PDL sweep detection (+ optional live PDL Window entry)
-  cron.schedule('10 12 * * 1-5', async () => {
+  // 12:01 UTC Mon-Fri — PDL detect (retry for OANDA lag) then live entry if armed
+  cron.schedule('1 12 * * 1-5', async () => {
     try {
-      await runPdlSweepDetection();
-    } catch (pdlSweepErr) {
-      console.error('[PdlSweep] Detection cron error:', pdlSweepErr);
-    }
-    try {
-      await PdlWindowEngine.runEntryOnce();
-    } catch (pdlWindowEntryErr) {
-      console.error('[PdlWindow] Entry cron error:', pdlWindowEntryErr);
+      await runPdlDetectThenEntry();
+    } catch (pdlPipelineErr) {
+      console.error('[PdlSweep] Detect/entry pipeline error:', pdlPipelineErr);
     }
   }, { timezone: 'UTC' });
-  logInfo('[cron] registered 10 12 * * 1-5 PDL sweep detection (+ PdlWindow entry if enabled)');
+  logInfo(
+    '[cron] registered 1 12 * * 1-5 PDL detect@12:01 (+retries) then PdlWindow entry if enabled',
+  );
 
   // 13:05 UTC Mon-Fri — PDL sweep outcome evaluation
   cron.schedule('5 13 * * 1-5', async () => {

@@ -67,13 +67,14 @@ async function upsertPdlSweepRow(tradeDate: string, computed: ReturnType<typeof 
   if (error) throw new Error(`pdl_sweep_signals upsert failed: ${error.message}`);
 }
 
-export async function runPdlSweepDetection(): Promise<void> {
+/** @returns true when a valid detector row was upserted. */
+export async function runPdlSweepDetection(): Promise<boolean> {
   const supabase = getSupabaseClient();
   if (!preflightDone) {
     const preflight = await runSchemaPreflight(supabase);
     if (!preflight.ok) {
       console.error('[PdlSweep] preflight failed:', preflight.reason);
-      return;
+      return false;
     }
     preflightDone = true;
   }
@@ -87,7 +88,7 @@ export async function runPdlSweepDetection(): Promise<void> {
     const candleCheck = validateDetectorM5Candles(detectorCandles);
     if (!candleCheck.ok) {
       console.error('[PdlSweep] detector M5 validation failed:', candleCheck.reason);
-      return;
+      return false;
     }
 
     const amdContext = await fetchTodayAmdContext(tradeDate);
@@ -114,7 +115,9 @@ export async function runPdlSweepDetection(): Promise<void> {
     if (computed.signal_fired) {
       await sendPdlSweepFireAlert(tradeDate, computed);
     }
+    return true;
   } catch (err) {
     console.error('[PdlSweep] detection error:', err);
+    return false;
   }
 }

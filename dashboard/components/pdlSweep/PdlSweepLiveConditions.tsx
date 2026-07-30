@@ -3,6 +3,7 @@
 import type { ConditionsMet, PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
 import { pdlLiveSideFromConditions } from '@/lib/pdlWindowDirection';
 import {
+  PDL_DETECTION_CRON_UTC,
   PDL_WINDOW_HARD_SL_PIPS,
   PDL_WINDOW_VT_SPREAD_PIPS,
 } from '@/lib/pdlSweepConstants';
@@ -43,10 +44,15 @@ function resolveBanner(
   paused: boolean,
 ): { text: string; active: boolean } {
   if (!conditions) {
-    return { text: '— Awaiting today 12:10 UTC detection', active: false };
+    return {
+      text: `— Awaiting today ${PDL_DETECTION_CRON_UTC} UTC detection`,
+      active: false,
+    };
   }
   const side = pdlLiveSideFromConditions(conditions).toUpperCase();
-  const rule = `${side} · 12:00–13:00 · SL ${PDL_WINDOW_HARD_SL_PIPS}p · spread ${PDL_WINDOW_VT_SPREAD_PIPS}p`;
+  const rule =
+    `${side} · entry ~${PDL_DETECTION_CRON_UTC}–13:00 · SL ${PDL_WINDOW_HARD_SL_PIPS}p · ` +
+    `spread ${PDL_WINDOW_VT_SPREAD_PIPS}p`;
   if (paused) {
     return { text: `LIVE ${rule} — paused in Controls`, active: false };
   }

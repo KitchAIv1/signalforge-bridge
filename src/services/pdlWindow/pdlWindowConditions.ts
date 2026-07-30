@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../../connectors/supabase.js';
+import { isFreshPdlDetection } from '../pdlSweepDetector/pdlDetectionFreshness.js';
 import { PDL_SWEEP_PAIR, PDL_SWEEP_TABLE } from '../pdlSweepDetector/pdlSweepConstants.js';
 import type { PdlWindowConditionsMet, PdlWindowDirection } from './pdlWindowTypes.js';
 
@@ -43,13 +44,13 @@ export function directionFromConditions(
   return allFalse || allTrue ? 'short' : 'long';
 }
 
-/** Load today's shadow detection row written at 12:10 UTC. */
+/** Load today's detection row only if evaluated after 12:00 UTC (11:55 closed). */
 export async function loadTodayPdlWindowSignal(
   tradeDate: string,
 ): Promise<PdlWindowDaySignal | null> {
   const { data, error } = await getSupabaseClient()
     .from(PDL_SWEEP_TABLE)
-    .select('conditions_met')
+    .select('conditions_met, evaluated_at')
     .eq('pair', PDL_SWEEP_PAIR)
     .eq('trade_date', tradeDate)
     .maybeSingle();
@@ -59,6 +60,11 @@ export async function loadTodayPdlWindowSignal(
     return null;
   }
   if (!data) return null;
+
+  if (!isFreshPdlDetection(tradeDate, data.evaluated_at as string | null)) {
+    console.warn('[PdlWindow] detection not fresh after 12:00 UTC — skip entry');
+    return null;
+  }
 
   const conditions = parseConditions(data.conditions_met);
   if (!conditions) return null;

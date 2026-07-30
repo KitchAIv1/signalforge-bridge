@@ -9,6 +9,7 @@ import { PdlResearchBookStatsStrip } from '@/components/pdlSweep/PdlResearchBook
 import { PdlSweepHistoryTable } from '@/components/pdlSweep/PdlSweepHistoryTable';
 import type { PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
 import {
+  PDL_DETECTION_CRON_UTC,
   PDL_WINDOW_HARD_SL_PIPS,
   PDL_WINDOW_VT_SPREAD_PIPS,
 } from '@/lib/pdlSweepConstants';
@@ -17,7 +18,8 @@ function TodayMissingBanner({ todayUtc }: { todayUtc: string }) {
   return (
     <div className="rounded-lg border border-blue-700/40 bg-blue-950/30 px-4 py-3">
       <p className="text-sm text-blue-300">
-        Today&apos;s PDL detection ({todayUtc}) has not run yet — scheduled for 12:10 UTC
+        Today&apos;s PDL detection ({todayUtc}) has not run yet — scheduled for{' '}
+        {PDL_DETECTION_CRON_UTC} UTC (retries if M5 lag)
       </p>
     </div>
   );
@@ -53,9 +55,9 @@ function LiveStatusBanner({
   return (
     <div className="rounded-lg border border-emerald-600/40 bg-emerald-950/20 px-4 py-3">
       <p className="text-sm text-emerald-300">
-        Live engine armed — always trade 12:00–13:00 UTC · SHORT if all✗ or all✓ · else LONG ·
-        SL {PDL_WINDOW_HARD_SL_PIPS}p · spread {PDL_WINDOW_VT_SPREAD_PIPS}p · shares Fade
-        OANDA/MT5 (OANDA blocks if Fade open).
+        Live engine armed — detect/entry ~{PDL_DETECTION_CRON_UTC} UTC · hold to 13:00 ·
+        SHORT if all✗ or all✓ · else LONG · SL {PDL_WINDOW_HARD_SL_PIPS}p · spread{' '}
+        {PDL_WINDOW_VT_SPREAD_PIPS}p · shares Fade OANDA/MT5 (OANDA blocks if Fade open).
       </p>
     </div>
   );

@@ -3,6 +3,7 @@
 import { PdlSweepShadowPill } from '@/components/pdlSweep/PdlSweepShadowPill';
 import {
   HISTORICAL_FIRED_DAYS,
+  PDL_DETECTION_CRON_UTC,
   PDL_WINDOW_HARD_SL_PIPS,
   PDL_WINDOW_VT_SPREAD_PIPS,
 } from '@/lib/pdlSweepConstants';
@@ -27,9 +28,10 @@ export function PdlSweepPageHeader({ rows, firedRows, liveArmed }: PageHeaderPro
         <PdlSweepShadowPill liveArmed={liveArmed} />
       </div>
       <p className="mt-1 text-sm text-slate-500">
-        {rows.length} trading days tracked — live rule: always trade 12:00–13:00 UTC;
-        SHORT if all✗ or all✓ (P1L1H1), else LONG. Hard SL {PDL_WINDOW_HARD_SL_PIPS}p ·
-        VT spread {PDL_WINDOW_VT_SPREAD_PIPS}p netted. Engine: pdl_window.
+        {rows.length} trading days tracked — live entry ~{PDL_DETECTION_CRON_UTC} UTC,
+        flatten 13:00; SHORT if all✗ or all✓ (P1L1H1), else LONG. Hard SL{' '}
+        {PDL_WINDOW_HARD_SL_PIPS}p · VT spread {PDL_WINDOW_VT_SPREAD_PIPS}p netted. Engine:
+        pdl_window.
       </p>
       <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
         <span>
