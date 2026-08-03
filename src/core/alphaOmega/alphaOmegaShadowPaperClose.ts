@@ -24,14 +24,20 @@ function computePaperPnlPips(
   return Math.round(raw * 10) / 10;
 }
 
+/**
+ * Persist paper close on bridge_trade_log, then clear position state.
+ * Position is deleted ONLY after a successful trade_log update so a failed
+ * update cannot orphan status=open rows without tracking.
+ */
 export async function closeShadowPaperTrade(
   supabase: SupabaseClient,
   position: ShadowPositionRow,
   closeReason: string,
   exitPrice: number | null = position.entry_price,
-): Promise<void> {
+): Promise<boolean> {
   const pnlPips = computePaperPnlPips(position, exitPrice);
   const closedAt = new Date().toISOString();
+  // bridge_trade_log has closed_at but NO updated_at (migration 001c).
   const { error } = await supabase
     .from('bridge_trade_log')
     .update({
@@ -40,23 +46,24 @@ export async function closeShadowPaperTrade(
       close_reason: closeReason,
       exit_price: exitPrice,
       pnl_pips: pnlPips,
-      updated_at: closedAt,
     })
     .eq('broker_id', OMEGA_AO_SHADOW_BROKER_ID)
     .eq('oanda_trade_id', position.paper_trade_id)
     .eq('status', 'open');
 
   if (error) {
-    logWarn('[AlphaOmegaShadow] paper close trade_log update failed', {
+    logWarn('[AlphaOmegaShadow] paper close trade_log update failed — position kept', {
       error: error.message,
       paperTradeId: position.paper_trade_id,
     });
-  } else {
-    logInfo('[AlphaOmegaShadow] paper trade closed', {
-      paperTradeId: position.paper_trade_id,
-      closeReason,
-      pnlPips,
-    });
+    return false;
   }
+
+  logInfo('[AlphaOmegaShadow] paper trade closed', {
+    paperTradeId: position.paper_trade_id,
+    closeReason,
+    pnlPips,
+  });
   await deleteShadowPosition(supabase, position.paper_trade_id);
+  return true;
 }
