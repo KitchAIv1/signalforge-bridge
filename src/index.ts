@@ -32,6 +32,7 @@ import { fetchTodayD1Candles } from './services/d1/fetchTodayD1Candle.js';
 import { AmdDistributionEngine } from './services/AmdDistributionEngine.js';
 import { runAmdTrailMonitor } from './monitoring/amdTrailingStopMonitor.js';
 import { runAlphaOmegaHardStopMonitor } from './monitoring/alphaOmegaHardStopMonitor.js';
+import { runSpeedfloorPaperMonitor } from './monitoring/speedfloorPaperMonitor.js';
 import {
   hardClose as scalperHardClose,
   initializeDayState as scalperInitDay,
@@ -303,6 +304,13 @@ async function main(): Promise<void> {
   setInterval(() => {
     void runAlphaOmegaHardStopMonitor().catch((alphaOmegaErr) => {
       console.error('[AlphaOmegaHardStop] Monitor error:', alphaOmegaErr);
+    });
+  }, 30000);
+
+  // SPEEDFLOOR semi-live paper — close pending BLOCKED floor rows (no broker orders).
+  setInterval(() => {
+    void runSpeedfloorPaperMonitor().catch((speedfloorErr) => {
+      console.error('[SpeedfloorPaper] Monitor error:', speedfloorErr);
     });
   }, 30000);
 

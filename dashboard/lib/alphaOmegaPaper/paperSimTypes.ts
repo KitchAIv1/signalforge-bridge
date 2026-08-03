@@ -1,4 +1,4 @@
-/** Types for SPEEDFLOOR would-enter paper PnL (display-only; never written to trade log). */
+/** Types for SPEEDFLOOR paper PnL (stored closes preferred; sim fallback for still-open). */
 
 export type PaperExitTrigger =
   | 'opposing_count'

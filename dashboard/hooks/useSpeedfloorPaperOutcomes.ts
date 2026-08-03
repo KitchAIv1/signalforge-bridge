@@ -27,6 +27,7 @@ export function useSpeedfloorPaperOutcomes(tradeRows: BridgeTradeLogRow[]) {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setByTradeId({});
     void fetch('/api/alphaomega/speedfloor-paper', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,7 +42,10 @@ export function useSpeedfloorPaperOutcomes(tradeRows: BridgeTradeLogRow[]) {
         if (!cancelled) setByTradeId(json.outcomes ?? {});
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) {
+          setByTradeId({});
+          setError(err instanceof Error ? err.message : String(err));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

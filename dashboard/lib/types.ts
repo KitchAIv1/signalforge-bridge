@@ -62,6 +62,7 @@ export interface BridgeTradeLogRow {
   pnl_r: number | null;
   lot_size: number | null;
   slippage_pips: number | null;
+  closed_at?: string | null;
   close_reason: string | null;
   duration_minutes: number | null;
   regime_direction?: string | null;

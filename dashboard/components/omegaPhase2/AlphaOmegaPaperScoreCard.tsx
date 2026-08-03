@@ -36,12 +36,12 @@ export function AlphaOmegaPaperScoreCard({
   return (
     <div className="rounded-lg border border-violet-200 bg-violet-50/40 p-3 dark:border-violet-900/50 dark:bg-violet-950/20">
       <p className="text-[11px] font-medium uppercase tracking-wide text-violet-700 dark:text-violet-300">
-        Shadow paper net
+        SPEEDFLOOR paper net
       </p>
       <p className={`mt-1 text-xl font-semibold tabular-nums ${tone}`}>{value}</p>
       <p className="mt-0.5 text-[11px] text-violet-700/80 dark:text-violet-300/80">{hint}</p>
       <p className="mt-1 text-[10px] text-violet-600/70 dark:text-violet-400/70">
-        Display-only · floor ≤35m only · not mid-band/blackout
+        Stored paper when closed · floor ≤35m only · not mid-band/blackout
       </p>
     </div>
   );
