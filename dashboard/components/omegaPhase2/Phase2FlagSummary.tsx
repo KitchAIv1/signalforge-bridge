@@ -9,6 +9,7 @@ import {
   OMEGA_AO_VT_BROKER_ID,
   OMEGA_LANE_B_BROKER_ID,
 } from '@/lib/omegaLaneBConstants';
+import { ToxicCrackSkipToggle } from './ToxicCrackSkipToggle';
 
 export function Phase2FlagSummary() {
   const { enabled, toggleError, isSaving, handleToggle } = useAlphaOmegaKillSwitch();
@@ -34,6 +35,7 @@ export function Phase2FlagSummary() {
       {toggleError ? (
         <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{toggleError}</p>
       ) : null}
+      <ToxicCrackSkipToggle />
     </div>
   );
 }

@@ -22,6 +22,10 @@ import {
 import { readOmegaFireDirection } from './alphaOmegaFireIdentity.js';
 import { placeLaneBCrackOrder } from './alphaOmegaLaneBCrackPlace.js';
 import { settleBrokerFanOutTasksWithFlags } from './runAoFanOutParallel.js';
+import {
+  evaluateToxicCrackSkip,
+  type ToxicCrackSkipResult,
+} from './alphaOmegaToxicCrackSkip.js';
 import type { CrackEvent } from './alphaOmegaStreakTracker.js';
 import type { EngineBrokerRoute } from '../../services/broker/brokerLinkService.js';
 
@@ -128,6 +132,20 @@ async function attemptLaneBCrack(
     hasOpenPosition: false,
   });
 
+  const toxicSkip =
+    gate.enter && gate.foundingLength != null && gate.foundingSpeedMin != null
+      ? await evaluateToxicCrackSkip(params.supabase, {
+          foundingLength: gate.foundingLength,
+          foundingSpeedMin: gate.foundingSpeedMin,
+          confluence:
+            params.payload.confluence_score != null
+              ? Number(params.payload.confluence_score)
+              : null,
+          entryAtIso: new Date().toISOString(),
+          signalId: params.signalId,
+        })
+      : null;
+
   const fanOutStartedAt = Date.now();
   logInfo('[AlphaOmega] Lane B crack fan-out start', {
     signalId: params.signalId,
@@ -143,6 +161,7 @@ async function attemptLaneBCrack(
           params,
           laneBRoute,
           gate,
+          toxicSkip,
           norm,
           direction,
           fanOutStartedAt,
@@ -162,11 +181,12 @@ async function placeOrSkipLaneBRoute(input: {
   params: AlphaOmegaLaneBCrackEntryParams;
   laneBRoute: EngineBrokerRoute;
   gate: ReturnType<typeof evaluateAlphaOmegaEntryGate>;
+  toxicSkip: ToxicCrackSkipResult | null;
   norm: NonNullable<ReturnType<typeof normalizeOmegaForAlphaOmegaEntry>>;
   direction: string;
   fanOutStartedAt: number;
 }): Promise<boolean> {
-  const { params, laneBRoute, gate, norm, fanOutStartedAt } = input;
+  const { params, laneBRoute, gate, toxicSkip, norm, fanOutStartedAt } = input;
   if (await hasOpenOmegaOnBroker(params.supabase, laneBRoute.brokerId)) {
     return true;
   }
@@ -177,6 +197,21 @@ async function placeOrSkipLaneBRoute(input: {
       norm.oandaInstrument,
       norm.direction,
       gate,
+    );
+    return true;
+  }
+  if (toxicSkip?.shouldBlock) {
+    await blockLaneBNoEnter(
+      params,
+      laneBRoute.brokerId,
+      norm.oandaInstrument,
+      norm.direction,
+      {
+        ...gate,
+        enter: false,
+        blockReason: toxicSkip.blockReason,
+        shadowAdvisory: toxicSkip.shadowAdvisory,
+      },
     );
     return true;
   }

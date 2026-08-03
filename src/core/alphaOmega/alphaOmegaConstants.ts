@@ -98,6 +98,12 @@ export const ALPHAOMEGA_UNARMED_AGEOUT_ENABLED_CONFIG_KEY =
   'alpha_omega_unarmed_ageout_enabled';
 /** When true, Lane B AO entries size at base risk only (no AMD/news/confluence/graduated). Default off. */
 export const ALPHAOMEGA_PURE_SIZING_CONFIG_KEY = 'alpha_omega_pure_sizing';
+/**
+ * When true, place-only skip for shallow+refuse toxic cracks.
+ * Default off — flip via bridge_config / dashboard toggle; no redeploy.
+ */
+export const ALPHAOMEGA_TOXIC_CRACK_SKIP_ENABLED_CONFIG_KEY =
+  'alpha_omega_toxic_crack_skip_enabled';
 /** Confluence score that leaves calculateUnits riskPct unscaled (bands are <75 and >=85). */
 export const ALPHAOMEGA_PURE_SIZING_NEUTRAL_CONFLUENCE = 80;
 /**
@@ -123,6 +129,8 @@ export const ALPHAOMEGA_BLOCK_SPEED_FLOOR = 'ALPHAOMEGA_SPEED_FLOOR';
 export const ALPHAOMEGA_BLOCK_SPEED_MID_BAND = 'ALPHAOMEGA_SPEED_MID_BAND';
 export const ALPHAOMEGA_BLOCK_ALREADY_OPEN = 'ALPHAOMEGA_ALREADY_OPEN';
 export const ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT = 'ALPHAOMEGA_ENTRY_BLACKOUT';
+/** Place-only: shallow crack on refuse pre-tape (kill-switched). */
+export const ALPHAOMEGA_BLOCK_TOXIC_CRACK = 'ALPHAOMEGA_TOXIC_CRACK';
 
 /**
  * signals.execution_tier written by engine-omega when bridge exec-dedup skips

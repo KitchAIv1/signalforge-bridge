@@ -57,6 +57,12 @@ export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
  */
 export const ALPHAOMEGA_UNARMED_AGEOUT_ENABLED_CONFIG_KEY =
   'alpha_omega_unarmed_ageout_enabled';
+/**
+ * Place-only toxic-crack skip. Display/toggle mirror of bridge key.
+ * Missing row → OFF (same as bridge default).
+ */
+export const ALPHAOMEGA_TOXIC_CRACK_SKIP_ENABLED_CONFIG_KEY =
+  'alpha_omega_toxic_crack_skip_enabled';
 /** Peak-favorable-giveback profit lock — additive, kill-switched via alpha_omega_giveback_trail_enabled. */
 export const ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS = 6;
 export const ALPHAOMEGA_GIVEBACK_PIPS = 3;

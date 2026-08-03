@@ -1,0 +1,211 @@
+AO TOXIC-CRACK LIVE COUNTERFACTUAL
+Generated: 2026-08-03T17:14:28.330Z
+Live AO closed trades: 50
+Fire stream rows: 797
+Truth: OANDA Lane B EXECUTED ALPHAOMEGA + BLOCKED fire stream
+RANGE/TREND labels: diagnostic overlay only (NOT a live gate)
+Skip rule: len=7 & speed<=40 & refuseTape(3h) & weak conf vs blocked
+v1 production target: shallow+refuse skip only (kill-switched, default OFF)
+
+=== A) baseline (actual live) ===
+actual: -41.8p / $-13635
+cf:     -41.8p / $-13635
+delta:  +0p / +$0
+PROMOTE: NO
+  - Jul-21 $ damage cut 0% < 50% target (cf=-5244)
+  - 2026-07-14 kept 100% of $
+  - 2026-07-20 kept 100% of $
+by day:
+  2026-07-10 actual=1.7p/$985 cf=1.7p/$985 taken=4 skipped=0
+  2026-07-13 actual=-3.8p/$981 cf=-3.8p/$981 taken=3 skipped=0
+  2026-07-14 actual=47.2p/$2973 cf=47.2p/$2973 taken=5 skipped=0
+  2026-07-15 actual=-8.4p/$-1188 cf=-8.4p/$-1188 taken=1 skipped=0
+  2026-07-16 actual=-12.6p/$-1219 cf=-12.6p/$-1219 taken=4 skipped=0
+  2026-07-20 actual=14.1p/$3377 cf=14.1p/$3377 taken=2 skipped=0
+  2026-07-21 actual=-22.9p/$-5244 cf=-22.9p/$-5244 taken=5 skipped=0
+  2026-07-22 actual=-3p/$-818 cf=-3p/$-818 taken=5 skipped=0
+  2026-07-23 actual=2p/$-70 cf=2p/$-70 taken=3 skipped=0
+  2026-07-24 actual=-20.9p/$-5629 cf=-20.9p/$-5629 taken=4 skipped=0
+  2026-07-26 actual=7.1p/$852 cf=7.1p/$852 taken=1 skipped=0
+  2026-07-27 actual=-7p/$-1302 cf=-7p/$-1302 taken=4 skipped=0
+  2026-07-28 actual=1.4p/$81 cf=1.4p/$81 taken=2 skipped=0
+  2026-07-30 actual=-7.8p/$-1138 cf=-7.8p/$-1138 taken=2 skipped=0
+  2026-07-31 actual=-12.1p/$-2340 cf=-12.1p/$-2340 taken=1 skipped=0
+  2026-08-02 actual=1.6p/$158 cf=1.6p/$158 taken=1 skipped=0
+  2026-08-03 actual=-18.4p/$-4094 cf=-18.4p/$-4094 taken=3 skipped=0
+
+=== D) shallow+refuse skip only ===
+actual: -41.8p / $-13635
+cf:     -30.9p / $-11943
+delta:  +10.9p / +$1692
+PROMOTE: NO
+  - Jul-21 $ damage cut 22% < 50% target (cf=-4083)
+  - 2026-07-14 kept 115% of $
+  - 2026-07-20 kept 100% of $
+by day:
+  2026-07-10 actual=1.7p/$985 cf=1.7p/$985 taken=4 skipped=0
+  2026-07-13 actual=-3.8p/$981 cf=0.8p/$1063 taken=2 skipped=1
+  2026-07-14 actual=47.2p/$2973 cf=49.5p/$3422 taken=4 skipped=1
+  2026-07-15 actual=-8.4p/$-1188 cf=-8.4p/$-1188 taken=1 skipped=0
+  2026-07-16 actual=-12.6p/$-1219 cf=-12.6p/$-1219 taken=4 skipped=0
+  2026-07-20 actual=14.1p/$3377 cf=14.1p/$3377 taken=2 skipped=0
+  2026-07-21 actual=-22.9p/$-5244 cf=-18.9p/$-4083 taken=4 skipped=1
+  2026-07-22 actual=-3p/$-818 cf=-3p/$-818 taken=5 skipped=0
+  2026-07-23 actual=2p/$-70 cf=2p/$-70 taken=3 skipped=0
+  2026-07-24 actual=-20.9p/$-5629 cf=-20.9p/$-5629 taken=4 skipped=0
+  2026-07-26 actual=7.1p/$852 cf=7.1p/$852 taken=1 skipped=0
+  2026-07-27 actual=-7p/$-1302 cf=-7p/$-1302 taken=4 skipped=0
+  2026-07-28 actual=1.4p/$81 cf=1.4p/$81 taken=2 skipped=0
+  2026-07-30 actual=-7.8p/$-1138 cf=-7.8p/$-1138 taken=2 skipped=0
+  2026-07-31 actual=-12.1p/$-2340 cf=-12.1p/$-2340 taken=1 skipped=0
+  2026-08-02 actual=1.6p/$158 cf=1.6p/$158 taken=1 skipped=0
+  2026-08-03 actual=-18.4p/$-4094 cf=-18.4p/$-4094 taken=3 skipped=0
+
+=== C) conditional brake only ===
+actual: -41.8p / $-13635
+cf:     -25.1p / $-10057
+delta:  +16.7p / +$3578
+PROMOTE: NO
+  - Jul-21 $ damage cut 65% (cf=-1822)
+  - 2026-07-14 kept 100% of $
+  - 2026-07-20 kept 100% of $
+  - 2026-07-13 flipped green→red (cf=-423)
+by day:
+  2026-07-10 actual=1.7p/$985 cf=1.7p/$985 taken=4 skipped=0
+  2026-07-13 actual=-3.8p/$981 cf=-8.4p/$-423 taken=2 skipped=1
+  2026-07-14 actual=47.2p/$2973 cf=47.2p/$2973 taken=5 skipped=0
+  2026-07-15 actual=-8.4p/$-1188 cf=-8.4p/$-1188 taken=1 skipped=0
+  2026-07-16 actual=-12.6p/$-1219 cf=-12.6p/$-1219 taken=4 skipped=0
+  2026-07-20 actual=14.1p/$3377 cf=14.1p/$3377 taken=2 skipped=0
+  2026-07-21 actual=-22.9p/$-5244 cf=-6.8p/$-1822 taken=3 skipped=2
+  2026-07-22 actual=-3p/$-818 cf=-3p/$-818 taken=5 skipped=0
+  2026-07-23 actual=2p/$-70 cf=2p/$-70 taken=3 skipped=0
+  2026-07-24 actual=-20.9p/$-5629 cf=-20.9p/$-5629 taken=4 skipped=0
+  2026-07-26 actual=7.1p/$852 cf=7.1p/$852 taken=1 skipped=0
+  2026-07-27 actual=-7p/$-1302 cf=-7p/$-1302 taken=4 skipped=0
+  2026-07-28 actual=1.4p/$81 cf=1.4p/$81 taken=2 skipped=0
+  2026-07-30 actual=-7.8p/$-1138 cf=-7.8p/$-1138 taken=2 skipped=0
+  2026-07-31 actual=-12.1p/$-2340 cf=-12.1p/$-2340 taken=1 skipped=0
+  2026-08-02 actual=1.6p/$158 cf=1.6p/$158 taken=1 skipped=0
+  2026-08-03 actual=-18.4p/$-4094 cf=-13.2p/$-2534 taken=2 skipped=1
+
+=== E) NFT abort only ===
+actual: -41.8p / $-13635
+cf:     -40.5p / $-13633
+delta:  +1.3p / +$2
+PROMOTE: NO
+  - Jul-21 $ damage cut 0% < 50% target (cf=-5244)
+  - 2026-07-14 kept 100% of $
+  - 2026-07-20 kept 100% of $
+by day:
+  2026-07-10 actual=1.7p/$985 cf=2.4p/$1048 taken=4 skipped=0
+  2026-07-13 actual=-3.8p/$981 cf=-3.2p/$920 taken=3 skipped=0
+  2026-07-14 actual=47.2p/$2973 cf=47.2p/$2973 taken=5 skipped=0
+  2026-07-15 actual=-8.4p/$-1188 cf=-8.4p/$-1188 taken=1 skipped=0
+  2026-07-16 actual=-12.6p/$-1219 cf=-12.6p/$-1219 taken=4 skipped=0
+  2026-07-20 actual=14.1p/$3377 cf=14.1p/$3377 taken=2 skipped=0
+  2026-07-21 actual=-22.9p/$-5244 cf=-22.9p/$-5244 taken=5 skipped=0
+  2026-07-22 actual=-3p/$-818 cf=-3p/$-818 taken=5 skipped=0
+  2026-07-23 actual=2p/$-70 cf=2p/$-70 taken=3 skipped=0
+  2026-07-24 actual=-20.9p/$-5629 cf=-20.9p/$-5629 taken=4 skipped=0
+  2026-07-26 actual=7.1p/$852 cf=7.1p/$852 taken=1 skipped=0
+  2026-07-27 actual=-7p/$-1302 cf=-7p/$-1302 taken=4 skipped=0
+  2026-07-28 actual=1.4p/$81 cf=1.4p/$81 taken=2 skipped=0
+  2026-07-30 actual=-7.8p/$-1138 cf=-7.8p/$-1138 taken=2 skipped=0
+  2026-07-31 actual=-12.1p/$-2340 cf=-12.1p/$-2340 taken=1 skipped=0
+  2026-08-02 actual=1.6p/$158 cf=1.6p/$158 taken=1 skipped=0
+  2026-08-03 actual=-18.4p/$-4094 cf=-18.4p/$-4094 taken=3 skipped=0
+
+=== I) MESH primary: brake + skip + abort (no global HS10) ===
+actual: -41.8p / $-13635
+cf:     -15.1p / $-8547
+delta:  +26.7p / +$5088
+PROMOTE: YES
+  - Jul-21 $ damage cut 58% (cf=-2220)
+  - 2026-07-14 kept 115% of $
+  - 2026-07-20 kept 100% of $
+by day:
+  2026-07-10 actual=1.7p/$985 cf=2.4p/$1048 taken=4 skipped=0
+  2026-07-13 actual=-3.8p/$981 cf=-0.2p/$973 taken=2 skipped=1
+  2026-07-14 actual=47.2p/$2973 cf=49.5p/$3422 taken=4 skipped=1
+  2026-07-15 actual=-8.4p/$-1188 cf=-8.4p/$-1188 taken=1 skipped=0
+  2026-07-16 actual=-12.6p/$-1219 cf=-12.6p/$-1219 taken=4 skipped=0
+  2026-07-20 actual=14.1p/$3377 cf=14.1p/$3377 taken=2 skipped=0
+  2026-07-21 actual=-22.9p/$-5244 cf=-8p/$-2220 taken=3 skipped=2
+  2026-07-22 actual=-3p/$-818 cf=-3p/$-818 taken=5 skipped=0
+  2026-07-23 actual=2p/$-70 cf=2p/$-70 taken=3 skipped=0
+  2026-07-24 actual=-20.9p/$-5629 cf=-20.9p/$-5629 taken=4 skipped=0
+  2026-07-26 actual=7.1p/$852 cf=7.1p/$852 taken=1 skipped=0
+  2026-07-27 actual=-7p/$-1302 cf=-7p/$-1302 taken=4 skipped=0
+  2026-07-28 actual=1.4p/$81 cf=1.4p/$81 taken=2 skipped=0
+  2026-07-30 actual=-7.8p/$-1138 cf=-7.8p/$-1138 taken=2 skipped=0
+  2026-07-31 actual=-12.1p/$-2340 cf=-12.1p/$-2340 taken=1 skipped=0
+  2026-08-02 actual=1.6p/$158 cf=1.6p/$158 taken=1 skipped=0
+  2026-08-03 actual=-18.4p/$-4094 cf=-13.2p/$-2534 taken=2 skipped=1
+
+=== PROMOTE SUMMARY (non-baseline) ===
+PASS I) MESH primary: brake + skip + abort (no global HS10) | delta $5088 | delta 26.7p
+
+=== POLICY I × DIAGNOSTIC TAPE (trade-by-trade) ===
+Day	Entry	Dir	Len	Spd	Tape	Action	ActPips	CfPips	Act$	Cf$	Why
+2026-07-10	08:11	LONG	8	35	RANGE_SIDEWAYS	ABORT	-4.5	-3.8	-401	-338	NFT abort
+2026-07-10	11:51	LONG	10	45	RANGE_SIDEWAYS	KEEP	-1.0	-1.0	-111	-111	current exit + live size
+2026-07-10	13:56	SHORT	11	50	RANGE_SIDEWAYS	KEEP	-2.0	-2.0	-124	-124	current exit + live size
+2026-07-10	16:46	SHORT	7	45	RANGE_SIDEWAYS	KEEP	9.2	9.2	1621	1621	current exit + live size
+2026-07-13	02:06	SHORT	9	40	MIXED	ABORT	-3.8	-4.8	-342	-432	NFT abort
+2026-07-13	11:21	SHORT	7	35	MIXED	SKIP_ENTRY	-4.6	0.0	-81	0	shallow+refuse skip
+2026-07-13	23:26	LONG	8	45	MIXED	KEEP	4.6	4.6	1404	1404	current exit + live size
+2026-07-14	03:01	SHORT	13	60	UNKNOWN	KEEP	-8.2	-8.2	-836	-836	current exit + live size
+2026-07-14	07:21	LONG	8	60	UNKNOWN	KEEP	12.6	12.6	702	702	current exit + live size
+2026-07-14	09:46	SHORT	9	65	UNKNOWN	KEEP	6.1	6.1	772	772	current exit + live size
+2026-07-14	11:26	LONG	9	40	UNKNOWN	KEEP	39.0	39.0	2784	2784	current exit + live size
+2026-07-14	17:06	SHORT	7	35	UNKNOWN	SKIP_ENTRY	-2.3	0.0	-450	0	shallow+refuse skip
+2026-07-15	01:41	SHORT	12	130	UNKNOWN	KEEP	-8.4	-8.4	-1188	-1188	current exit + live size
+2026-07-16	09:46	SHORT	10	50	UNKNOWN	KEEP	-7.2	-7.2	-606	-606	current exit + live size
+2026-07-16	11:01	SHORT	11	50	UNKNOWN	KEEP	-6.1	-6.1	-679	-679	current exit + live size
+2026-07-16	14:51	SHORT	8	40	UNKNOWN	KEEP	1.1	1.1	108	108	current exit + live size
+2026-07-16	19:56	LONG	8	40	UNKNOWN	KEEP	-0.4	-0.4	-42	-42	current exit + live size
+2026-07-20	05:01	SHORT	17	80	UNKNOWN	KEEP	6.2	6.2	1860	1860	current exit + live size
+2026-07-20	14:36	SHORT	14	70	UNKNOWN	KEEP	7.9	7.9	1517	1517	current exit + live size
+2026-07-21	02:36	SHORT	8	40	UNKNOWN	KEEP	0.5	0.5	150	150	current exit + live size
+2026-07-21	05:16	SHORT	7	30	UNKNOWN	KEEP	-3.3	-3.3	-810	-810	current exit + live size
+2026-07-21	08:36	SHORT	7	40	UNKNOWN	SKIP_ENTRY	-4.0	0.0	-1162	0	shallow+refuse skip
+2026-07-21	11:31	LONG	7	45	UNKNOWN	KEEP	-5.2	-5.2	-1560	-1560	current exit + live size
+2026-07-21	12:56	LONG	9	45	UNKNOWN	SKIP_BRAKE	-10.9	0.0	-1862	0	paused after 2 shallow losers
+2026-07-22	04:36	LONG	8	40	UNKNOWN	KEEP	-3.3	-3.3	-990	-990	current exit + live size
+2026-07-22	10:21	LONG	11	50	UNKNOWN	KEEP	-2.7	-2.7	-688	-688	current exit + live size
+2026-07-22	16:11	SHORT	8	35	UNKNOWN	KEEP	2.4	2.4	680	680	current exit + live size
+2026-07-22	19:21	SHORT	7	40	UNKNOWN	KEEP	3.6	3.6	1080	1080	current exit + live size
+2026-07-22	23:46	SHORT	9	45	UNKNOWN	KEEP	-3.0	-3.0	-900	-900	current exit + live size
+2026-07-23	04:21	SHORT	11	50	UNKNOWN	KEEP	2.8	2.8	216	216	current exit + live size
+2026-07-23	09:36	SHORT	9	40	UNKNOWN	KEEP	0.4	0.4	71	71	current exit + live size
+2026-07-23	19:31	LONG	20	140	UNKNOWN	KEEP	-1.2	-1.2	-357	-357	current exit + live size
+2026-07-24	09:16	SHORT	11	60	UNKNOWN	KEEP	-6.7	-6.7	-1589	-1589	current exit + live size
+2026-07-24	10:46	SHORT	10	45	UNKNOWN	KEEP	3.1	3.1	700	700	current exit + live size
+2026-07-24	12:16	LONG	8	35	UNKNOWN	KEEP	-11.6	-11.6	-3029	-3029	current exit + live size
+2026-07-24	17:31	LONG	12	60	UNKNOWN	KEEP	-5.7	-5.7	-1710	-1710	current exit + live size
+2026-07-26	22:01	SHORT	11	60	UNKNOWN	KEEP	7.1	7.1	852	852	current exit + live size
+2026-07-27	07:06	SHORT	15	85	UNKNOWN	KEEP	2.1	2.1	95	95	current exit + live size
+2026-07-27	14:51	LONG	7	40	UNKNOWN	KEEP	0.7	0.7	103	103	current exit + live size
+2026-07-27	20:01	SHORT	12	60	UNKNOWN	KEEP	-1.8	-1.8	-540	-540	current exit + live size
+2026-07-27	21:06	LONG	8	50	UNKNOWN	KEEP	-8.0	-8.0	-960	-960	current exit + live size
+2026-07-28	07:01	SHORT	9	40	UNKNOWN	KEEP	1.5	1.5	100	100	current exit + live size
+2026-07-28	13:36	SHORT	9	40	UNKNOWN	KEEP	-0.1	-0.1	-19	-19	current exit + live size
+2026-07-30	16:46	SHORT	11	65	UNKNOWN	KEEP	-4.7	-4.7	-824	-824	current exit + live size
+2026-07-30	21:41	LONG	8	75	UNKNOWN	KEEP	-3.1	-3.1	-315	-315	current exit + live size
+2026-07-31	16:56	SHORT	9	45	UNKNOWN	KEEP	-12.1	-12.1	-2340	-2340	current exit + live size
+2026-08-02	22:56	SHORT	9	45	UNKNOWN	KEEP	1.6	1.6	158	158	current exit + live size
+2026-08-03	05:01	SHORT	8	40	UNKNOWN	KEEP	-2.1	-2.1	-245	-245	current exit + live size
+2026-08-03	13:06	LONG	7	40	UNKNOWN	KEEP	-11.1	-11.1	-2289	-2289	current exit + live size
+2026-08-03	15:26	SHORT	7	45	UNKNOWN	SKIP_BRAKE	-5.2	0.0	-1560	0	paused after 2 shallow losers
+
+=== ACTION × TAPE COUNTS ===
+  RANGE_SIDEWAYS: KEEP=3 SKIP_ENTRY=0 SKIP_BRAKE=0 ABORT=1
+  TREND_DAY: KEEP=0 SKIP_ENTRY=0 SKIP_BRAKE=0 ABORT=0
+  MIXED: KEEP=1 SKIP_ENTRY=1 SKIP_BRAKE=0 ABORT=1
+  UNKNOWN: KEEP=39 SKIP_ENTRY=2 SKIP_BRAKE=2 ABORT=0
+
+=== V1 GO / NO-GO ===
+Policy I mesh PROMOTE: YES (delta $5088 / 26.7p)
+Skip-only (D) PROMOTE: NO (delta $1692 / 10.9p)
+v1 ships skip-only when D promote OR I promote; brake/abort deferred.

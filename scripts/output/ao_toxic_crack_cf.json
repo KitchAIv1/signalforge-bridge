@@ -1,0 +1,871 @@
+{
+  "generatedAt": "2026-08-03T17:14:28.332Z",
+  "tradeCount": 50,
+  "fireCount": 797,
+  "policyIFlags": {
+    "label": "I) MESH primary: brake + skip + abort (no global HS10)",
+    "normalizeSizeToHardStop10": false,
+    "sizeCutShallowRefuseToHardStop10": false,
+    "conditionalBrakeAfter2Losers": true,
+    "skipShallowRefuseEntries": true,
+    "halfSizeShallowRefuseEntries": false,
+    "noFollowThroughAbort": true
+  },
+  "scorecards": [
+    {
+      "label": "A) baseline (actual live)",
+      "totalActualPips": -41.8,
+      "totalActualDollars": -13635,
+      "totalCfPips": -41.8,
+      "totalCfDollars": -13635,
+      "deltaPips": 0,
+      "deltaDollars": 0,
+      "byDay": [
+        {
+          "day": "2026-07-10",
+          "actualPips": 1.7,
+          "actualDollars": 985,
+          "cfPips": 1.7,
+          "cfDollars": 985,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-13",
+          "actualPips": -3.8,
+          "actualDollars": 981,
+          "cfPips": -3.8,
+          "cfDollars": 981,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-14",
+          "actualPips": 47.2,
+          "actualDollars": 2973,
+          "cfPips": 47.2,
+          "cfDollars": 2973,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-15",
+          "actualPips": -8.4,
+          "actualDollars": -1188,
+          "cfPips": -8.4,
+          "cfDollars": -1188,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-16",
+          "actualPips": -12.6,
+          "actualDollars": -1219,
+          "cfPips": -12.6,
+          "cfDollars": -1219,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-20",
+          "actualPips": 14.1,
+          "actualDollars": 3377,
+          "cfPips": 14.1,
+          "cfDollars": 3377,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-21",
+          "actualPips": -22.9,
+          "actualDollars": -5244,
+          "cfPips": -22.9,
+          "cfDollars": -5244,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-22",
+          "actualPips": -3,
+          "actualDollars": -818,
+          "cfPips": -3,
+          "cfDollars": -818,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-23",
+          "actualPips": 2,
+          "actualDollars": -70,
+          "cfPips": 2,
+          "cfDollars": -70,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-24",
+          "actualPips": -20.9,
+          "actualDollars": -5629,
+          "cfPips": -20.9,
+          "cfDollars": -5629,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-26",
+          "actualPips": 7.1,
+          "actualDollars": 852,
+          "cfPips": 7.1,
+          "cfDollars": 852,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-27",
+          "actualPips": -7,
+          "actualDollars": -1302,
+          "cfPips": -7,
+          "cfDollars": -1302,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-28",
+          "actualPips": 1.4,
+          "actualDollars": 81,
+          "cfPips": 1.4,
+          "cfDollars": 81,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-30",
+          "actualPips": -7.8,
+          "actualDollars": -1138,
+          "cfPips": -7.8,
+          "cfDollars": -1138,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-31",
+          "actualPips": -12.1,
+          "actualDollars": -2340,
+          "cfPips": -12.1,
+          "cfDollars": -2340,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-02",
+          "actualPips": 1.6,
+          "actualDollars": 158,
+          "cfPips": 1.6,
+          "cfDollars": 158,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-03",
+          "actualPips": -18.4,
+          "actualDollars": -4094,
+          "cfPips": -18.4,
+          "cfDollars": -4094,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        }
+      ],
+      "promoteOk": false,
+      "promoteNotes": [
+        "Jul-21 $ damage cut 0% < 50% target (cf=-5244)",
+        "2026-07-14 kept 100% of $",
+        "2026-07-20 kept 100% of $"
+      ]
+    },
+    {
+      "label": "D) shallow+refuse skip only",
+      "totalActualPips": -41.8,
+      "totalActualDollars": -13635,
+      "totalCfPips": -30.9,
+      "totalCfDollars": -11943,
+      "deltaPips": 10.9,
+      "deltaDollars": 1692,
+      "byDay": [
+        {
+          "day": "2026-07-10",
+          "actualPips": 1.7,
+          "actualDollars": 985,
+          "cfPips": 1.7,
+          "cfDollars": 985,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-13",
+          "actualPips": -3.8,
+          "actualDollars": 981,
+          "cfPips": 0.8,
+          "cfDollars": 1063,
+          "tradesTaken": 2,
+          "tradesSkipped": 1
+        },
+        {
+          "day": "2026-07-14",
+          "actualPips": 47.2,
+          "actualDollars": 2973,
+          "cfPips": 49.5,
+          "cfDollars": 3422,
+          "tradesTaken": 4,
+          "tradesSkipped": 1
+        },
+        {
+          "day": "2026-07-15",
+          "actualPips": -8.4,
+          "actualDollars": -1188,
+          "cfPips": -8.4,
+          "cfDollars": -1188,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-16",
+          "actualPips": -12.6,
+          "actualDollars": -1219,
+          "cfPips": -12.6,
+          "cfDollars": -1219,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-20",
+          "actualPips": 14.1,
+          "actualDollars": 3377,
+          "cfPips": 14.1,
+          "cfDollars": 3377,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-21",
+          "actualPips": -22.9,
+          "actualDollars": -5244,
+          "cfPips": -18.9,
+          "cfDollars": -4083,
+          "tradesTaken": 4,
+          "tradesSkipped": 1
+        },
+        {
+          "day": "2026-07-22",
+          "actualPips": -3,
+          "actualDollars": -818,
+          "cfPips": -3,
+          "cfDollars": -818,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-23",
+          "actualPips": 2,
+          "actualDollars": -70,
+          "cfPips": 2,
+          "cfDollars": -70,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-24",
+          "actualPips": -20.9,
+          "actualDollars": -5629,
+          "cfPips": -20.9,
+          "cfDollars": -5629,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-26",
+          "actualPips": 7.1,
+          "actualDollars": 852,
+          "cfPips": 7.1,
+          "cfDollars": 852,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-27",
+          "actualPips": -7,
+          "actualDollars": -1302,
+          "cfPips": -7,
+          "cfDollars": -1302,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-28",
+          "actualPips": 1.4,
+          "actualDollars": 81,
+          "cfPips": 1.4,
+          "cfDollars": 81,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-30",
+          "actualPips": -7.8,
+          "actualDollars": -1138,
+          "cfPips": -7.8,
+          "cfDollars": -1138,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-31",
+          "actualPips": -12.1,
+          "actualDollars": -2340,
+          "cfPips": -12.1,
+          "cfDollars": -2340,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-02",
+          "actualPips": 1.6,
+          "actualDollars": 158,
+          "cfPips": 1.6,
+          "cfDollars": 158,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-03",
+          "actualPips": -18.4,
+          "actualDollars": -4094,
+          "cfPips": -18.4,
+          "cfDollars": -4094,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        }
+      ],
+      "promoteOk": false,
+      "promoteNotes": [
+        "Jul-21 $ damage cut 22% < 50% target (cf=-4083)",
+        "2026-07-14 kept 115% of $",
+        "2026-07-20 kept 100% of $"
+      ]
+    },
+    {
+      "label": "C) conditional brake only",
+      "totalActualPips": -41.8,
+      "totalActualDollars": -13635,
+      "totalCfPips": -25.1,
+      "totalCfDollars": -10057,
+      "deltaPips": 16.7,
+      "deltaDollars": 3578,
+      "byDay": [
+        {
+          "day": "2026-07-10",
+          "actualPips": 1.7,
+          "actualDollars": 985,
+          "cfPips": 1.7,
+          "cfDollars": 985,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-13",
+          "actualPips": -3.8,
+          "actualDollars": 981,
+          "cfPips": -8.4,
+          "cfDollars": -423,
+          "tradesTaken": 2,
+          "tradesSkipped": 1
+        },
+        {
+          "day": "2026-07-14",
+          "actualPips": 47.2,
+          "actualDollars": 2973,
+          "cfPips": 47.2,
+          "cfDollars": 2973,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-15",
+          "actualPips": -8.4,
+          "actualDollars": -1188,
+          "cfPips": -8.4,
+          "cfDollars": -1188,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-16",
+          "actualPips": -12.6,
+          "actualDollars": -1219,
+          "cfPips": -12.6,
+          "cfDollars": -1219,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-20",
+          "actualPips": 14.1,
+          "actualDollars": 3377,
+          "cfPips": 14.1,
+          "cfDollars": 3377,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-21",
+          "actualPips": -22.9,
+          "actualDollars": -5244,
+          "cfPips": -6.8,
+          "cfDollars": -1822,
+          "tradesTaken": 3,
+          "tradesSkipped": 2
+        },
+        {
+          "day": "2026-07-22",
+          "actualPips": -3,
+          "actualDollars": -818,
+          "cfPips": -3,
+          "cfDollars": -818,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-23",
+          "actualPips": 2,
+          "actualDollars": -70,
+          "cfPips": 2,
+          "cfDollars": -70,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-24",
+          "actualPips": -20.9,
+          "actualDollars": -5629,
+          "cfPips": -20.9,
+          "cfDollars": -5629,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-26",
+          "actualPips": 7.1,
+          "actualDollars": 852,
+          "cfPips": 7.1,
+          "cfDollars": 852,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-27",
+          "actualPips": -7,
+          "actualDollars": -1302,
+          "cfPips": -7,
+          "cfDollars": -1302,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-28",
+          "actualPips": 1.4,
+          "actualDollars": 81,
+          "cfPips": 1.4,
+          "cfDollars": 81,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-30",
+          "actualPips": -7.8,
+          "actualDollars": -1138,
+          "cfPips": -7.8,
+          "cfDollars": -1138,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-31",
+          "actualPips": -12.1,
+          "actualDollars": -2340,
+          "cfPips": -12.1,
+          "cfDollars": -2340,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-02",
+          "actualPips": 1.6,
+          "actualDollars": 158,
+          "cfPips": 1.6,
+          "cfDollars": 158,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-03",
+          "actualPips": -18.4,
+          "actualDollars": -4094,
+          "cfPips": -13.2,
+          "cfDollars": -2534,
+          "tradesTaken": 2,
+          "tradesSkipped": 1
+        }
+      ],
+      "promoteOk": false,
+      "promoteNotes": [
+        "Jul-21 $ damage cut 65% (cf=-1822)",
+        "2026-07-14 kept 100% of $",
+        "2026-07-20 kept 100% of $",
+        "2026-07-13 flipped green→red (cf=-423)"
+      ]
+    },
+    {
+      "label": "E) NFT abort only",
+      "totalActualPips": -41.8,
+      "totalActualDollars": -13635,
+      "totalCfPips": -40.5,
+      "totalCfDollars": -13633,
+      "deltaPips": 1.3,
+      "deltaDollars": 2,
+      "byDay": [
+        {
+          "day": "2026-07-10",
+          "actualPips": 1.7,
+          "actualDollars": 985,
+          "cfPips": 2.4,
+          "cfDollars": 1048,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-13",
+          "actualPips": -3.8,
+          "actualDollars": 981,
+          "cfPips": -3.2,
+          "cfDollars": 920,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-14",
+          "actualPips": 47.2,
+          "actualDollars": 2973,
+          "cfPips": 47.2,
+          "cfDollars": 2973,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-15",
+          "actualPips": -8.4,
+          "actualDollars": -1188,
+          "cfPips": -8.4,
+          "cfDollars": -1188,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-16",
+          "actualPips": -12.6,
+          "actualDollars": -1219,
+          "cfPips": -12.6,
+          "cfDollars": -1219,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-20",
+          "actualPips": 14.1,
+          "actualDollars": 3377,
+          "cfPips": 14.1,
+          "cfDollars": 3377,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-21",
+          "actualPips": -22.9,
+          "actualDollars": -5244,
+          "cfPips": -22.9,
+          "cfDollars": -5244,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-22",
+          "actualPips": -3,
+          "actualDollars": -818,
+          "cfPips": -3,
+          "cfDollars": -818,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-23",
+          "actualPips": 2,
+          "actualDollars": -70,
+          "cfPips": 2,
+          "cfDollars": -70,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-24",
+          "actualPips": -20.9,
+          "actualDollars": -5629,
+          "cfPips": -20.9,
+          "cfDollars": -5629,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-26",
+          "actualPips": 7.1,
+          "actualDollars": 852,
+          "cfPips": 7.1,
+          "cfDollars": 852,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-27",
+          "actualPips": -7,
+          "actualDollars": -1302,
+          "cfPips": -7,
+          "cfDollars": -1302,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-28",
+          "actualPips": 1.4,
+          "actualDollars": 81,
+          "cfPips": 1.4,
+          "cfDollars": 81,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-30",
+          "actualPips": -7.8,
+          "actualDollars": -1138,
+          "cfPips": -7.8,
+          "cfDollars": -1138,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-31",
+          "actualPips": -12.1,
+          "actualDollars": -2340,
+          "cfPips": -12.1,
+          "cfDollars": -2340,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-02",
+          "actualPips": 1.6,
+          "actualDollars": 158,
+          "cfPips": 1.6,
+          "cfDollars": 158,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-03",
+          "actualPips": -18.4,
+          "actualDollars": -4094,
+          "cfPips": -18.4,
+          "cfDollars": -4094,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        }
+      ],
+      "promoteOk": false,
+      "promoteNotes": [
+        "Jul-21 $ damage cut 0% < 50% target (cf=-5244)",
+        "2026-07-14 kept 100% of $",
+        "2026-07-20 kept 100% of $"
+      ]
+    },
+    {
+      "label": "I) MESH primary: brake + skip + abort (no global HS10)",
+      "totalActualPips": -41.8,
+      "totalActualDollars": -13635,
+      "totalCfPips": -15.1,
+      "totalCfDollars": -8547,
+      "deltaPips": 26.7,
+      "deltaDollars": 5088,
+      "byDay": [
+        {
+          "day": "2026-07-10",
+          "actualPips": 1.7,
+          "actualDollars": 985,
+          "cfPips": 2.4,
+          "cfDollars": 1048,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-13",
+          "actualPips": -3.8,
+          "actualDollars": 981,
+          "cfPips": -0.2,
+          "cfDollars": 973,
+          "tradesTaken": 2,
+          "tradesSkipped": 1
+        },
+        {
+          "day": "2026-07-14",
+          "actualPips": 47.2,
+          "actualDollars": 2973,
+          "cfPips": 49.5,
+          "cfDollars": 3422,
+          "tradesTaken": 4,
+          "tradesSkipped": 1
+        },
+        {
+          "day": "2026-07-15",
+          "actualPips": -8.4,
+          "actualDollars": -1188,
+          "cfPips": -8.4,
+          "cfDollars": -1188,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-16",
+          "actualPips": -12.6,
+          "actualDollars": -1219,
+          "cfPips": -12.6,
+          "cfDollars": -1219,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-20",
+          "actualPips": 14.1,
+          "actualDollars": 3377,
+          "cfPips": 14.1,
+          "cfDollars": 3377,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-21",
+          "actualPips": -22.9,
+          "actualDollars": -5244,
+          "cfPips": -8,
+          "cfDollars": -2220,
+          "tradesTaken": 3,
+          "tradesSkipped": 2
+        },
+        {
+          "day": "2026-07-22",
+          "actualPips": -3,
+          "actualDollars": -818,
+          "cfPips": -3,
+          "cfDollars": -818,
+          "tradesTaken": 5,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-23",
+          "actualPips": 2,
+          "actualDollars": -70,
+          "cfPips": 2,
+          "cfDollars": -70,
+          "tradesTaken": 3,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-24",
+          "actualPips": -20.9,
+          "actualDollars": -5629,
+          "cfPips": -20.9,
+          "cfDollars": -5629,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-26",
+          "actualPips": 7.1,
+          "actualDollars": 852,
+          "cfPips": 7.1,
+          "cfDollars": 852,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-27",
+          "actualPips": -7,
+          "actualDollars": -1302,
+          "cfPips": -7,
+          "cfDollars": -1302,
+          "tradesTaken": 4,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-28",
+          "actualPips": 1.4,
+          "actualDollars": 81,
+          "cfPips": 1.4,
+          "cfDollars": 81,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-30",
+          "actualPips": -7.8,
+          "actualDollars": -1138,
+          "cfPips": -7.8,
+          "cfDollars": -1138,
+          "tradesTaken": 2,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-07-31",
+          "actualPips": -12.1,
+          "actualDollars": -2340,
+          "cfPips": -12.1,
+          "cfDollars": -2340,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-02",
+          "actualPips": 1.6,
+          "actualDollars": 158,
+          "cfPips": 1.6,
+          "cfDollars": 158,
+          "tradesTaken": 1,
+          "tradesSkipped": 0
+        },
+        {
+          "day": "2026-08-03",
+          "actualPips": -18.4,
+          "actualDollars": -4094,
+          "cfPips": -13.2,
+          "cfDollars": -2534,
+          "tradesTaken": 2,
+          "tradesSkipped": 1
+        }
+      ],
+      "promoteOk": true,
+      "promoteNotes": [
+        "Jul-21 $ damage cut 58% (cf=-2220)",
+        "2026-07-14 kept 115% of $",
+        "2026-07-20 kept 100% of $"
+      ]
+    }
+  ],
+  "goNoGo": {
+    "policyIPromote": true,
+    "skipOnlyPromote": false
+  }
+}

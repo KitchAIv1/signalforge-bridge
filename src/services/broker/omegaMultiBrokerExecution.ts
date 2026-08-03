@@ -33,6 +33,7 @@ import {
   sizeAlphaOmegaPureUnits,
   withPureSizingAdvisory,
 } from '../../core/alphaOmega/alphaOmegaPureSizer.js';
+import { evaluateToxicCrackSkip } from '../../core/alphaOmega/alphaOmegaToxicCrackSkip.js';
 import {
   isOmegaRawPureSizingEnabled,
   sizeOmegaRawPureUnits,
@@ -346,6 +347,42 @@ async function resolveLaneAdvisory(
     });
     return 'BLOCKED_SKIP';
   }
+
+  if (gate.foundingLength != null && gate.foundingSpeedMin != null) {
+    const toxicSkip = await evaluateToxicCrackSkip(params.supabase, {
+      foundingLength: gate.foundingLength,
+      foundingSpeedMin: gate.foundingSpeedMin,
+      confluence:
+        params.payload.confluence_score != null
+          ? Number(params.payload.confluence_score)
+          : null,
+      entryAtIso: new Date().toISOString(),
+      signalId: params.signalId,
+    });
+    if (toxicSkip.shouldBlock) {
+      await insertLaneBBlockedRow({
+        supabase: params.supabase,
+        payload: params.payload,
+        signalId: params.signalId,
+        brokerId,
+        blockReason: toxicSkip.blockReason ?? 'ALPHAOMEGA_TOXIC_CRACK',
+        decisionLatencyMs: params.decisionLatencyMs,
+        routeEquity,
+        openTradeCount: params.openTradeCount,
+        instrument: params.norm.oandaInstrument,
+        direction: params.norm.direction,
+        regimeState: params.regimeState,
+        regimeSizeMultiplier: params.regimeSizeMultiplier,
+        amdState: params.amdState,
+        directionMode: params.directionMode,
+        buildTradeLogRow: params.buildTradeLogRow,
+        attachOmegaAuditFields: params.attachOmegaAuditFields,
+        shadowAdvisory: toxicSkip.shadowAdvisory,
+      });
+      return 'BLOCKED_SKIP';
+    }
+  }
+
   return `ALPHAOMEGA_ENTRY:len=${gate.foundingLength}:speed=${gate.foundingSpeedMin?.toFixed(1)}m`;
 }
 
