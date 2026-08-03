@@ -18,6 +18,7 @@ export interface AlphaOmegaLiveState {
   streak: AlphaOmegaStreakSnapshot | null;
   openPosition: AlphaOmegaOpenPositionSnapshot | null;
   lastExit: AlphaOmegaLastExitSnapshot | null;
+  unarmedAgeOutEnabled: boolean;
   loading: boolean;
   errorMessage: string | null;
 }
@@ -26,6 +27,7 @@ export function useAlphaOmegaLiveState(): AlphaOmegaLiveState {
   const [streak, setStreak] = useState<AlphaOmegaStreakSnapshot | null>(null);
   const [openPosition, setOpenPosition] = useState<AlphaOmegaOpenPositionSnapshot | null>(null);
   const [lastExit, setLastExit] = useState<AlphaOmegaLastExitSnapshot | null>(null);
+  const [unarmedAgeOutEnabled, setUnarmedAgeOutEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -34,6 +36,7 @@ export function useAlphaOmegaLiveState(): AlphaOmegaLiveState {
     setStreak(result.streak);
     setOpenPosition(result.openPosition);
     setLastExit(result.lastExit);
+    setUnarmedAgeOutEnabled(result.unarmedAgeOutEnabled);
     setErrorMessage(result.errorMessage);
     setLoading(false);
   }, []);
@@ -44,5 +47,12 @@ export function useAlphaOmegaLiveState(): AlphaOmegaLiveState {
     return () => window.clearInterval(pollId);
   }, [refresh]);
 
-  return { streak, openPosition, lastExit, loading, errorMessage };
+  return {
+    streak,
+    openPosition,
+    lastExit,
+    unarmedAgeOutEnabled,
+    loading,
+    errorMessage,
+  };
 }

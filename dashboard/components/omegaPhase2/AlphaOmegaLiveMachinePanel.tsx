@@ -6,7 +6,14 @@ import { useAlphaOmegaLiveState } from '@/hooks/useAlphaOmegaLiveState';
 import { describeOpenRiskBridge } from '@/lib/alphaOmegaStreakDisplay';
 
 export function AlphaOmegaLiveMachinePanel() {
-  const { streak, openPosition, lastExit, loading, errorMessage } = useAlphaOmegaLiveState();
+  const {
+    streak,
+    openPosition,
+    lastExit,
+    unarmedAgeOutEnabled,
+    loading,
+    errorMessage,
+  } = useAlphaOmegaLiveState();
   const bridge =
     openPosition != null ? describeOpenRiskBridge(openPosition, streak) : null;
 
@@ -16,7 +23,11 @@ export function AlphaOmegaLiveMachinePanel() {
         <p className="text-xs text-rose-600 dark:text-rose-400">Live state: {errorMessage}</p>
       ) : null}
       <div className="grid gap-3 lg:grid-cols-2">
-        <AlphaOmegaStreakRadar streak={streak} isLoading={loading} />
+        <AlphaOmegaStreakRadar
+          streak={streak}
+          isLoading={loading}
+          unarmedAgeOutEnabled={unarmedAgeOutEnabled}
+        />
         <AlphaOmegaOpenRiskCard
           openPosition={openPosition}
           lastExit={lastExit}

@@ -51,6 +51,12 @@ export const ALPHAOMEGA_ENTRY_BLACKOUT_END_UTC_MIN = 21 * 60 + 15;
 export const ALPHAOMEGA_OPPOSING_FIRE_THRESHOLD = 5;
 export const ALPHAOMEGA_HARD_STOP_PIPS = 10;
 export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
+/**
+ * Unarmed streak age-out hygiene (>45m → reset). Display mirror of bridge key.
+ * Missing row → ON (same as bridge default).
+ */
+export const ALPHAOMEGA_UNARMED_AGEOUT_ENABLED_CONFIG_KEY =
+  'alpha_omega_unarmed_ageout_enabled';
 /** Peak-favorable-giveback profit lock — additive, kill-switched via alpha_omega_giveback_trail_enabled. */
 export const ALPHAOMEGA_GIVEBACK_ACTIVATION_PIPS = 6;
 export const ALPHAOMEGA_GIVEBACK_PIPS = 3;
