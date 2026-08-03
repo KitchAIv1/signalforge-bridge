@@ -1,15 +1,9 @@
 /**
  * ALPHAOMEGA live streak tracker — incremental state machine mirroring the
- * validated backtest algorithm exactly (scripts/omegaEntryTaxonomyRefinement.ts
- * `findEntriesWithMeta`): a "founding streak" of ENTRY_STREAK_LENGTH
- * same-direction fires forming within ENTRY_SPEED_CEILING_MIN minutes arms;
- * the next opposite-direction fire is a "crack" — simultaneously a fresh
- * entry opportunity (if flat) and a backstop-exit trigger (if the cracked
- * direction matches an open position).
+ * validated backtest algorithm (scripts/omegaEntryTaxonomyRefinement.ts
+ * `findEntriesWithMeta`), plus unarmed age-out hygiene (>45m reset).
  *
- * Persisted as a single row (alpha_omega_streak_state) so state survives
- * process restarts. Lane A is untouched — this only observes the shared
- * omega fire stream and is consumed exclusively by Lane B code paths.
+ * Persisted as alpha_omega_streak_state id=1. Lane A untouched.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -18,6 +12,11 @@ import {
   ENTRY_STREAK_LENGTH,
   MAX_INTRA_RUN_GAP_MINUTES,
 } from './alphaOmegaConstants.js';
+import {
+  isAlphaOmegaUnarmedAgeOutEnabled,
+  minutesBetweenIso,
+  shouldResetUnarmedStreakForAge,
+} from './alphaOmegaUnarmedAgeOut.js';
 
 export type AlphaOmegaDirection = 'LONG' | 'SHORT';
 
@@ -38,18 +37,15 @@ export interface StreakState {
 }
 
 export interface CrackEvent {
-  /** The founding streak's direction — the one that just broke. */
   brokenDirection: AlphaOmegaDirection;
-  /** The new fire's direction — what a fresh entry (or backstop exit) would act on. */
   enterDirection: AlphaOmegaDirection;
-  /** Exact founding streak length (>= ENTRY_STREAK_LENGTH; can be longer if it kept growing post-arm). */
   foundingLength: number;
-  /** Minutes from founding streak start to its last fire before cracking. */
   foundingSpeedMin: number;
 }
 
-function minutesBetween(fromIso: string, toIso: string): number {
-  return (Date.parse(toIso) - Date.parse(fromIso)) / 60_000;
+export interface ProcessFireOptions {
+  /** Default true. Live/shadow paths may pass false via kill switch. */
+  unarmedAgeOutEnabled?: boolean;
 }
 
 export function emptyStreakState(): StreakState {
@@ -64,45 +60,103 @@ export function emptyStreakState(): StreakState {
   };
 }
 
+function detectCrack(
+  state: StreakState,
+  fire: StreakFireInput,
+  preLength: number,
+  preStartAt: string | null,
+): CrackEvent | null {
+  if (
+    !state.armed ||
+    !state.armedDirection ||
+    fire.direction === state.armedDirection ||
+    !preStartAt ||
+    !state.lastFireAt
+  ) {
+    return null;
+  }
+  return {
+    brokenDirection: state.armedDirection,
+    enterDirection: fire.direction,
+    foundingLength: preLength,
+    foundingSpeedMin: minutesBetweenIso(preStartAt, state.lastFireAt),
+  };
+}
+
+function continuesSameDirection(
+  state: StreakState,
+  fire: StreakFireInput,
+  unarmedAgeOutEnabled: boolean,
+): boolean {
+  if (
+    shouldResetUnarmedStreakForAge({
+      armed: state.armed,
+      streakStartAt: state.currentStreakStartAt,
+      fireAt: fire.firedAt,
+      enabled: unarmedAgeOutEnabled,
+    })
+  ) {
+    return false;
+  }
+  const gapMinutes = state.lastFireAt
+    ? minutesBetweenIso(state.lastFireAt, fire.firedAt)
+    : 0;
+  return (
+    fire.direction === state.currentStreakDirection &&
+    gapMinutes <= MAX_INTRA_RUN_GAP_MINUTES
+  );
+}
+
+function tryArmStreak(
+  nextArmed: boolean,
+  nextLength: number,
+  nextStartAt: string,
+  nextDirection: AlphaOmegaDirection,
+  fireAt: string,
+): { armed: boolean; armedDirection: AlphaOmegaDirection | null } {
+  if (nextArmed || nextLength < ENTRY_STREAK_LENGTH) {
+    return { armed: nextArmed, armedDirection: nextArmed ? nextDirection : null };
+  }
+  const durationMin = minutesBetweenIso(nextStartAt, fireAt);
+  if (durationMin >= 0 && durationMin <= ENTRY_SPEED_CEILING_MIN) {
+    return { armed: true, armedDirection: nextDirection };
+  }
+  return { armed: false, armedDirection: null };
+}
+
 /**
- * Pure function — processes exactly one fire against the current state.
- * Mirrors the validated backtest's `findEntriesWithMeta` loop body exactly,
- * adapted from batch (full array + index) to incremental (one fire at a time).
+ * Pure function — one fire against current state.
+ * Crack check runs before continue/reset. Unarmed age-out only affects continue.
  */
 export function processFireForStreak(
   state: StreakState,
   fire: StreakFireInput,
+  options?: ProcessFireOptions,
 ): { nextState: StreakState; crack: CrackEvent | null } {
+  const unarmedAgeOutEnabled = options?.unarmedAgeOutEnabled !== false;
   const preLength = state.currentStreakLength;
   const preStartAt = state.currentStreakStartAt;
-  const preDirection = state.currentStreakDirection;
+  const crack = detectCrack(state, fire, preLength, preStartAt);
 
-  let crack: CrackEvent | null = null;
-  if (state.armed && state.armedDirection && fire.direction !== state.armedDirection && preStartAt && state.lastFireAt) {
-    crack = {
-      brokenDirection: state.armedDirection,
-      enterDirection: fire.direction,
-      foundingLength: preLength,
-      foundingSpeedMin: minutesBetween(preStartAt, state.lastFireAt),
-    };
-  }
-
-  const gapMinutes = state.lastFireAt ? minutesBetween(state.lastFireAt, fire.firedAt) : 0;
-  const continuesStreak = fire.direction === preDirection && gapMinutes <= MAX_INTRA_RUN_GAP_MINUTES;
-
-  const nextDirection: AlphaOmegaDirection = continuesStreak ? (preDirection as AlphaOmegaDirection) : fire.direction;
+  const continuesStreak = continuesSameDirection(state, fire, unarmedAgeOutEnabled);
+  const nextDirection: AlphaOmegaDirection = continuesStreak
+    ? (state.currentStreakDirection as AlphaOmegaDirection)
+    : fire.direction;
   const nextLength = continuesStreak ? preLength + 1 : 1;
   const nextStartAt = continuesStreak ? preStartAt! : fire.firedAt;
 
   let nextArmed = crack ? false : state.armed;
   let nextArmedDirection = crack ? null : state.armedDirection;
-
-  if (!nextArmed && nextLength >= ENTRY_STREAK_LENGTH) {
-    const durationMin = minutesBetween(nextStartAt, fire.firedAt);
-    if (durationMin >= 0 && durationMin <= ENTRY_SPEED_CEILING_MIN) {
-      nextArmed = true;
-      nextArmedDirection = nextDirection;
-    }
+  if (!nextArmed) {
+    const armedResult = tryArmStreak(
+      false,
+      nextLength,
+      nextStartAt,
+      nextDirection,
+      fire.firedAt,
+    );
+    nextArmed = armedResult.armed;
+    nextArmedDirection = armedResult.armedDirection;
   }
 
   return {
@@ -137,7 +191,10 @@ export async function loadStreakState(supabase: SupabaseClient): Promise<StreakS
   };
 }
 
-export async function saveStreakState(supabase: SupabaseClient, state: StreakState): Promise<void> {
+export async function saveStreakState(
+  supabase: SupabaseClient,
+  state: StreakState,
+): Promise<void> {
   const { error } = await supabase
     .from('alpha_omega_streak_state')
     .update({
@@ -157,11 +214,8 @@ export async function saveStreakState(supabase: SupabaseClient, state: StreakSta
 }
 
 /**
- * Loads state, processes this one fire, persists the updated state, returns
- * the crack event (if any). Idempotency guard: if this exact signal was
- * already the last one processed (e.g. a retry / duplicate fan-out call for
- * the same incoming signal across multiple broker routes), skip re-processing
- * so the streak isn't double-counted.
+ * Load → process one fire → persist. Idempotent on duplicate signal_id.
+ * Kill switch read here so pure tests stay side-effect free.
  */
 export async function recordFireAndDetectCrack(
   supabase: SupabaseClient,
@@ -169,9 +223,12 @@ export async function recordFireAndDetectCrack(
 ): Promise<CrackEvent | null> {
   const state = await loadStreakState(supabase);
   if (state.lastProcessedSignalId === fire.signalId) {
-    return null; // already processed this exact signal (duplicate fan-out call)
+    return null;
   }
-  const { nextState, crack } = processFireForStreak(state, fire);
+  const unarmedAgeOutEnabled = await isAlphaOmegaUnarmedAgeOutEnabled(supabase);
+  const { nextState, crack } = processFireForStreak(state, fire, {
+    unarmedAgeOutEnabled,
+  });
   await saveStreakState(supabase, nextState);
   return crack;
 }

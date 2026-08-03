@@ -90,6 +90,12 @@ export const ALPHAOMEGA_GIVEBACK_TRAIL_ENABLED_CONFIG_KEY = 'alpha_omega_givebac
 export const PIP_SIZE = 0.0001;
 
 export const ALPHAOMEGA_ENABLED_CONFIG_KEY = 'alpha_omega_enabled';
+/**
+ * Unarmed streak age-out hygiene (>45m from start → reset). Default ON when
+ * missing. Set false in bridge_config to kill without redeploy.
+ */
+export const ALPHAOMEGA_UNARMED_AGEOUT_ENABLED_CONFIG_KEY =
+  'alpha_omega_unarmed_ageout_enabled';
 /** When true, Lane B AO entries size at base risk only (no AMD/news/confluence/graduated). Default off. */
 export const ALPHAOMEGA_PURE_SIZING_CONFIG_KEY = 'alpha_omega_pure_sizing';
 /** Confluence score that leaves calculateUnits riskPct unscaled (bands are <75 and >=85). */

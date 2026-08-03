@@ -3,6 +3,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isAlphaOmegaUnarmedAgeOutEnabled } from './alphaOmegaUnarmedAgeOut.js';
 import {
   emptyStreakState,
   processFireForStreak,
@@ -61,7 +62,10 @@ export async function recordShadowFireAndDetectCrack(
 ): Promise<CrackEvent | null> {
   const state = await loadShadowStreakState(supabase);
   if (state.lastProcessedSignalId === fire.signalId) return null;
-  const { nextState, crack } = processFireForStreak(state, fire);
+  const unarmedAgeOutEnabled = await isAlphaOmegaUnarmedAgeOutEnabled(supabase);
+  const { nextState, crack } = processFireForStreak(state, fire, {
+    unarmedAgeOutEnabled,
+  });
   await saveShadowStreakState(supabase, nextState);
   return crack;
 }
