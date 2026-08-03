@@ -29,36 +29,39 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body = (await request.json()) as { tradeIds?: string[] };
     const tradeIds = Array.isArray(body.tradeIds)
-      ? body.tradeIds.filter((id) => typeof id === 'string').slice(0, 40)
+      ? body.tradeIds.filter((id) => typeof id === 'string').slice(0, 200)
       : [];
     if (tradeIds.length === 0) {
       return NextResponse.json({ outcomes: {}, givebackEnabled: false });
     }
 
     const supabase = createServiceSupabase();
-    const { data, error } = await supabase
-      .from('bridge_trade_log')
-      .select(
-        'id,signal_id,direction,decision,block_reason,lane_advisory,status,' +
-          'entry_price,stop_loss,account_equity_at_signal,signal_received_at,created_at,' +
-          'broker_id,exit_price,pnl_pips,pnl_dollars,close_reason,closed_at,duration_minutes',
-      )
-      .in('id', tradeIds);
-    if (error) throw new Error(error.message);
-
-    const rows = (data ?? []) as unknown as BridgeTradeLogRow[];
     const outcomes: Record<string, SpeedfloorPaperOutcome> = {};
     const needSimInputs: SpeedfloorPaperInput[] = [];
 
-    for (const row of rows) {
-      if (!isSpeedfloorShadowRow(row)) continue;
-      const stored = mapStoredSpeedfloorOutcome(row);
-      if (stored) {
-        outcomes[row.id] = stored;
-        continue;
+    // Chunk .in() — PostgREST URL limits; never silently drop caller IDs.
+    for (let i = 0; i < tradeIds.length; i += 40) {
+      const chunk = tradeIds.slice(i, i + 40);
+      const { data, error } = await supabase
+        .from('bridge_trade_log')
+        .select(
+          'id,signal_id,direction,decision,block_reason,lane_advisory,status,' +
+            'entry_price,stop_loss,account_equity_at_signal,signal_received_at,created_at,' +
+            'broker_id,exit_price,pnl_pips,pnl_dollars,close_reason,closed_at,duration_minutes',
+        )
+        .in('id', chunk);
+      if (error) throw new Error(error.message);
+
+      for (const row of (data ?? []) as unknown as BridgeTradeLogRow[]) {
+        if (!isSpeedfloorShadowRow(row)) continue;
+        const stored = mapStoredSpeedfloorOutcome(row);
+        if (stored) {
+          outcomes[row.id] = stored;
+          continue;
+        }
+        const input = mapTradeToPaperInput(row);
+        if (input) needSimInputs.push(input);
       }
-      const input = mapTradeToPaperInput(row);
-      if (input) needSimInputs.push(input);
     }
 
     const batch =
