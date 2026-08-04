@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { fetchAudUsdTodayAmdState } from '@/lib/fetchAudUsdTodayAmdState';
 import { fetchAsianDirectionLog, fetchAsianSessionDetectionLog, fetchD1ContextConfig } from '@/lib/fetchAsianDirectionLog';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/directionDecisionLogic';
 import type { AsianSessionDetection } from '@/lib/directionDecisionTypes';
 import type { AmdState, RegimeState, ScalperDayState, ScalperTrade } from '@/lib/types';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const REFRESH_MS = 60 * 1000;
 
@@ -154,12 +155,7 @@ export function useDirectionDecisionData(): UseDirectionDecisionDataResult {
     }
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    void loadAll();
-    const interval = window.setInterval(() => void loadAll(), REFRESH_MS);
-    return () => window.clearInterval(interval);
-  }, [loadAll]);
+  usePollingInterval(() => void loadAll(), REFRESH_MS);
 
   const refetch = useCallback(() => {
     setLoading(true);

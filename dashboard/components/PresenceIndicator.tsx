@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import {
   fetchMinutesSincePresence,
   isWithinPresenceWindow,
   PRESENCE_TIMEOUT_MINUTES,
 } from '@/lib/presenceConfig';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const REFRESH_MS = 30_000;
 
@@ -17,18 +18,14 @@ export function PresenceIndicator() {
   const [isPresent, setIsPresent] = useState(true);
   const [minutesSince, setMinutesSince] = useState(0);
 
-  useEffect(() => {
-    async function checkPresence(): Promise<void> {
+  usePollingInterval(() => {
+    void (async () => {
       const supabase = getSupabase();
       const mins = await fetchMinutesSincePresence(supabase);
       setMinutesSince(Math.round(mins));
       setIsPresent(isWithinPresenceWindow(mins));
-    }
-
-    void checkPresence();
-    const interval = window.setInterval(() => void checkPresence(), REFRESH_MS);
-    return () => window.clearInterval(interval);
-  }, []);
+    })();
+  }, REFRESH_MS);
 
   if (isPresent) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { OMEGA_CENTROID_HEALTH_REFRESH_MS } from '@/lib/omegaCentroidConstants';
 import { fetchOmegaCentroidHealth } from '@/lib/fetchOmegaCentroidHealth';
@@ -9,6 +9,7 @@ import {
   type CentroidFireSample,
   type OmegaCentroidHealthStats,
 } from '@/lib/omegaCentroidHealthStats';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 export function useOmegaCentroidHealth() {
   const [fires, setFires] = useState<CentroidFireSample[]>([]);
@@ -29,14 +30,7 @@ export function useOmegaCentroidHealth() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void reload();
-    const intervalId = window.setInterval(
-      () => void reload(),
-      OMEGA_CENTROID_HEALTH_REFRESH_MS,
-    );
-    return () => window.clearInterval(intervalId);
-  }, [reload]);
+  usePollingInterval(() => void reload(), OMEGA_CENTROID_HEALTH_REFRESH_MS);
 
   return { fires, stats, loading, errorMessage, reload };
 }

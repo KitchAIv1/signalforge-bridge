@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { AmdState } from '@/lib/types';
 import { fetchAudUsdTodayAmdState } from '@/lib/fetchAudUsdTodayAmdState';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const REFRESH_MS = 5 * 60 * 1000;
 
@@ -39,13 +40,12 @@ export function useAmdState(): UseAmdStateResult {
 
     void load();
 
-    const interval = window.setInterval(() => setTick((t) => t + 1), REFRESH_MS);
-
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
     };
   }, [tick]);
+
+  usePollingInterval(() => setTick((t) => t + 1), REFRESH_MS, { runImmediately: false });
 
   return {
     amdState,

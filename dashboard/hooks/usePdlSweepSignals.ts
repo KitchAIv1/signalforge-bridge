@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { PdlSweepSignalRow } from '@/lib/pdlSweepTypes';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 import { fetchPdlSweepSignals } from '@/lib/fetchPdlSweepSignals';
 import {
   PDL_POLL_END_HOUR_UTC,
@@ -35,41 +36,27 @@ export function usePdlSweepSignals(): UsePdlSweepSignalsResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load(): Promise<void> {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchPdlSweepSignals();
-        if (!cancelled) setRows(data);
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Unknown error');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const load = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const signalRows = await fetchPdlSweepSignals();
+      setRows(signalRows);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
     }
-
-    void load();
-
-    if (!isActivePollWindow()) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const ticker = setInterval(() => {
-      void load();
-    }, PDL_SWEEP_REFRESH_MS);
-
-    return () => {
-      cancelled = true;
-      clearInterval(ticker);
-    };
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Ticks only fetch during the PDL poll window; initial load always runs above.
+  usePollingInterval(() => {
+    if (isActivePollWindow()) void load();
+  }, PDL_SWEEP_REFRESH_MS, { runImmediately: false });
 
   const todayUtc = new Date().toISOString().slice(0, 10);
   const todayRow = rows.find((row) => row.trade_date === todayUtc) ?? null;

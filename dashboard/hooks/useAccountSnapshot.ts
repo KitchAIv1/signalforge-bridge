@@ -6,6 +6,7 @@ import {
   fetchLatestAccountSnapshot,
   type AccountSnapshot,
 } from '@/lib/accountSnapshotService';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const POLL_MS = 30_000;
 const STALE_AFTER_MS = 60_000;
@@ -24,11 +25,7 @@ export function useAccountSnapshot() {
     }
   }, []);
 
-  useEffect(() => {
-    void refreshSnapshot();
-    const pollId = window.setInterval(() => void refreshSnapshot(), POLL_MS);
-    return () => window.clearInterval(pollId);
-  }, [refreshSnapshot]);
+  usePollingInterval(() => void refreshSnapshot(), POLL_MS);
 
   useEffect(() => {
     const tickId = window.setInterval(() => setNowMs(Date.now()), STALE_TICK_MS);

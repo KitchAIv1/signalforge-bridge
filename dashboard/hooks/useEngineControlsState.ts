@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import {
   fetchEngineControlRows,
@@ -10,8 +10,10 @@ import {
   writePaused,
   writeRebuildRetry,
 } from '@/lib/engineControlConfig';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const TOAST_MS = 4000;
+const SYNC_MS = 60_000;
 
 export function useEngineControlsState() {
   const [pausedIds, setPausedIds] = useState<string[]>([]);
@@ -44,11 +46,7 @@ export function useEngineControlsState() {
     }
   }, []);
 
-  useEffect(() => {
-    void sync();
-    const syncInterval = window.setInterval(() => void sync(), 15_000);
-    return () => clearInterval(syncInterval);
-  }, [sync]);
+  usePollingInterval(() => void sync(), SYNC_MS);
 
   const togglePause = useCallback(
     async (engineId: string, display: string) => {

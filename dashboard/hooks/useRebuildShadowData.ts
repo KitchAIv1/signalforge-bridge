@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import type { RebuildShadowSignalRow, RebuildWeeklyReportRow } from '@/lib/types';
 import { REBUILD_REFRESH_MS } from '@/lib/rebuildShadowConstants';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
-const FETCH_LIMIT = 2000;
+const FETCH_LIMIT = 200;
 
 export function useRebuildShadowData() {
   const [signals, setSignals] = useState<RebuildShadowSignalRow[]>([]);
@@ -36,11 +37,7 @@ export function useRebuildShadowData() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void fetchPayload();
-    const ticker = setInterval(fetchPayload, REBUILD_REFRESH_MS);
-    return () => clearInterval(ticker);
-  }, [fetchPayload]);
+  usePollingInterval(() => void fetchPayload(), REBUILD_REFRESH_MS);
 
   return { signals, weeklyReport, loading };
 }

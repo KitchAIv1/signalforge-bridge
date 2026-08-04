@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeBrokerRow, BridgeEngineRow, BridgeHealthLogRow, BridgeTradeLogRow } from '@/lib/types';
 import { BridgeToggle } from '@/components/BridgeToggle';
 import { OverviewRecentActivity, OverviewRecentHeader } from '@/components/overview/OverviewRecentActivity';
 import { applyActivityBrokerScope } from '@/lib/activityTradeLogQuery';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const TRADE_LOG_PAGE_SIZE = 25;
+const OVERVIEW_POLL_MS = 60_000;
 
 function formatTimeAgo(iso: string | null): string {
   if (!iso) return '—';
@@ -56,11 +58,7 @@ export default function OverviewPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 15000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+  usePollingInterval(() => void fetchData(), OVERVIEW_POLL_MS);
 
   const handleBridgeToggle = useCallback(async (next: boolean) => {
     setToggleError(null);

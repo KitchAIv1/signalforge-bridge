@@ -10,6 +10,7 @@ import {
   ColorType,
 } from 'lightweight-charts';
 import { parseOverrideApiError } from '@/lib/parseOverrideApiError';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 interface OandaCandle {
   time: number;
@@ -141,13 +142,9 @@ export function OverrideChart({ tradeLines }: OverrideChartProps) {
 
   useEffect(() => {
     void fetchAndRender(timeframe);
-
-    const interval = setInterval(() => {
-      void fetchAndRender(timeframe);
-    }, 10000);
-
-    return () => clearInterval(interval);
   }, [timeframe, fetchAndRender]);
+
+  usePollingInterval(() => void fetchAndRender(timeframe), 10_000, { runImmediately: false });
 
   return (
     <div className="mb-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950">

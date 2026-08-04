@@ -1,4 +1,4 @@
-export const REBUILD_REFRESH_MS = 15_000;
+export const REBUILD_REFRESH_MS = 5 * 60_000;
 
 // ── Filter constants (derived from April 13-17 analysis) ──
 // Block hours where avg P&L R is structurally negative

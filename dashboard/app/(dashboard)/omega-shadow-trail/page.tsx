@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { fetchShadowTrailData } from '@/lib/fetchShadowTrailData';
 import type { ShadowTrailPayload } from '@/lib/shadowTrailTypes';
 import { ShadowTrailCompareTable } from '@/components/shadowTrail/ShadowTrailCompareTable';
 import { ShadowTrailSlLegend } from '@/components/shadowTrail/ShadowTrailSlLegend';
 import { ShadowTrailSummaryCards } from '@/components/shadowTrail/ShadowTrailSummaryCards';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
-const POLL_MS = 30_000;
+const POLL_MS = 5 * 60_000;
 
 export default function OmegaShadowTrailPage() {
   const [payload, setPayload] = useState<ShadowTrailPayload | null>(null);
@@ -25,11 +26,7 @@ export default function OmegaShadowTrailPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadPayload();
-    const ticker = setInterval(() => void loadPayload(), POLL_MS);
-    return () => clearInterval(ticker);
-  }, [loadPayload]);
+  usePollingInterval(() => void loadPayload(), POLL_MS);
 
   if (loading) {
     return <p className="p-6 text-slate-400">Loading Shadow Trail v1...</p>;

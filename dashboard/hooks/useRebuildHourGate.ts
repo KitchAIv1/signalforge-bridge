@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import {
   fetchRebuildHourGateEnabled,
   writeRebuildHourGateEnabled,
 } from '@/lib/rebuildHourGateConfig';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
-const SYNC_MS = 15_000;
+const SYNC_MS = 60_000;
 const TOAST_MS = 4000;
 
 export function useRebuildHourGate() {
@@ -32,11 +33,7 @@ export function useRebuildHourGate() {
     }
   }, []);
 
-  useEffect(() => {
-    void sync();
-    const interval = window.setInterval(() => void sync(), SYNC_MS);
-    return () => window.clearInterval(interval);
-  }, [sync]);
+  usePollingInterval(() => void sync(), SYNC_MS);
 
   const toggleHourGate = useCallback(async () => {
     if (busy) return;

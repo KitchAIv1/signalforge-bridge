@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { EnrichedLiveTrade } from '@/lib/overrideTradeLogEnrichment';
 import type { OverrideBrokerId } from '@/lib/overrideBrokerScope';
 import { parseOverrideApiError } from '@/lib/parseOverrideApiError';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
-const POLL_MS = 5_000;
+const POLL_MS = 30_000;
 
 export function useOverrideLaneTrades(brokerId: OverrideBrokerId) {
   const [trades, setTrades] = useState<EnrichedLiveTrade[]>([]);
@@ -34,11 +35,7 @@ export function useOverrideLaneTrades(brokerId: OverrideBrokerId) {
     }
   }, [brokerId]);
 
-  useEffect(() => {
-    void fetchTrades();
-    const interval = window.setInterval(() => void fetchTrades(), POLL_MS);
-    return () => window.clearInterval(interval);
-  }, [fetchTrades]);
+  usePollingInterval(() => void fetchTrades(), POLL_MS);
 
   const closeTrade = useCallback(
     async (tradeId: string) => {

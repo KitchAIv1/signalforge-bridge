@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import {
   fetchAmdAsianCloseFilterEnabled,
   writeAmdAsianCloseFilterEnabled,
 } from '@/lib/amdAsianCloseFilterConfig';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
-const SYNC_MS = 15_000;
+const SYNC_MS = 60_000;
 const TOAST_MS = 4000;
 
 export function useAmdAsianCloseFilter() {
@@ -32,11 +33,7 @@ export function useAmdAsianCloseFilter() {
     }
   }, []);
 
-  useEffect(() => {
-    void sync();
-    const interval = window.setInterval(() => void sync(), SYNC_MS);
-    return () => window.clearInterval(interval);
-  }, [sync]);
+  usePollingInterval(() => void sync(), SYNC_MS);
 
   const toggleFilter = useCallback(async () => {
     if (busy) return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import {
   KEY_OMEGA_DIR,
@@ -9,6 +9,7 @@ import {
   writeOmegaDir,
 } from '@/lib/engineControlConfig';
 import type { RegimeState } from '@/lib/types';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const REFRESH_MS = 30_000;
 
@@ -84,11 +85,7 @@ export function useRegimeState(): RegimePanelData {
     }
   }, []);
 
-  useEffect(() => {
-    void fetchData();
-    const interval = window.setInterval(() => void fetchData(), REFRESH_MS);
-    return () => window.clearInterval(interval);
-  }, [fetchData]);
+  usePollingInterval(() => void fetchData(), REFRESH_MS);
 
   return { regimeState, omegaDirection, isLoading, fetchError, flipDirection, directionMode };
 }

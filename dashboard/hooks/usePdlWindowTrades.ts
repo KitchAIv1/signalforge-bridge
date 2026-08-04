@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fetchPdlWindowTrades } from '@/lib/fetchPdlWindowTrades';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 import type { PdlWindowTradeRow } from '@/lib/pdlWindowTypes';
 import { normalizeTradeDateKey } from '@/lib/pdlWindowDirection';
 import {
@@ -43,40 +44,27 @@ export function usePdlWindowTrades(): UsePdlWindowTradesResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load(): Promise<void> {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchPdlWindowTrades();
-        if (!cancelled) setTrades(data);
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Unknown error');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const fetchedTrades = await fetchPdlWindowTrades();
+      setTrades(fetchedTrades);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
     }
-
-    void load();
-    if (!isActivePollWindow()) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const ticker = setInterval(() => {
-      void load();
-    }, PDL_SWEEP_REFRESH_MS);
-
-    return () => {
-      cancelled = true;
-      clearInterval(ticker);
-    };
   }, []);
+
+  // Initial load always runs; subsequent ticks only fetch during the PDL poll window.
+  usePollingInterval(() => {
+    if (isActivePollWindow()) void load();
+  }, PDL_SWEEP_REFRESH_MS, { runImmediately: false });
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return {
     trades,

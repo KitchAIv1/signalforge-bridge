@@ -4,9 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AccountSnapshot } from '@/lib/accountSnapshotService';
 import type { OverrideBrokerId } from '@/lib/overrideBrokerScope';
 import { parseOverrideApiError } from '@/lib/parseOverrideApiError';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
-const POLL_MS = 15_000;
-const STALE_AFTER_MS = 45_000;
+const POLL_MS = 60_000;
+const STALE_AFTER_MS = 90_000;
 const STALE_TICK_MS = 10_000;
 
 export function useOverrideAccountSnapshot(brokerId: OverrideBrokerId) {
@@ -30,11 +31,7 @@ export function useOverrideAccountSnapshot(brokerId: OverrideBrokerId) {
     }
   }, [brokerId]);
 
-  useEffect(() => {
-    void refreshSnapshot();
-    const pollId = window.setInterval(() => void refreshSnapshot(), POLL_MS);
-    return () => window.clearInterval(pollId);
-  }, [refreshSnapshot]);
+  usePollingInterval(() => void refreshSnapshot(), POLL_MS);
 
   useEffect(() => {
     const tickId = window.setInterval(() => setNowMs(Date.now()), STALE_TICK_MS);

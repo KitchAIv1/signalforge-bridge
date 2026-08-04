@@ -39,6 +39,6 @@ export const OMEGA_CENTROID_FEATURE_LABELS = [
   'close ret',
 ] as const;
 
-export const OMEGA_CENTROID_HEALTH_REFRESH_MS = 30_000;
+export const OMEGA_CENTROID_HEALTH_REFRESH_MS = 5 * 60_000;
 export const OMEGA_CENTROID_RECENT_LIMIT = 80;
 export const OMEGA_CENTROID_LOOKBACK_DAYS = 30;

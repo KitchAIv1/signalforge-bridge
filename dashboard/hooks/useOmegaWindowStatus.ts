@@ -4,6 +4,7 @@ import {
   fetchOmegaWindowStatus,
   type OmegaWindowStatus,
 } from '@/lib/fetchOmegaWindowStatus';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const REFRESH_MS = 60 * 1000;
 
@@ -36,12 +37,12 @@ export function useOmegaWindowStatus(): UseOmegaWindowStatusResult {
     }
 
     void load();
-    const interval = window.setInterval(() => setTick((t) => t + 1), REFRESH_MS);
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
     };
   }, [tick]);
+
+  usePollingInterval(() => setTick((t) => t + 1), REFRESH_MS, { runImmediately: false });
 
   return { status, loading, error };
 }

@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import type { BridgeBrokerRow, BridgeHealthLogRow } from '@/lib/types';
 import { Mt5BrokerHealthSection } from '@/components/broker/Mt5BrokerHealthSection';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 const HEALTH_HISTORY_SIZE = 50;
+const HEALTH_POLL_MS = 60_000;
 
 function formatTimeAgo(iso: string | null): string {
   if (!iso) return '—';
@@ -40,10 +42,9 @@ export default function HealthPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 15000);
+  usePollingInterval(() => void fetchData(), HEALTH_POLL_MS);
 
+  useEffect(() => {
     const supabase = getSupabase();
     const channel = supabase
       .channel('health-realtime')
@@ -60,7 +61,6 @@ export default function HealthPage() {
       .subscribe();
 
     return () => {
-      clearInterval(interval);
       void supabase.removeChannel(channel);
     };
   }, [fetchData]);

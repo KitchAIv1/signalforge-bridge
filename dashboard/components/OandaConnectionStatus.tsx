@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 interface EngineHealthRow {
   service: string;
@@ -107,19 +108,16 @@ export function OandaConnectionStatus() {
   const [open, setOpen] = useState(false);
   const [payload, setPayload] = useState<HealthPayload | null>(null);
 
-  useEffect(() => {
-    const fetchHealth = async () => {
+  usePollingInterval(() => {
+    void (async () => {
       try {
         const res = await fetch('/api/engine-health');
         if (res.ok) setPayload((await res.json()) as HealthPayload);
       } catch {
         // silent — stale data shown
       }
-    };
-    void fetchHealth();
-    const interval = setInterval(() => void fetchHealth(), 30_000);
-    return () => clearInterval(interval);
-  }, []);
+    })();
+  }, 30_000);
 
   const omegaDot = engineDotColor(payload?.omega ?? null);
   const rebuildDot = engineDotColor(payload?.rebuild ?? null);

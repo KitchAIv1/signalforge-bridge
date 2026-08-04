@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 import { CRON_SCHEDULE } from '@/lib/asianDetectionDisplayHelpers';
 import {
   ASIAN_FETCH_LOOKBACK_DAYS,
@@ -68,57 +69,41 @@ export function useAsianSessionDetection(): UseAsianSessionDetectionResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load(): Promise<void> {
-      setLoading(true);
-      setError(null);
+  const load = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const detectionRows = await fetchAsianSessionDetectionLog(ASIAN_FETCH_LOOKBACK_DAYS);
+      const tradeDates = distinctTradeDates(detectionRows);
+      let amdMetricRows: AsianSessionAmdMetricsSlice[] = [];
       try {
-        const detectionRows = await fetchAsianSessionDetectionLog(ASIAN_FETCH_LOOKBACK_DAYS);
-        const tradeDates = distinctTradeDates(detectionRows);
-        let amdMetricRows: AsianSessionAmdMetricsSlice[] = [];
-        try {
-          amdMetricRows = await fetchAsianSessionAmdMetricsByDates(tradeDates);
-        } catch {
-          amdMetricRows = [];
-        }
-        const [d1Context, windowStatus] = await Promise.all([
-          fetchD1ContextConfig(),
-          fetchOmegaWindowStatus(),
-        ]);
-        if (!cancelled) {
-          setRows(detectionRows);
-          setAmdMetricsByDate(buildAsianSessionAmdMetricsMap(amdMetricRows));
-          setD1Config(d1Context);
-          setOmegaWindow(windowStatus);
-        }
-      } catch (loadError: unknown) {
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : 'Unknown error');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        amdMetricRows = await fetchAsianSessionAmdMetricsByDates(tradeDates);
+      } catch {
+        amdMetricRows = [];
       }
+      const [d1Context, windowStatus] = await Promise.all([
+        fetchD1ContextConfig(),
+        fetchOmegaWindowStatus(),
+      ]);
+      setRows(detectionRows);
+      setAmdMetricsByDate(buildAsianSessionAmdMetricsMap(amdMetricRows));
+      setD1Config(d1Context);
+      setOmegaWindow(windowStatus);
+    } catch (loadError: unknown) {
+      setError(loadError instanceof Error ? loadError.message : 'Unknown error');
+    } finally {
+      setLoading(false);
     }
-
-    void load();
-
-    if (!isActiveAsianPollWindow()) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const ticker = setInterval(() => {
-      void load();
-    }, ASIAN_REFRESH_MS);
-
-    return () => {
-      cancelled = true;
-      clearInterval(ticker);
-    };
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Ticks only fetch during the Asian poll window; initial load always runs above.
+  usePollingInterval(() => {
+    if (isActiveAsianPollWindow()) void load();
+  }, ASIAN_REFRESH_MS, { runImmediately: false });
 
   const todayUtc = new Date().toISOString().slice(0, 10);
   const todayChecks = useMemo(

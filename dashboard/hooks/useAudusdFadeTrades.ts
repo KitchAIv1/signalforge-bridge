@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AUDUSD_FADE_REFRESH_MS } from '@/lib/audusdFadeConstants';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 import { computeAudusdFadeStats, isFadeTradeOpen } from '@/lib/audusdFadeStats';
 import type { AudusdFadeStats, AudusdFadeTradeRow } from '@/lib/audusdFadeTypes';
 import { fetchAudusdFadeTrades } from '@/lib/fetchAudusdFadeTrades';
@@ -33,13 +34,7 @@ export function useAudusdFadeTrades(): UseAudusdFadeTradesResult {
     }
   }, []);
 
-  useEffect(() => {
-    void loadRows();
-    const ticker = setInterval(() => {
-      void loadRows();
-    }, AUDUSD_FADE_REFRESH_MS);
-    return () => clearInterval(ticker);
-  }, [loadRows]);
+  usePollingInterval(() => void loadRows(), AUDUSD_FADE_REFRESH_MS);
 
   const todayUtc = new Date().toISOString().slice(0, 10);
   const closedRows = rows.filter((row) => !isFadeTradeOpen(row));

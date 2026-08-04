@@ -9,10 +9,11 @@ import type {
   AlphaOmegaStreakSnapshot,
 } from '@/lib/alphaOmegaLiveStateMap';
 import type { AlphaOmegaLastExitSnapshot } from '@/lib/reconcileAlphaOmegaOpenPosition';
+import { usePollingInterval } from '@/hooks/usePollingInterval';
 
 export type { AlphaOmegaOpenPositionSnapshot, AlphaOmegaStreakSnapshot, AlphaOmegaLastExitSnapshot };
 
-const POLL_MS = 15_000;
+const POLL_MS = 30_000;
 
 export interface AlphaOmegaLiveState {
   streak: AlphaOmegaStreakSnapshot | null;
@@ -41,11 +42,7 @@ export function useAlphaOmegaLiveState(): AlphaOmegaLiveState {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void refresh();
-    const pollId = window.setInterval(() => void refresh(), POLL_MS);
-    return () => window.clearInterval(pollId);
-  }, [refresh]);
+  usePollingInterval(() => void refresh(), POLL_MS);
 
   return {
     streak,
