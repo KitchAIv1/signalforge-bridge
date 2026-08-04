@@ -17,6 +17,7 @@ function aoTrade(overrides: Partial<PnlTradeRow>): PnlTradeRow {
     created_at: '2026-07-21T12:00:00Z',
     engine_id: 'omega',
     broker_id: OMEGA_LANE_B_BROKER_ID,
+    decision: 'EXECUTED',
     direction: 'LONG',
     result: 'loss',
     pnl_r: null,

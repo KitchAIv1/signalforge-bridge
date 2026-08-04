@@ -2,12 +2,17 @@
  * P&L calendar engine filter — client-side only.
  * Does not change fetch/pagination; filters already-loaded closed trades.
  *
- * ALPHAOMEGA is not a separate engine_id — it is omega on Lane B
- * (broker_id = oanda_phase2_demo). "omega" filter = other omega brokers.
+ * ALPHAOMEGA is not a separate engine_id — it is omega on live AO brokers
+ * with EXECUTED fills only (no SPEEDFLOOR / ao_shadow_paper).
+ * "omega" filter = other omega brokers, excluding shadow paper.
  */
 
 import { isOmegaLaneBBroker } from '@/lib/omegaLaneBConstants';
 import { PDL_WINDOW_CALENDAR_START_ISO } from '@/lib/pnlCalendarConstants';
+import {
+  isLiveAlphaOmegaCalendarTrade,
+  isShadowAoCalendarTrade,
+} from '@/lib/pnlCalendarLiveAo';
 import type { PnlTradeRow } from '@/lib/pnlCalendarTypes';
 
 /** Old 15:00 flatten test fills — not the live 13:00 book. */
@@ -55,8 +60,9 @@ export const PNL_CALENDAR_FILTER_OPTIONS: readonly PnlCalendarFilterOption[] = [
   { key: 'pdl_window', label: 'PDL Window', colorKey: 'pdl_window' },
 ];
 
+/** @deprecated Prefer isLiveAlphaOmegaCalendarTrade — kept as calendar alias. */
 export function isOmegaLaneBTrade(trade: PnlTradeRow): boolean {
-  return trade.engine_id === 'omega' && isOmegaLaneBBroker(trade.broker_id);
+  return isLiveAlphaOmegaCalendarTrade(trade);
 }
 
 export function tradeMatchesCalendarFilter(
@@ -65,8 +71,11 @@ export function tradeMatchesCalendarFilter(
 ): boolean {
   if (selected.size === 0) return false;
   if (isLegacyPdlWindowTestTrade(trade)) return false;
+  if (isShadowAoCalendarTrade(trade)) return false;
   if (trade.engine_id === 'omega') {
-    if (isOmegaLaneBTrade(trade)) return selected.has('alphaomega');
+    if (isLiveAlphaOmegaCalendarTrade(trade)) return selected.has('alphaomega');
+    // Live AO broker but not a live fill (SPEEDFLOOR paper etc.) — hide entirely.
+    if (isOmegaLaneBBroker(trade.broker_id)) return false;
     return selected.has('omega');
   }
   if (trade.engine_id === 'engine_amd') return selected.has('engine_amd');

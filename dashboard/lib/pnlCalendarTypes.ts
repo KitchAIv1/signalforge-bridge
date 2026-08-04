@@ -4,6 +4,11 @@ export type PnlTradeRow = {
   engine_id: string;
   /** Null on some legacy rows; Lane B AO uses oanda_phase2_demo. */
   broker_id: string | null;
+  /**
+   * EXECUTED = live fill. BLOCKED paper (SPEEDFLOOR / shadow forensics) must
+   * not count toward ALPHAOMEGA calendar. Null on some legacy rows.
+   */
+  decision: string | null;
   direction: string;
   result: string;
   pnl_r: number | null;
