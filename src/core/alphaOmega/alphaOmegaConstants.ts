@@ -169,6 +169,22 @@ export const ALPHAOMEGA_CLOSE_OPPOSING_SHARE = 'alphaomega_opposing_share';
 export const ALPHAOMEGA_CLOSE_HARD_STOP = 'alphaomega_hard_stop';
 export const ALPHAOMEGA_CLOSE_BACKSTOP_CRACK = 'alphaomega_backstop_crack';
 export const ALPHAOMEGA_CLOSE_PEAK_GIVEBACK_TRAIL = 'alphaomega_peak_giveback_trail';
+export const ALPHAOMEGA_CLOSE_DEAD_CRACK_ABORT = 'alphaomega_dead_crack_abort';
+
+/**
+ * Dead-crack abort (no-follow-through exit) — additive, kill-switched, checked
+ * LAST in the 30s monitor cycle (after hard stop and giveback trail). Aborts a
+ * position that is >=30m old, never reached 1.5p favorable, and has been >=3p
+ * underwater. Thresholds mirror scripts/aoRefuseTapeCf/walkLiveTradePath.ts
+ * (Policy I NFT abort, re-validated Aug 3 2026: +25.2p raw / ~+11p after fill
+ * realism on the 53-trade live book; 2 recovering winners clipped, 21 losers cut).
+ */
+export const ALPHAOMEGA_DEAD_CRACK_MIN_HOLD_MINUTES = 30;
+export const ALPHAOMEGA_DEAD_CRACK_MFE_MAX_PIPS = 1.5;
+export const ALPHAOMEGA_DEAD_CRACK_MAE_MIN_PIPS = 3;
+/** When true, the dead-crack abort closes positions. Default off — flip via bridge_config / dashboard toggle. */
+export const ALPHAOMEGA_DEAD_CRACK_ABORT_ENABLED_CONFIG_KEY =
+  'alpha_omega_dead_crack_abort_enabled';
 
 export function isOmegaLaneBBroker(brokerId: string | null | undefined): boolean {
   if (!brokerId) return false;

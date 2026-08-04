@@ -13,16 +13,21 @@
  * see between fires.
  */
 
-import { fetchLatestM5Candle } from '../connectors/oanda.js';
+import { fetchLatestM5Candle, type LatestM5Candle } from '../connectors/oanda.js';
 import { getSupabaseClient } from '../connectors/supabase.js';
 import { pairToInstrument } from './trailingStopSupport.js';
-import { logWarn } from '../utils/logger.js';
+import { logInfo, logWarn } from '../utils/logger.js';
 import {
   ALPHAOMEGA_CLOSE_HARD_STOP,
   HARD_STOP_PIPS,
   isOmegaLaneBBroker,
   PIP_SIZE,
 } from '../core/alphaOmega/alphaOmegaConstants.js';
+import {
+  evaluateDeadCrackAbort,
+  formatDeadCrackAdvisory,
+  isAlphaOmegaDeadCrackAbortEnabled,
+} from '../core/alphaOmega/alphaOmegaDeadCrackAbort.js';
 import {
   evaluateGivebackTrail,
   isAlphaOmegaGivebackTrailEnabled,
@@ -31,21 +36,23 @@ import {
   closeAlphaOmegaPosition,
   loadOpenLaneBPositions,
   updatePeakFavorablePips,
+  updateTroughAdversePips,
   type AlphaOmegaPositionRow,
 } from '../core/alphaOmega/alphaOmegaPositionTracking.js';
 
 /**
  * Checks the price-based exits for one open Lane B position, in priority
- * order: hard stop first (unchanged), then — only if the hard stop didn't
- * already close it, and only when the giveback trail is enabled — the
- * peak-favorable-giveback trail. Reuses the single already-fetched candle
- * for both checks; the trail is purely additive and never runs before or
- * instead of the hard stop.
+ * order: hard stop first (unchanged), then the peak-favorable-giveback trail
+ * (when enabled), then — only if nothing above closed it — the dead-crack
+ * abort (kill-switched; shadow-logs would_abort while OFF). Reuses the single
+ * already-fetched candle for all checks; later checks are purely additive and
+ * never run before or instead of an earlier one.
  */
 async function checkPositionHardStop(
   position: AlphaOmegaPositionRow,
   instrument: string,
   givebackTrailEnabled: boolean,
+  deadCrackAbortEnabled: boolean,
 ): Promise<void> {
   if (position.entry_price == null) return;
   const candle = await fetchLatestM5Candle(instrument);
@@ -61,18 +68,77 @@ async function checkPositionHardStop(
     return;
   }
 
-  if (!givebackTrailEnabled) return;
-  const trail = evaluateGivebackTrail(
-    { direction: position.direction, entryPrice: position.entry_price, peakFavorablePips: position.peak_favorable_pips },
+  if (givebackTrailEnabled) {
+    const trail = evaluateGivebackTrail(
+      { direction: position.direction, entryPrice: position.entry_price, peakFavorablePips: position.peak_favorable_pips },
+      candle,
+    );
+    if (trail.shouldExit && trail.exitReason) {
+      await closeAlphaOmegaPosition(supabase, position, trail.exitReason);
+      return;
+    }
+    if (trail.nextPeakFavorablePips !== position.peak_favorable_pips) {
+      await updatePeakFavorablePips(supabase, position.oanda_trade_id, trail.nextPeakFavorablePips);
+    }
+  }
+
+  await checkDeadCrackAbort(position, candle, givebackTrailEnabled, deadCrackAbortEnabled);
+}
+
+/** Shadow would_abort logged once per position — avoids one line per 30s cycle on a dead trade. */
+const deadCrackShadowLoggedTradeIds = new Set<string>();
+
+/**
+ * Dead-crack abort check — LAST in the exit priority chain. Always maintains
+ * the running trough (and the peak when the trail isn't doing it) so the
+ * path extremes stay truthful whether or not the abort switch is on.
+ */
+async function checkDeadCrackAbort(
+  position: AlphaOmegaPositionRow,
+  candle: LatestM5Candle,
+  givebackTrailEnabled: boolean,
+  deadCrackAbortEnabled: boolean,
+): Promise<void> {
+  if (position.entry_price == null) return;
+  const supabase = getSupabaseClient();
+  const abort = evaluateDeadCrackAbort(
+    {
+      direction: position.direction,
+      entryPrice: position.entry_price,
+      entryFiredAt: position.entry_fired_at,
+      peakFavorablePips: position.peak_favorable_pips,
+      troughAdversePips: position.trough_adverse_pips ?? 0,
+    },
     candle,
   );
-  if (trail.shouldExit && trail.exitReason) {
-    await closeAlphaOmegaPosition(supabase, position, trail.exitReason);
+
+  if (abort.nextTroughAdversePips > (position.trough_adverse_pips ?? 0)) {
+    await updateTroughAdversePips(supabase, position.oanda_trade_id, abort.nextTroughAdversePips);
+  }
+  if (!givebackTrailEnabled && abort.nextPeakFavorablePips > position.peak_favorable_pips) {
+    await updatePeakFavorablePips(supabase, position.oanda_trade_id, abort.nextPeakFavorablePips);
+  }
+
+  if (!abort.shouldAbort || abort.abortReason == null) return;
+
+  if (!deadCrackAbortEnabled) {
+    if (!deadCrackShadowLoggedTradeIds.has(position.oanda_trade_id)) {
+      deadCrackShadowLoggedTradeIds.add(position.oanda_trade_id);
+      logInfo('[AlphaOmega] dead-crack would_abort (kill switch OFF)', {
+        oandaTradeId: position.oanda_trade_id,
+        brokerId: position.broker_id,
+        advisory: formatDeadCrackAdvisory(abort, 'would_abort'),
+      });
+    }
     return;
   }
-  if (trail.nextPeakFavorablePips !== position.peak_favorable_pips) {
-    await updatePeakFavorablePips(supabase, position.oanda_trade_id, trail.nextPeakFavorablePips);
-  }
+
+  logInfo('[AlphaOmega] dead-crack ABORT (kill switch ON)', {
+    oandaTradeId: position.oanda_trade_id,
+    brokerId: position.broker_id,
+    advisory: formatDeadCrackAdvisory(abort, 'abort'),
+  });
+  await closeAlphaOmegaPosition(supabase, position, abort.abortReason);
 }
 
 /** Currently AUD_USD only, matching the research window and Lane B's current instrument scope. */
@@ -92,11 +158,12 @@ export async function runAlphaOmegaHardStopMonitor(): Promise<void> {
   // Read once per cycle (not once per position) — cheap either way today since
   // Lane B holds at most one open position, but correct regardless.
   const givebackTrailEnabled = await isAlphaOmegaGivebackTrailEnabled(supabase);
+  const deadCrackAbortEnabled = await isAlphaOmegaDeadCrackAbortEnabled(supabase);
 
   for (const position of positions) {
     try {
       const instrument = pairToInstrument(DEFAULT_INSTRUMENT);
-      await checkPositionHardStop(position, instrument, givebackTrailEnabled);
+      await checkPositionHardStop(position, instrument, givebackTrailEnabled, deadCrackAbortEnabled);
     } catch (err) {
       logWarn('[AlphaOmegaHardStop] checkPositionHardStop failed', {
         oandaTradeId: position.oanda_trade_id,

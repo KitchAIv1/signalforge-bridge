@@ -34,20 +34,41 @@ export interface AlphaOmegaPositionRow {
   total_fire_count: number;
   /** Running best-ever favorable excursion (pips) since entry. Feeds the giveback-trail exit. */
   peak_favorable_pips: number;
+  /** Running worst-ever adverse excursion (pips) since entry. Feeds the dead-crack abort. */
+  trough_adverse_pips: number;
 }
+
+const POSITION_STATE_BASE_COLUMNS =
+  'oanda_trade_id, broker_id, direction, entry_fired_at, entry_price, opposing_fire_count, total_fire_count, peak_favorable_pips';
 
 export async function loadOpenLaneBPositions(supabase: SupabaseClient): Promise<AlphaOmegaPositionRow[]> {
   const { data, error } = await supabase
     .from('alpha_omega_position_state')
-    .select(
-      'oanda_trade_id, broker_id, direction, entry_fired_at, entry_price, opposing_fire_count, total_fire_count, peak_favorable_pips',
-    )
+    .select(`${POSITION_STATE_BASE_COLUMNS}, trough_adverse_pips`)
     .in('broker_id', [...OMEGA_AO_BROKER_IDS]);
-  if (error) {
-    logWarn('[AlphaOmega] loadOpenLaneBPositions failed', { error: error.message });
+  if (!error) {
+    return filterOpenAlphaOmegaPositions(supabase, (data ?? []) as AlphaOmegaPositionRow[]);
+  }
+
+  // Migration-071 safety net: if trough_adverse_pips does not exist yet, the
+  // opposing/hard-stop/trail exits MUST still see open positions. Retry with
+  // the pre-071 column list; trough defaults to 0 (abort under-fires — safe).
+  logWarn('[AlphaOmega] loadOpenLaneBPositions with trough failed — retrying legacy columns', {
+    error: error.message,
+  });
+  const legacy = await supabase
+    .from('alpha_omega_position_state')
+    .select(POSITION_STATE_BASE_COLUMNS)
+    .in('broker_id', [...OMEGA_AO_BROKER_IDS]);
+  if (legacy.error) {
+    logWarn('[AlphaOmega] loadOpenLaneBPositions failed', { error: legacy.error.message });
     return [];
   }
-  return filterOpenAlphaOmegaPositions(supabase, (data ?? []) as AlphaOmegaPositionRow[]);
+  const rows = (legacy.data ?? []).map((row) => ({
+    ...(row as Omit<AlphaOmegaPositionRow, 'trough_adverse_pips'>),
+    trough_adverse_pips: 0,
+  }));
+  return filterOpenAlphaOmegaPositions(supabase, rows);
 }
 
 export async function registerAlphaOmegaPosition(
@@ -69,6 +90,8 @@ export async function registerAlphaOmegaPosition(
     opposing_fire_count: 0,
     total_fire_count: 0,
     peak_favorable_pips: 0,
+    // trough_adverse_pips intentionally omitted — DB default 0 (071) keeps this
+    // insert valid whether or not that migration has run yet.
   });
   if (error) {
     logWarn('[AlphaOmega] registerAlphaOmegaPosition failed', {
@@ -94,6 +117,21 @@ export async function updatePeakFavorablePips(
   }
 }
 
+/** Persists the running trough-adverse-excursion so the dead-crack abort sees the true path across cycles. */
+export async function updateTroughAdversePips(
+  supabase: SupabaseClient,
+  oandaTradeId: string,
+  nextTroughAdversePips: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('alpha_omega_position_state')
+    .update({ trough_adverse_pips: nextTroughAdversePips, updated_at: new Date().toISOString() })
+    .eq('oanda_trade_id', oandaTradeId);
+  if (error) {
+    logWarn('[AlphaOmega] updateTroughAdversePips failed', { error: error.message, oandaTradeId });
+  }
+}
+
 /**
  * Closes one Lane B position: resolves the correct broker (fixes the same
  * class of routing bug found in omegaClosePositions.ts, for this path from
@@ -105,12 +143,16 @@ export async function closeAlphaOmegaPosition(
   position: AlphaOmegaPositionRow,
   reason: string,
 ): Promise<void> {
+  const closeStartedAt = Date.now();
   try {
     const broker = await resolveBrokerForLogRow(supabase, position.broker_id, 'omega');
+    const brokerResolveMs = Date.now() - closeStartedAt;
+    const brokerCloseStartedAt = Date.now();
     const { closedAt, pnlDollars, exitPriceNum } = await closeTradeViaBroker(
       broker,
       position.oanda_trade_id,
     );
+    const brokerCloseMs = Date.now() - brokerCloseStartedAt;
     const pnlPips = computePnlPips(position, exitPriceNum);
     const logTagged = await persistAndClearPositionState({
       supabase,
@@ -123,9 +165,13 @@ export async function closeAlphaOmegaPosition(
     });
     logInfo('[AlphaOmega] Closed Lane B position', {
       oandaTradeId: position.oanda_trade_id,
+      brokerId: position.broker_id,
       reason,
       pnlDollars,
       logTagged,
+      brokerResolveMs,
+      brokerCloseMs,
+      totalCloseMs: Date.now() - closeStartedAt,
     });
     void sendAlphaOmegaClosedAlert({
       supabase,

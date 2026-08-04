@@ -9,6 +9,7 @@ import {
   OMEGA_AO_VT_BROKER_ID,
   OMEGA_LANE_B_BROKER_ID,
 } from '@/lib/omegaLaneBConstants';
+import { DeadCrackAbortToggle } from './DeadCrackAbortToggle';
 import { ToxicCrackSkipToggle } from './ToxicCrackSkipToggle';
 
 export function Phase2FlagSummary() {
@@ -36,6 +37,7 @@ export function Phase2FlagSummary() {
         <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{toggleError}</p>
       ) : null}
       <ToxicCrackSkipToggle />
+      <DeadCrackAbortToggle />
     </div>
   );
 }
