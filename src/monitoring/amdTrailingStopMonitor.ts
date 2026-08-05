@@ -15,6 +15,19 @@ import {
 import { logInfo, logError } from '../utils/logger.js';
 import { sendTradeClosedAlert } from '../services/telegram/alertTradeClose.js';
 import { resolveAmdOandaAccountId } from '../services/amd/resolveAmdOandaAccountId.js';
+import {
+  evaluateAmdDeadTradeAbort,
+  formatAmdDeadTradeAdvisory,
+  isAmdDeadTradeAbortEnabled,
+} from '../services/amd/amdDeadTradeAbort.js';
+import {
+  amdTrailExitFired,
+  isAmdTrailSplitEnabled,
+} from '../services/amd/amdTrailSplit.js';
+import {
+  AMD_TRAIL_ARM_PIPS,
+  AMD_TRAIL_GIVEBACK_PIPS,
+} from '../services/amd/amdTrailConstants.js';
 
 const INSTRUMENT = 'AUD_USD';
 const ENGINE_ID = 'engine_amd';
@@ -22,6 +35,19 @@ const PIP_SIZE = 0.0001;
 const HARD_SL_PIPS = 15;
 
 type TrailStateRow = Record<string, unknown>;
+
+interface AmdExitFlags {
+  trailSplitEnabled: boolean;
+  deadTradeAbortEnabled: boolean;
+}
+
+/** Per-trade SL pips from the trade's own stored hard SL; legacy 15 fallback. */
+function slPipsOf(state: TrailStateRow): number {
+  const fillPrice = parseFloat(state.fill_price as string);
+  const hardSlPrice = parseFloat(state.hard_sl_price as string);
+  const derived = Math.abs(fillPrice - hardSlPrice) / PIP_SIZE;
+  return Number.isFinite(derived) && derived > 0 ? derived : HARD_SL_PIPS;
+}
 
 function supabaseDb(): SupabaseClient {
   return getSupabaseClient();
@@ -69,6 +95,7 @@ async function updateTradeLogClosed(
   result: string,
   closeReason: string,
   state: TrailStateRow,
+  capturedPips: number,
 ): Promise<void> {
   await supabaseDb()
     .from('bridge_trade_log')
@@ -89,7 +116,7 @@ async function updateTradeLogClosed(
     direction: String(state.direction),
     entryPrice: parseFloat(state.fill_price as string),
     exitPrice,
-    pnlPips: pnlR * HARD_SL_PIPS,
+    pnlPips: capturedPips,
     pnlDollars: pnlDollars ?? 0,
     closeReason,
     durationMinutes: Math.floor(
@@ -147,7 +174,7 @@ async function finalizeClose(
   const direction = directionOf(state);
   const fillPrice = parseFloat(state.fill_price as string);
   const captured = pipsCaptured(direction, fillPrice, exitPrice);
-  const pnlR = captured / HARD_SL_PIPS;
+  const pnlR = captured / slPipsOf(state);
   let pnlDollars: number | null = null;
   try {
     const closed = await fetchClosedPnl(tradeId);
@@ -157,7 +184,9 @@ async function finalizeClose(
   }
   const result = pnlR > 0 ? 'win' : pnlR < 0 ? 'loss' : 'breakeven';
   await markTrailClosed(tradeId);
-  await updateTradeLogClosed(tradeId, exitPrice, pnlR, pnlDollars, result, closeReason, state);
+  await updateTradeLogClosed(
+    tradeId, exitPrice, pnlR, pnlDollars, result, closeReason, state, captured,
+  );
   await attachCloseCandleMetrics(state, captured);
   logInfo('[AmdTrail] Trade closed', { tradeId, direction, closeReason, captured, pnlR, pnlDollars });
 }
@@ -208,7 +237,7 @@ async function handleExternalClose(state: TrailStateRow): Promise<void> {
   const storedTakeProfit = await fetchStoredTakeProfit(tradeId);
   const closeReason = resolveExternalCloseReason(exitPrice, storedTakeProfit);
   const captured = pipsCaptured(direction, fillPrice, exitPrice);
-  const pnlR = captured / HARD_SL_PIPS;
+  const pnlR = captured / slPipsOf(state);
   let pnlDollars: number | null = null;
   try {
     pnlDollars = (await fetchClosedPnl(tradeId)).pnlDollars;
@@ -217,29 +246,51 @@ async function handleExternalClose(state: TrailStateRow): Promise<void> {
   }
   const result = pnlR > 0 ? 'win' : pnlR < 0 ? 'loss' : 'breakeven';
   await markTrailClosed(tradeId);
-  await updateTradeLogClosed(tradeId, exitPrice, pnlR, pnlDollars, result, closeReason, state);
+  await updateTradeLogClosed(
+    tradeId, exitPrice, pnlR, pnlDollars, result, closeReason, state, captured,
+  );
   await attachCloseCandleMetrics(state, captured);
   logInfo('[AmdTrail] External close reconciled', { tradeId, pnlR, result, closeReason });
 }
 
-function trailExitFired(
-  direction: 'long' | 'short',
-  fillPrice: number,
-  peakPrice: number,
-  trailPips: number,
+/** Shadow would_abort logged once per trade — avoids one line per 30s cycle on a dead trade. */
+const deadTradeShadowLoggedTradeIds = new Set<string>();
+
+/**
+ * Dead-trade abort check — LAST in the exit priority chain, only reached
+ * when neither the time gate nor the pip trail closed the trade this cycle.
+ * Kill-switched via amd_dead_trade_abort_enabled; shadow-logs while OFF.
+ */
+async function maybeDeadTradeAbort(
+  state: TrailStateRow,
   currentPrice: number,
-): boolean {
-  const peakGainPips =
-    direction === 'long'
-      ? (peakPrice - fillPrice) / PIP_SIZE
-      : (fillPrice - peakPrice) / PIP_SIZE;
-  if (peakGainPips < trailPips) return false;
-  const trailDistance = trailPips * PIP_SIZE;
-  const trailExitLevel =
-    direction === 'long' ? peakPrice - trailDistance : peakPrice + trailDistance;
-  return direction === 'long'
-    ? currentPrice <= trailExitLevel
-    : currentPrice >= trailExitLevel;
+  abortEnabled: boolean,
+): Promise<void> {
+  const tradeId = state.oanda_trade_id as string;
+  const abort = evaluateAmdDeadTradeAbort({
+    direction: directionOf(state),
+    fillPrice: parseFloat(state.fill_price as string),
+    peakFavorablePrice: parseFloat(state.peak_favorable_price as string),
+    createdAt: state.created_at as string,
+  });
+  if (!abort.shouldAbort || abort.abortReason == null) return;
+
+  if (!abortEnabled) {
+    if (!deadTradeShadowLoggedTradeIds.has(tradeId)) {
+      deadTradeShadowLoggedTradeIds.add(tradeId);
+      logInfo('[AmdTrail] dead-trade would_abort (kill switch OFF)', {
+        tradeId,
+        advisory: formatAmdDeadTradeAdvisory(abort, 'would_abort'),
+      });
+    }
+    return;
+  }
+
+  logInfo('[AmdTrail] dead-trade ABORT (kill switch ON)', {
+    tradeId,
+    advisory: formatAmdDeadTradeAdvisory(abort, 'abort'),
+  });
+  await closeAmdTrade(state, currentPrice, abort.abortReason);
 }
 
 async function processOpenState(
@@ -247,6 +298,7 @@ async function processOpenState(
   oandaOpenIds: Set<string>,
   currentPrice: number,
   nowUtcHour: number,
+  flags: AmdExitFlags,
 ): Promise<void> {
   const tradeId = state.oanda_trade_id as string;
   if (!oandaOpenIds.has(tradeId)) {
@@ -257,7 +309,7 @@ async function processOpenState(
   const direction = directionOf(state);
   const fillPrice = parseFloat(state.fill_price as string);
   let peakPrice = parseFloat(state.peak_favorable_price as string);
-  const trailPips = parseFloat(state.trail_pip_distance as string);
+  const legacyTrailPips = parseFloat(state.trail_pip_distance as string);
   const timeGateHour = state.time_gate_utc_hour as number | null;
   const exitStrategy = state.exit_strategy as string;
   if (direction === 'long' && currentPrice > peakPrice) {
@@ -272,10 +324,16 @@ async function processOpenState(
     await closeAmdTrade(state, currentPrice, 'time_gate');
     return;
   }
-  if (trailExitFired(direction, fillPrice, peakPrice, trailPips, currentPrice)) {
-    logInfo('[AmdTrail] Pip trail fired', { tradeId, direction, currentPrice, peakPrice });
+  const armPips = flags.trailSplitEnabled ? AMD_TRAIL_ARM_PIPS : legacyTrailPips;
+  const givebackPips = flags.trailSplitEnabled ? AMD_TRAIL_GIVEBACK_PIPS : legacyTrailPips;
+  if (amdTrailExitFired(direction, fillPrice, peakPrice, currentPrice, armPips, givebackPips)) {
+    logInfo('[AmdTrail] Pip trail fired', {
+      tradeId, direction, currentPrice, peakPrice, armPips, givebackPips,
+    });
     await closeAmdTrade(state, currentPrice, 'pip_trail');
+    return;
   }
+  await maybeDeadTradeAbort(state, currentPrice, flags.deadTradeAbortEnabled);
 }
 
 function isTrailEligibleState(state: Record<string, unknown>): boolean {
@@ -315,8 +373,15 @@ export async function runAmdTrailMonitor(): Promise<void> {
     logError('[AmdTrail] getPricing returned empty');
     return;
   }
+  // Read once per cycle (not once per open state) — same pattern as AO's monitor.
+  const flags: AmdExitFlags = {
+    trailSplitEnabled: await isAmdTrailSplitEnabled(supabaseDb()),
+    deadTradeAbortEnabled: await isAmdDeadTradeAbortEnabled(supabaseDb()),
+  };
   const nowUtcHour = new Date().getUTCHours();
   for (const state of trailEligibleStates) {
-    await processOpenState(state as TrailStateRow, oandaOpenIds, currentPrice, nowUtcHour);
+    await processOpenState(
+      state as TrailStateRow, oandaOpenIds, currentPrice, nowUtcHour, flags,
+    );
   }
 }

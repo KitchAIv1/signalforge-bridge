@@ -21,7 +21,7 @@ import {
   AMD_BROKER_ID,
   resolveAmdOandaAccountId,
 } from './amd/resolveAmdOandaAccountId.js';
-import { AMD_HARD_SL_PIPS, AMD_PIP_TRAIL_PIPS } from './amd/amdTrailConstants.js';
+import { AMD_PIP_TRAIL_PIPS } from './amd/amdTrailConstants.js';
 import {
   computeAmdRiskAmount,
   resolveAmdSizeMultiplier,
@@ -63,7 +63,6 @@ const TAG_TIME_GATE_HOUR: Record<string, number | null> = {
   AMD_NONE: 11,
 };
 
-const HARD_SL_PIPS = AMD_HARD_SL_PIPS;
 const INSTRUMENT = 'AUD_USD';
 const ENGINE_ID = 'engine_amd';
 const BASELINE_RISK_PCT = 0.02;
@@ -210,19 +209,15 @@ async function persistOpenTrade(
   direction: TradeDirection,
   amdRow: AmdStateRow,
   fillPrice: number,
-  hardSlPrice: number,
-  signedUnits: number,
   tradeId: string,
   exitStrategy: string,
-  equity: number,
-  weight: number,
-  sizeMultiplier: number,
+  plan: AmdDistributionOrderPlan,
 ): Promise<void> {
   const receivedAt = new Date().toISOString();
   const riskAmount = computeAmdRiskAmount(
-    equity,
-    weight,
-    sizeMultiplier,
+    plan.equity,
+    plan.weight,
+    plan.sizeMultiplier,
     BASELINE_RISK_PCT,
   );
   await supabaseDb().from('bridge_trade_log').insert({
@@ -231,15 +226,15 @@ async function persistOpenTrade(
     broker_id: AMD_BROKER_ID,
     pair: INSTRUMENT,
     direction: direction.toUpperCase(),
-    stop_loss: hardSlPrice,
+    stop_loss: plan.hardSlPrice,
     entry_price: fillPrice,
     fill_price: fillPrice,
-    units: signedUnits,
+    units: plan.signedUnits,
     oanda_trade_id: tradeId,
     signal_received_at: receivedAt,
     decision: 'EXECUTED',
     status: 'open',
-    account_equity_at_signal: equity,
+    account_equity_at_signal: plan.equity,
     risk_amount: riskAmount,
     amd_tag: tag,
     amd_evaluated_at: amdRow.evaluated_at,
@@ -248,11 +243,11 @@ async function persistOpenTrade(
     direction_source: 'amd_auto_direction',
     reversal_confirmed: amdRow.reversal_confirmed,
     auto_direction_reason: amdRow.auto_direction_reason,
-    amd_size_multiplier: sizeMultiplier,
+    amd_size_multiplier: plan.sizeMultiplier,
     amd_entry_hour: new Date().getUTCHours(),
     amd_exit_strategy: exitStrategy,
     amd_pip_trail: AMD_PIP_TRAIL_PIPS,
-    amd_hard_sl_pips: HARD_SL_PIPS,
+    amd_hard_sl_pips: plan.hardSlPips,
   });
 }
 
@@ -322,19 +317,7 @@ async function submitAmdOrder(
   }
   const fillPrice = oandaFill ?? plan.entryPrice;
   logInfo('[AmdDistribution] Order filled', { tradeId, fillPrice, tag, direction });
-  await persistOpenTrade(
-    tag,
-    direction,
-    amdRow,
-    fillPrice,
-    plan.hardSlPrice,
-    plan.signedUnits,
-    tradeId,
-    exitStrategy,
-    plan.equity,
-    plan.weight,
-    plan.sizeMultiplier,
-  );
+  await persistOpenTrade(tag, direction, amdRow, fillPrice, tradeId, exitStrategy, plan);
   void sendTradeExecutedAlert({
     oandaInstrument: INSTRUMENT,
     direction: direction.toUpperCase(),
