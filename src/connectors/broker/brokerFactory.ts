@@ -31,6 +31,8 @@ const ENGINE_MAGIC: Record<string, number> = {
 
 /** Distinct magic for AO-on-MT5 vs classic omega RAW VT (88001). */
 const AO_VT_MAGIC = 88004;
+/** Distinct magic for the AMD mirror leg on the shared AO VT account. */
+const AMD_VT_MAGIC = 88005;
 
 function resolveOandaAccountId(engineId: string, brokerId?: string): string | undefined {
   if (brokerId === 'oanda_phase2_demo') {
@@ -68,7 +70,10 @@ export function resolveMt5AccountId(
 }
 
 function resolveMagicNumber(engineId: string, brokerId: string): number {
-  if (brokerId === OMEGA_AO_VT_BROKER_ID) return AO_VT_MAGIC;
+  if (brokerId === OMEGA_AO_VT_BROKER_ID) {
+    // Shared account, engine-distinct magic: AO keeps 88004, AMD mirror 88005.
+    return engineId === 'engine_amd' ? AMD_VT_MAGIC : AO_VT_MAGIC;
+  }
   return ENGINE_MAGIC[engineId] ?? 88099;
 }
 

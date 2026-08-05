@@ -79,6 +79,9 @@ async function fetchLogRow(
     .select(LOG_ROW_SELECT)
     .eq('oanda_trade_id', oandaTradeId)
     .eq('broker_id', brokerId)
+    // Engine filter: the AMD VT mirror shares this broker; a ticket-id
+    // collision must never retag an engine_amd row as an AO close.
+    .eq('engine_id', 'omega')
     .eq('status', status)
     .maybeSingle();
   if (error) {
@@ -101,6 +104,7 @@ async function fetchLatestLogRow(
     .select(LOG_ROW_SELECT)
     .eq('oanda_trade_id', oandaTradeId)
     .eq('broker_id', brokerId)
+    .eq('engine_id', 'omega')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

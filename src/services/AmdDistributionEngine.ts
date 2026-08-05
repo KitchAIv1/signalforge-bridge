@@ -26,6 +26,7 @@ import {
   computeAmdRiskAmount,
   resolveAmdSizeMultiplier,
 } from './amd/resolveAmdSizeMultiplier.js';
+import { mirrorAmdOrderToVt } from './amd/amdVtMirror.js';
 
 const TAG_ENTRY_HOUR: Record<string, number> = {
   AMD_COMPRESSION_BREAKOUT: 10,
@@ -120,10 +121,13 @@ async function loadTodayAmdState(todayStr: string): Promise<AmdStateRow | null> 
 }
 
 async function hasExecutedToday(todayStr: string): Promise<boolean> {
+  // Scoped to the OANDA book: the VT mirror leg writes its own EXECUTED row
+  // on vtmarkets_ao_live and must not trip the once-per-day gate.
   const { count } = await supabaseDb()
     .from('bridge_trade_log')
     .select('id', { count: 'exact', head: true })
     .eq('engine_id', ENGINE_ID)
+    .eq('broker_id', AMD_BROKER_ID)
     .eq('decision', 'EXECUTED')
     .gte('created_at', `${todayStr}T00:00:00Z`);
   return (count ?? 0) > 0;
@@ -262,6 +266,7 @@ async function persistTrailState(
 ): Promise<void> {
   await supabaseDb().from('amd_trail_stop_state').insert({
     oanda_trade_id: tradeId,
+    broker_id: AMD_BROKER_ID,
     engine_id: ENGINE_ID,
     direction,
     fill_price: fillPrice,
@@ -331,6 +336,16 @@ async function submitAmdOrder(
     engineId: ENGINE_ID,
   }).catch(() => {});
   await persistTrailState(tag, direction, fillPrice, plan.hardSlPrice, tradeId, exitStrategy, todayStr);
+  try {
+    await mirrorAmdOrderToVt(
+      { supabase: supabaseDb(), tag, direction, amdRow, plan, exitStrategy, todayStr },
+      TAG_TIME_GATE_HOUR[tag] ?? null,
+    );
+  } catch (mirrorErr) {
+    logError('[AmdVtMirror] VT mirror failed — OANDA book unaffected', {
+      err: String(mirrorErr),
+    });
+  }
   try {
     const now = new Date();
     const preFrom = new Date(now.getTime() - 60 * 60 * 1000).toISOString();

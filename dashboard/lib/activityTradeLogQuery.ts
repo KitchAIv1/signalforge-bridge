@@ -24,16 +24,21 @@ function aoBrokerListCsv(): string {
   return OMEGA_AO_BROKER_IDS.join(',');
 }
 
-/** PostgREST filter: exclude live AO + Shadow paper EXECUTED venues. */
+/**
+ * PostgREST filter: exclude live AO + Shadow paper EXECUTED venues.
+ * Engine-aware: non-omega fills on AO brokers (e.g. the engine_amd VT mirror
+ * on vtmarkets_ao_live) stay visible in the Activity ledger.
+ */
 function excludeAoExecutedOrFilter(): string {
-  return `broker_id.is.null,broker_id.not.in.(${activityExcludeBrokerListCsv()})`;
+  const excludeCsv = activityExcludeBrokerListCsv();
+  return `broker_id.is.null,broker_id.not.in.(${excludeCsv}),and(broker_id.in.(${excludeCsv}),engine_id.neq.omega)`;
 }
 
-/** All-view: shared ledger + AO non-fills — never live/shadow AO EXECUTED. */
+/** All-view: shared ledger + AO non-fills — never live/shadow AO (omega) EXECUTED. */
 function allViewExcludeAoExecutedOrFilter(): string {
   const excludeCsv = activityExcludeBrokerListCsv();
   const liveCsv = aoBrokerListCsv();
-  return `broker_id.is.null,broker_id.not.in.(${excludeCsv}),and(broker_id.in.(${liveCsv}),decision.neq.EXECUTED)`;
+  return `broker_id.is.null,broker_id.not.in.(${excludeCsv}),and(broker_id.in.(${excludeCsv}),engine_id.neq.omega),and(broker_id.in.(${liveCsv}),decision.neq.EXECUTED)`;
 }
 
 export function applyActivityDecisionFilter<T extends { eq: Function; in: Function }>(

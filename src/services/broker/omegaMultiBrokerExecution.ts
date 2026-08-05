@@ -34,6 +34,7 @@ import {
   withPureSizingAdvisory,
 } from '../../core/alphaOmega/alphaOmegaPureSizer.js';
 import { evaluateToxicCrackSkip } from '../../core/alphaOmega/alphaOmegaToxicCrackSkip.js';
+import { evaluateAlphaOmegaAmdDayGate } from '../../core/alphaOmega/alphaOmegaAmdDayGate.js';
 import {
   isOmegaRawPureSizingEnabled,
   sizeOmegaRawPureUnits,
@@ -344,6 +345,33 @@ async function resolveLaneAdvisory(
       buildTradeLogRow: params.buildTradeLogRow,
       attachOmegaAuditFields: params.attachOmegaAuditFields,
       shadowAdvisory: gate.shadowAdvisory,
+    });
+    return 'BLOCKED_SKIP';
+  }
+
+  const amdDayGate = await evaluateAlphaOmegaAmdDayGate(params.supabase, {
+    entryAtIso: new Date().toISOString(),
+    signalId: params.signalId,
+  });
+  if (amdDayGate.shouldBlock) {
+    await insertLaneBBlockedRow({
+      supabase: params.supabase,
+      payload: params.payload,
+      signalId: params.signalId,
+      brokerId,
+      blockReason: amdDayGate.blockReason ?? 'ALPHAOMEGA_AMD_DAY_GATE',
+      decisionLatencyMs: params.decisionLatencyMs,
+      routeEquity,
+      openTradeCount: params.openTradeCount,
+      instrument: params.norm.oandaInstrument,
+      direction: params.norm.direction,
+      regimeState: params.regimeState,
+      regimeSizeMultiplier: params.regimeSizeMultiplier,
+      amdState: params.amdState,
+      directionMode: params.directionMode,
+      buildTradeLogRow: params.buildTradeLogRow,
+      attachOmegaAuditFields: params.attachOmegaAuditFields,
+      shadowAdvisory: amdDayGate.shadowAdvisory,
     });
     return 'BLOCKED_SKIP';
   }

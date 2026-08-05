@@ -26,6 +26,10 @@ import {
   evaluateToxicCrackSkip,
   type ToxicCrackSkipResult,
 } from './alphaOmegaToxicCrackSkip.js';
+import {
+  evaluateAlphaOmegaAmdDayGate,
+  type AmdDayGateResult,
+} from './alphaOmegaAmdDayGate.js';
 import type { CrackEvent } from './alphaOmegaStreakTracker.js';
 import type { EngineBrokerRoute } from '../../services/broker/brokerLinkService.js';
 
@@ -132,6 +136,13 @@ async function attemptLaneBCrack(
     hasOpenPosition: false,
   });
 
+  const amdDayGate = gate.enter
+    ? await evaluateAlphaOmegaAmdDayGate(params.supabase, {
+        entryAtIso: new Date().toISOString(),
+        signalId: params.signalId,
+      })
+    : null;
+
   const toxicSkip =
     gate.enter && gate.foundingLength != null && gate.foundingSpeedMin != null
       ? await evaluateToxicCrackSkip(params.supabase, {
@@ -161,6 +172,7 @@ async function attemptLaneBCrack(
           params,
           laneBRoute,
           gate,
+          amdDayGate,
           toxicSkip,
           norm,
           direction,
@@ -181,12 +193,13 @@ async function placeOrSkipLaneBRoute(input: {
   params: AlphaOmegaLaneBCrackEntryParams;
   laneBRoute: EngineBrokerRoute;
   gate: ReturnType<typeof evaluateAlphaOmegaEntryGate>;
+  amdDayGate: AmdDayGateResult | null;
   toxicSkip: ToxicCrackSkipResult | null;
   norm: NonNullable<ReturnType<typeof normalizeOmegaForAlphaOmegaEntry>>;
   direction: string;
   fanOutStartedAt: number;
 }): Promise<boolean> {
-  const { params, laneBRoute, gate, toxicSkip, norm, fanOutStartedAt } = input;
+  const { params, laneBRoute, gate, amdDayGate, toxicSkip, norm, fanOutStartedAt } = input;
   if (await hasOpenOmegaOnBroker(params.supabase, laneBRoute.brokerId)) {
     return true;
   }
@@ -197,6 +210,21 @@ async function placeOrSkipLaneBRoute(input: {
       norm.oandaInstrument,
       norm.direction,
       gate,
+    );
+    return true;
+  }
+  if (amdDayGate?.shouldBlock) {
+    await blockLaneBNoEnter(
+      params,
+      laneBRoute.brokerId,
+      norm.oandaInstrument,
+      norm.direction,
+      {
+        ...gate,
+        enter: false,
+        blockReason: amdDayGate.blockReason,
+        shadowAdvisory: amdDayGate.shadowAdvisory,
+      },
     );
     return true;
   }

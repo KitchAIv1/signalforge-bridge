@@ -131,6 +131,8 @@ export const ALPHAOMEGA_BLOCK_ALREADY_OPEN = 'ALPHAOMEGA_ALREADY_OPEN';
 export const ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT = 'ALPHAOMEGA_ENTRY_BLACKOUT';
 /** Place-only: shallow crack on refuse pre-tape (kill-switched). */
 export const ALPHAOMEGA_BLOCK_TOXIC_CRACK = 'ALPHAOMEGA_TOXIC_CRACK';
+/** Place-only: AMD detector tagged today AMD_FAILED, signal after 10:31 UTC tag write (kill-switched). */
+export const ALPHAOMEGA_BLOCK_AMD_DAY_GATE = 'ALPHAOMEGA_AMD_DAY_GATE';
 
 /**
  * signals.execution_tier written by engine-omega when bridge exec-dedup skips
@@ -185,6 +187,18 @@ export const ALPHAOMEGA_DEAD_CRACK_MAE_MIN_PIPS = 3;
 /** When true, the dead-crack abort closes positions. Default off — flip via bridge_config / dashboard toggle. */
 export const ALPHAOMEGA_DEAD_CRACK_ABORT_ENABLED_CONFIG_KEY =
   'alpha_omega_dead_crack_abort_enabled';
+
+/**
+ * AMD-day gate: skip new AO entries on days the AMD detector (10:31 UTC cron)
+ * tagged AMD_FAILED — only for signals at/after the tag write time (no
+ * look-ahead; pre-tag entries unaffected). 45d causal counterfactual (Aug 2026):
+ * AO book -98.3p -> +3.3p; removed fills were 25% winners vs 39% baseline.
+ * Fail-open: missing amd_state row or read error = trade normally.
+ */
+export const ALPHAOMEGA_AMD_DAY_GATE_ENABLED_CONFIG_KEY =
+  'alpha_omega_amd_day_gate_enabled';
+/** amd_state.amd_tag value that triggers the gate. */
+export const ALPHAOMEGA_AMD_DAY_GATE_BLOCKING_TAG = 'AMD_FAILED';
 
 export function isOmegaLaneBBroker(brokerId: string | null | undefined): boolean {
   if (!brokerId) return false;

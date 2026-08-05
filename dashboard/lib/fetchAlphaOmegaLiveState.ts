@@ -104,6 +104,9 @@ async function fetchTradeLogStatus(
     .from('bridge_trade_log')
     .select('status')
     .eq('oanda_trade_id', oandaTradeId)
+    // Engine filter: the AMD VT mirror shares AO's broker; never reconcile
+    // an AO position snapshot against an engine_amd row.
+    .eq('engine_id', 'omega')
     .order('created_at', { ascending: false })
     .limit(1);
   if (brokerId) query = query.eq('broker_id', brokerId);

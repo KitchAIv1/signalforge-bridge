@@ -9,6 +9,9 @@ import {
   OMEGA_AO_VT_BROKER_ID,
   OMEGA_LANE_B_BROKER_ID,
 } from '@/lib/omegaLaneBConstants';
+import { AmdDayGateToggle } from './AmdDayGateToggle';
+import { AmdExitLeverToggles } from './AmdExitLeverToggles';
+import { CombinedStackToggle } from './CombinedStackToggle';
 import { DeadCrackAbortToggle } from './DeadCrackAbortToggle';
 import { ToxicCrackSkipToggle } from './ToxicCrackSkipToggle';
 
@@ -38,6 +41,9 @@ export function Phase2FlagSummary() {
       ) : null}
       <ToxicCrackSkipToggle />
       <DeadCrackAbortToggle />
+      <CombinedStackToggle />
+      <AmdDayGateToggle />
+      <AmdExitLeverToggles />
     </div>
   );
 }

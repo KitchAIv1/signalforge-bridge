@@ -1,20 +1,21 @@
 /**
  * Pip-based exit monitor for engine_amd trades (amd_trail_stop_state).
- * S0: pip trail + OANDA hard SL. S1 (NONE): adds time gate at H11.
+ * S0: pip trail + broker-side hard SL. S1 (NONE): adds time gate at H11.
+ * Venue-aware: OANDA rows use the legacy REST path, VT mirror rows the
+ * BrokerClient adapter. Decision price is the OANDA mid for both venues.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../connectors/supabase.js';
-import {
-  fetchCandleRange,
-  getPricing,
-  closeTrade,
-  getOpenTrades,
-  getClosedTradeDetails,
-} from '../connectors/oanda.js';
+import { fetchCandleRange, getPricing } from '../connectors/oanda.js';
 import { logInfo, logError } from '../utils/logger.js';
 import { sendTradeClosedAlert } from '../services/telegram/alertTradeClose.js';
 import { resolveAmdOandaAccountId } from '../services/amd/resolveAmdOandaAccountId.js';
+import {
+  amdStateBrokerId,
+  buildAmdVenueOps,
+  type AmdVenueOps,
+} from '../services/amd/amdVenueOps.js';
 import {
   evaluateAmdDeadTradeAbort,
   formatAmdDeadTradeAdvisory,
@@ -73,18 +74,24 @@ async function fetchMidPrice(): Promise<number | null> {
   return (parseFloat(pricing[0].ask) + parseFloat(pricing[0].bid)) / 2;
 }
 
-async function updatePeakPrice(tradeId: string, peakPrice: number): Promise<void> {
+async function updatePeakPrice(
+  tradeId: string,
+  brokerId: string,
+  peakPrice: number,
+): Promise<void> {
   await supabaseDb()
     .from('amd_trail_stop_state')
     .update({ peak_favorable_price: peakPrice, updated_at: new Date().toISOString() })
-    .eq('oanda_trade_id', tradeId);
+    .eq('oanda_trade_id', tradeId)
+    .eq('broker_id', brokerId);
 }
 
-async function markTrailClosed(tradeId: string): Promise<void> {
+async function markTrailClosed(tradeId: string, brokerId: string): Promise<void> {
   await supabaseDb()
     .from('amd_trail_stop_state')
     .update({ status: 'closed', updated_at: new Date().toISOString() })
-    .eq('oanda_trade_id', tradeId);
+    .eq('oanda_trade_id', tradeId)
+    .eq('broker_id', brokerId);
 }
 
 async function updateTradeLogClosed(
@@ -109,7 +116,8 @@ async function updateTradeLogClosed(
       closed_at: new Date().toISOString(),
     })
     .eq('oanda_trade_id', tradeId)
-    .eq('engine_id', ENGINE_ID);
+    .eq('engine_id', ENGINE_ID)
+    .eq('broker_id', amdStateBrokerId(state));
   void sendTradeClosedAlert({
     engineId: ENGINE_ID,
     instrument: INSTRUMENT,
@@ -123,15 +131,6 @@ async function updateTradeLogClosed(
       (Date.now() - new Date(state.created_at as string).getTime()) / 60000,
     ),
   }).catch(() => {});
-}
-
-async function fetchClosedPnl(tradeId: string): Promise<{
-  exitPrice: number | null;
-  pnlDollars: number | null;
-}> {
-  const fromTime = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-  const closed = await getClosedTradeDetails(tradeId, fromTime, amdAccountId());
-  return { exitPrice: closed.exitPrice, pnlDollars: closed.pnlDollars };
 }
 
 async function attachCloseCandleMetrics(
@@ -159,7 +158,8 @@ async function attachCloseCandleMetrics(
         duration_minutes: durationMinutes,
       })
       .eq('oanda_trade_id', state.oanda_trade_id)
-      .eq('engine_id', ENGINE_ID);
+      .eq('engine_id', ENGINE_ID)
+      .eq('broker_id', amdStateBrokerId(state));
   } catch {
     // non-fatal
   }
@@ -167,6 +167,7 @@ async function attachCloseCandleMetrics(
 
 async function finalizeClose(
   state: TrailStateRow,
+  venue: AmdVenueOps,
   exitPrice: number,
   closeReason: string,
 ): Promise<void> {
@@ -177,41 +178,49 @@ async function finalizeClose(
   const pnlR = captured / slPipsOf(state);
   let pnlDollars: number | null = null;
   try {
-    const closed = await fetchClosedPnl(tradeId);
-    pnlDollars = closed.pnlDollars;
+    pnlDollars = (await venue.fetchClosedDetails(tradeId)).pnlDollars;
   } catch {
     // non-fatal
   }
   const result = pnlR > 0 ? 'win' : pnlR < 0 ? 'loss' : 'breakeven';
-  await markTrailClosed(tradeId);
+  await markTrailClosed(tradeId, venue.brokerId);
   await updateTradeLogClosed(
     tradeId, exitPrice, pnlR, pnlDollars, result, closeReason, state, captured,
   );
   await attachCloseCandleMetrics(state, captured);
-  logInfo('[AmdTrail] Trade closed', { tradeId, direction, closeReason, captured, pnlR, pnlDollars });
+  logInfo('[AmdTrail] Trade closed', {
+    tradeId, brokerId: venue.brokerId, direction, closeReason, captured, pnlR, pnlDollars,
+  });
 }
 
 async function closeAmdTrade(
   state: TrailStateRow,
+  venue: AmdVenueOps,
   exitPrice: number,
   reason: string,
 ): Promise<void> {
   const tradeId = state.oanda_trade_id as string;
   try {
-    await closeTrade(tradeId, undefined, amdAccountId());
+    await venue.closeTrade(tradeId);
   } catch (err) {
-    logError('[AmdTrail] closeTrade failed', { tradeId, err: String(err) });
+    logError('[AmdTrail] closeTrade failed', {
+      tradeId, brokerId: venue.brokerId, err: String(err),
+    });
     return;
   }
-  await finalizeClose(state, exitPrice, reason);
+  await finalizeClose(state, venue, exitPrice, reason);
 }
 
-async function fetchStoredTakeProfit(tradeId: string): Promise<number | null> {
+async function fetchStoredTakeProfit(
+  tradeId: string,
+  brokerId: string,
+): Promise<number | null> {
   const { data } = await supabaseDb()
     .from('bridge_trade_log')
     .select('take_profit')
     .eq('oanda_trade_id', tradeId)
     .eq('engine_id', ENGINE_ID)
+    .eq('broker_id', brokerId)
     .maybeSingle();
   const takeProfit = data?.take_profit;
   return takeProfit != null ? Number(takeProfit) : null;
@@ -223,34 +232,32 @@ function resolveExternalCloseReason(exitPrice: number, storedTakeProfit: number 
   return Math.abs(exitPrice - storedTakeProfit) <= tolerance ? 'tp_hit' : 'hard_sl_external';
 }
 
-async function handleExternalClose(state: TrailStateRow): Promise<void> {
+async function handleExternalClose(state: TrailStateRow, venue: AmdVenueOps): Promise<void> {
   const tradeId = state.oanda_trade_id as string;
   const fillPrice = parseFloat(state.fill_price as string);
   const direction = directionOf(state);
   let exitPrice = parseFloat(state.hard_sl_price as string);
+  let pnlDollars: number | null = null;
   try {
-    const closed = await fetchClosedPnl(tradeId);
+    const closed = await venue.fetchClosedDetails(tradeId);
     if (closed.exitPrice != null) exitPrice = closed.exitPrice;
+    pnlDollars = closed.pnlDollars;
   } catch {
     // non-fatal
   }
-  const storedTakeProfit = await fetchStoredTakeProfit(tradeId);
+  const storedTakeProfit = await fetchStoredTakeProfit(tradeId, venue.brokerId);
   const closeReason = resolveExternalCloseReason(exitPrice, storedTakeProfit);
   const captured = pipsCaptured(direction, fillPrice, exitPrice);
   const pnlR = captured / slPipsOf(state);
-  let pnlDollars: number | null = null;
-  try {
-    pnlDollars = (await fetchClosedPnl(tradeId)).pnlDollars;
-  } catch {
-    // non-fatal
-  }
   const result = pnlR > 0 ? 'win' : pnlR < 0 ? 'loss' : 'breakeven';
-  await markTrailClosed(tradeId);
+  await markTrailClosed(tradeId, venue.brokerId);
   await updateTradeLogClosed(
     tradeId, exitPrice, pnlR, pnlDollars, result, closeReason, state, captured,
   );
   await attachCloseCandleMetrics(state, captured);
-  logInfo('[AmdTrail] External close reconciled', { tradeId, pnlR, result, closeReason });
+  logInfo('[AmdTrail] External close reconciled', {
+    tradeId, brokerId: venue.brokerId, pnlR, result, closeReason,
+  });
 }
 
 /** Shadow would_abort logged once per trade — avoids one line per 30s cycle on a dead trade. */
@@ -263,6 +270,7 @@ const deadTradeShadowLoggedTradeIds = new Set<string>();
  */
 async function maybeDeadTradeAbort(
   state: TrailStateRow,
+  venue: AmdVenueOps,
   currentPrice: number,
   abortEnabled: boolean,
 ): Promise<void> {
@@ -290,20 +298,22 @@ async function maybeDeadTradeAbort(
     tradeId,
     advisory: formatAmdDeadTradeAdvisory(abort, 'abort'),
   });
-  await closeAmdTrade(state, currentPrice, abort.abortReason);
+  await closeAmdTrade(state, venue, currentPrice, abort.abortReason);
 }
 
 async function processOpenState(
   state: TrailStateRow,
-  oandaOpenIds: Set<string>,
+  venue: AmdVenueOps,
   currentPrice: number,
   nowUtcHour: number,
   flags: AmdExitFlags,
 ): Promise<void> {
   const tradeId = state.oanda_trade_id as string;
-  if (!oandaOpenIds.has(tradeId)) {
-    logInfo('[AmdTrail] Trade closed externally on OANDA', { tradeId });
-    await handleExternalClose(state);
+  if (!venue.openIds.has(tradeId)) {
+    logInfo('[AmdTrail] Trade closed externally on broker', {
+      tradeId, brokerId: venue.brokerId,
+    });
+    await handleExternalClose(state, venue);
     return;
   }
   const direction = directionOf(state);
@@ -314,14 +324,14 @@ async function processOpenState(
   const exitStrategy = state.exit_strategy as string;
   if (direction === 'long' && currentPrice > peakPrice) {
     peakPrice = currentPrice;
-    await updatePeakPrice(tradeId, peakPrice);
+    await updatePeakPrice(tradeId, venue.brokerId, peakPrice);
   } else if (direction === 'short' && currentPrice < peakPrice) {
     peakPrice = currentPrice;
-    await updatePeakPrice(tradeId, peakPrice);
+    await updatePeakPrice(tradeId, venue.brokerId, peakPrice);
   }
   if (exitStrategy === 'S1' && timeGateHour != null && nowUtcHour >= timeGateHour) {
     logInfo('[AmdTrail] Time gate reached', { tradeId, timeGateHour, nowUtcHour });
-    await closeAmdTrade(state, currentPrice, 'time_gate');
+    await closeAmdTrade(state, venue, currentPrice, 'time_gate');
     return;
   }
   const armPips = flags.trailSplitEnabled ? AMD_TRAIL_ARM_PIPS : legacyTrailPips;
@@ -330,10 +340,10 @@ async function processOpenState(
     logInfo('[AmdTrail] Pip trail fired', {
       tradeId, direction, currentPrice, peakPrice, armPips, givebackPips,
     });
-    await closeAmdTrade(state, currentPrice, 'pip_trail');
+    await closeAmdTrade(state, venue, currentPrice, 'pip_trail');
     return;
   }
-  await maybeDeadTradeAbort(state, currentPrice, flags.deadTradeAbortEnabled);
+  await maybeDeadTradeAbort(state, venue, currentPrice, flags.deadTradeAbortEnabled);
 }
 
 function isTrailEligibleState(state: Record<string, unknown>): boolean {
@@ -342,15 +352,6 @@ function isTrailEligibleState(state: Record<string, unknown>): boolean {
 }
 
 export async function runAmdTrailMonitor(): Promise<void> {
-  const accountId = amdAccountId();
-  let oandaOpenIds: Set<string>;
-  try {
-    oandaOpenIds = new Set((await getOpenTrades(accountId)).map((tradeRow) => tradeRow.id));
-  } catch (err) {
-    logError('[AmdTrail] getOpenTrades failed — skipping cycle', { err: String(err) });
-    return;
-  }
-
   const { data: openStates, error } = await supabaseDb()
     .from('amd_trail_stop_state')
     .select('*')
@@ -361,6 +362,11 @@ export async function runAmdTrailMonitor(): Promise<void> {
   }
   const trailEligibleStates = (openStates ?? []).filter(isTrailEligibleState);
   if (!trailEligibleStates.length) return;
+
+  // One broker snapshot per venue present; a failed venue is omitted and its
+  // rows are skipped this cycle (never treated as externally closed).
+  const venues = await buildAmdVenueOps(supabaseDb(), trailEligibleStates);
+  if (!venues.size) return;
 
   let currentPrice: number | null;
   try {
@@ -380,8 +386,10 @@ export async function runAmdTrailMonitor(): Promise<void> {
   };
   const nowUtcHour = new Date().getUTCHours();
   for (const state of trailEligibleStates) {
+    const venue = venues.get(amdStateBrokerId(state));
+    if (!venue) continue;
     await processOpenState(
-      state as TrailStateRow, oandaOpenIds, currentPrice, nowUtcHour, flags,
+      state as TrailStateRow, venue, currentPrice, nowUtcHour, flags,
     );
   }
 }
