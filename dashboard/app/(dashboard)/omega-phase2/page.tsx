@@ -113,6 +113,10 @@ export default function OmegaPhase2ActivityPage() {
             {shadowNetPips >= 0 ? '+' : ''}
             {shadowNetPips.toFixed(1)}p
           </div>
+          <p className="mt-1 text-xs font-medium opacity-90">
+            Paper only — not live risk. Live AO blocks (incl. Combined Stack AMD day
+            gate) appear under Live → Blocked.
+          </p>
           <p className="mt-1 text-xs opacity-80">
             Enable with bridge_config alpha_omega_shadow_enabled=true and engine
             OMEGA_AO_SHADOW_OVER_EMIT=true. Requires migration 065.

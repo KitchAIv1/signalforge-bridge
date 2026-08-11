@@ -1,26 +1,30 @@
 import {
   LANE_B_BLOCK_PHASE2_DIST,
   LANE_B_BLOCK_R1_FLIP,
-} from '@/lib/omegaLaneBConstants';
+} from './omegaLaneBConstants.js';
 import {
   ALPHAOMEGA_ADVISORY_DISABLED,
   ALPHAOMEGA_ADVISORY_ENTRY_PREFIX,
+  ALPHAOMEGA_ADVISORY_SHADOW_ENTRY_PREFIX,
   ALPHAOMEGA_ADVISORY_SPEEDBAND_PREFIX,
   ALPHAOMEGA_ADVISORY_SPEEDFLOOR_PREFIX,
   ALPHAOMEGA_BLOCK_ALREADY_OPEN,
+  ALPHAOMEGA_BLOCK_AMD_DAY_GATE,
   ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
   ALPHAOMEGA_BLOCK_INVALID_DIRECTION,
   ALPHAOMEGA_BLOCK_NO_CRACK,
   ALPHAOMEGA_BLOCK_SPEED_FLOOR,
   ALPHAOMEGA_BLOCK_SPEED_MID_BAND,
+  formatAmdDayGateAdvisoryDetail,
   formatFoundingSummary,
   isAlphaOmegaSpeedBandAdvisory,
   isAlphaOmegaSpeedFloorAdvisory,
   parseAlphaOmegaFoundingMeta,
-} from '@/lib/alphaOmegaAdvisoryParse';
+} from './alphaOmegaAdvisoryParse.js';
 
 export type Phase2AdvisoryKind =
   | 'crack_entry'
+  | 'shadow_paper_entry'
   | 'speedfloor_shadow'
   | 'speed_mid_band'
   | 'entry_blackout'
@@ -28,6 +32,7 @@ export type Phase2AdvisoryKind =
   | 'already_open'
   | 'invalid_direction'
   | 'disabled_fallback'
+  | 'amd_day_gate'
   | 'clear'
   | 'r1_shadow'
   | 'phase2_shadow'
@@ -83,6 +88,15 @@ function resolveBlockedAlphaOmega(
   if (blockReason === ALPHAOMEGA_BLOCK_INVALID_DIRECTION) {
     return { kind: 'invalid_direction', label: 'BAD DIR', detail: null };
   }
+  if (blockReason === ALPHAOMEGA_BLOCK_AMD_DAY_GATE) {
+    return {
+      kind: 'amd_day_gate',
+      label: 'AMD DAY GATE',
+      detail:
+        formatAmdDayGateAdvisoryDetail(advisoryText) ??
+        'AMD_FAILED — Combined Stack blocked live entry',
+    };
+  }
   return null;
 }
 
@@ -90,6 +104,13 @@ function resolveAdvisoryAlphaOmega(laneAdvisory: string | null): Phase2AdvisoryD
   const advisoryText = (laneAdvisory ?? '').trim();
   if (advisoryText.startsWith(ALPHAOMEGA_ADVISORY_ENTRY_PREFIX)) {
     return { kind: 'crack_entry', label: 'CRACK ENTRY', detail: foundingDetail(advisoryText) };
+  }
+  if (advisoryText.startsWith(ALPHAOMEGA_ADVISORY_SHADOW_ENTRY_PREFIX)) {
+    return {
+      kind: 'shadow_paper_entry',
+      label: 'PAPER ENTRY',
+      detail: foundingDetail(advisoryText) ?? 'Shadow AO paper — not live risk',
+    };
   }
   if (advisoryText.startsWith(ALPHAOMEGA_ADVISORY_SPEEDFLOOR_PREFIX)) {
     return {
@@ -206,6 +227,7 @@ export function isAlphaOmegaLiveBlock(row: {
     display.kind === 'invalid_direction' ||
     display.kind === 'speed_mid_band' ||
     display.kind === 'entry_blackout' ||
+    display.kind === 'amd_day_gate' ||
     display.kind === 'r1_live' ||
     display.kind === 'phase2_live'
   );

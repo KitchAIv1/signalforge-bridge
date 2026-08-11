@@ -11,6 +11,7 @@ import {
 } from '@/lib/omegaLaneBConstants';
 import { AmdDayGateToggle } from './AmdDayGateToggle';
 import { AmdExitLeverToggles } from './AmdExitLeverToggles';
+import { CombinedStackStatusCard } from './CombinedStackStatusCard';
 import { CombinedStackToggle } from './CombinedStackToggle';
 import { DeadCrackAbortToggle } from './DeadCrackAbortToggle';
 import { ToxicCrackSkipToggle } from './ToxicCrackSkipToggle';
@@ -41,6 +42,7 @@ export function Phase2FlagSummary() {
       ) : null}
       <ToxicCrackSkipToggle />
       <DeadCrackAbortToggle />
+      <CombinedStackStatusCard />
       <CombinedStackToggle />
       <AmdDayGateToggle />
       <AmdExitLeverToggles />

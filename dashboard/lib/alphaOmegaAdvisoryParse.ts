@@ -9,8 +9,12 @@ export const ALPHAOMEGA_BLOCK_SPEED_MID_BAND = 'ALPHAOMEGA_SPEED_MID_BAND';
 export const ALPHAOMEGA_BLOCK_ALREADY_OPEN = 'ALPHAOMEGA_ALREADY_OPEN';
 export const ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT = 'ALPHAOMEGA_ENTRY_BLACKOUT';
 export const ALPHAOMEGA_BLOCK_INVALID_DIRECTION = 'ALPHAOMEGA_INVALID_DIRECTION';
+/** Combined Stack — live AO blocked on AMD_FAILED day after tag write. */
+export const ALPHAOMEGA_BLOCK_AMD_DAY_GATE = 'ALPHAOMEGA_AMD_DAY_GATE';
 
 export const ALPHAOMEGA_ADVISORY_ENTRY_PREFIX = 'ALPHAOMEGA_ENTRY:';
+/** Shadow AO paper fill advisory (ao_shadow_paper) — not a live broker entry. */
+export const ALPHAOMEGA_ADVISORY_SHADOW_ENTRY_PREFIX = 'ALPHAOMEGA_SHADOW_ENTRY';
 export const ALPHAOMEGA_ADVISORY_SPEEDFLOOR_PREFIX = 'ALPHAOMEGA_SPEEDFLOOR_SHADOW:';
 export const ALPHAOMEGA_ADVISORY_SPEEDBAND_PREFIX = 'ALPHAOMEGA_SPEEDBAND_SHADOW:';
 export const ALPHAOMEGA_ADVISORY_DISABLED = 'ALPHAOMEGA_DISABLED_FALLBACK';
@@ -28,6 +32,7 @@ const BLOCK_REASON_LABELS: Record<string, string> = {
   [ALPHAOMEGA_BLOCK_ALREADY_OPEN]: 'Already open',
   [ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT]: 'Asia open blackout',
   [ALPHAOMEGA_BLOCK_INVALID_DIRECTION]: 'Invalid direction',
+  [ALPHAOMEGA_BLOCK_AMD_DAY_GATE]: 'AMD day gate',
 };
 
 export function formatAlphaOmegaBlockReason(blockReason: string | null | undefined): string {
@@ -76,4 +81,28 @@ export function isAlphaOmegaSpeedBandAdvisory(laneAdvisory: string | null | unde
 
 export function isAlphaOmegaEntryAdvisory(laneAdvisory: string | null | undefined): boolean {
   return (laneAdvisory ?? '').trim().startsWith(ALPHAOMEGA_ADVISORY_ENTRY_PREFIX);
+}
+
+export function isAlphaOmegaShadowEntryAdvisory(
+  laneAdvisory: string | null | undefined,
+): boolean {
+  return (laneAdvisory ?? '').trim().startsWith(ALPHAOMEGA_ADVISORY_SHADOW_ENTRY_PREFIX);
+}
+
+/** Human detail from bridge lane_advisory AMD_DAY_GATE:tag=…:taggedAt=… */
+export function formatAmdDayGateAdvisoryDetail(
+  laneAdvisory: string | null | undefined,
+): string | null {
+  const text = (laneAdvisory ?? '').trim();
+  if (!text.startsWith('AMD_DAY_GATE:')) return null;
+  const tagMatch = text.match(/tag=([^:]+)/);
+  // ISO timestamps contain ':' — capture through :block (or end).
+  const taggedAtMatch = text.match(/taggedAt=(.+?)(?::block|$)/);
+  const tag = tagMatch?.[1] ?? 'AMD_FAILED';
+  if (!taggedAtMatch?.[1]) return `${tag} — Combined Stack gate`;
+  const taggedAt = new Date(taggedAtMatch[1]);
+  if (Number.isNaN(taggedAt.getTime())) return `${tag} — Combined Stack gate`;
+  const hours = String(taggedAt.getUTCHours()).padStart(2, '0');
+  const minutes = String(taggedAt.getUTCMinutes()).padStart(2, '0');
+  return `${tag} · tagged ${hours}:${minutes} UTC`;
 }

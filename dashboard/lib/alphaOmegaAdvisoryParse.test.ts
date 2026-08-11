@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   ALPHAOMEGA_ADVISORY_SPEEDBAND_PREFIX,
+  ALPHAOMEGA_BLOCK_AMD_DAY_GATE,
   ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT,
   ALPHAOMEGA_BLOCK_SPEED_MID_BAND,
   formatAlphaOmegaBlockReason,
@@ -18,6 +19,10 @@ describe('alphaOmegaAdvisoryParse — mid-band / blackout labels', () => {
     assert.equal(
       formatAlphaOmegaBlockReason(ALPHAOMEGA_BLOCK_ENTRY_BLACKOUT),
       'Asia open blackout',
+    );
+    assert.equal(
+      formatAlphaOmegaBlockReason(ALPHAOMEGA_BLOCK_AMD_DAY_GATE),
+      'AMD day gate',
     );
   });
 

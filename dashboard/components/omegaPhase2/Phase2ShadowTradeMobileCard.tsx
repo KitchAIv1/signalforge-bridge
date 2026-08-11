@@ -2,8 +2,10 @@
 
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
+import { AoTradeVenueChip } from '@/components/omegaPhase2/AoTradeVenueChip';
 import { Phase2LaneAdvisoryBadge } from '@/components/omegaPhase2/Phase2LaneAdvisoryBadge';
 import { Phase2PaperPnlCell } from '@/components/omegaPhase2/Phase2PaperPnlCell';
+import { aoTradeDecisionChipLabel } from '@/lib/aoTradeVenueLabel';
 import { resolvePhase2AdvisoryDisplay } from '@/lib/phase2LaneAdvisoryFormat';
 import { formatCloseReason } from '@/lib/formatCloseReason';
 import { formatAlphaOmegaBlockReason } from '@/lib/alphaOmegaAdvisoryParse';
@@ -70,9 +72,12 @@ function MobileCardHeader({
           {isLong ? 'LONG' : 'SHORT'} · {tradeRow.pair}
         </p>
       </div>
-      <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-        {tradeRow.decision === 'EXECUTED' ? 'TAKEN' : tradeRow.decision}
-      </span>
+      <div className="flex flex-col items-end gap-1">
+        <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          {aoTradeDecisionChipLabel(tradeRow.decision, tradeRow.broker_id)}
+        </span>
+        <AoTradeVenueChip brokerId={tradeRow.broker_id} />
+      </div>
     </div>
   );
 }

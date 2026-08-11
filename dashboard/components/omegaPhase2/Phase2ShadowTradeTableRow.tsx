@@ -2,9 +2,11 @@
 
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
+import { AoTradeVenueChip } from '@/components/omegaPhase2/AoTradeVenueChip';
 import { Phase2LaneAdvisoryBadge } from '@/components/omegaPhase2/Phase2LaneAdvisoryBadge';
 import { Phase2PaperPnlCell } from '@/components/omegaPhase2/Phase2PaperPnlCell';
 import { resolvePhase2AdvisoryDisplay } from '@/lib/phase2LaneAdvisoryFormat';
+import { aoTradeDecisionChipLabel } from '@/lib/aoTradeVenueLabel';
 import { formatCloseReason } from '@/lib/formatCloseReason';
 import { formatAlphaOmegaBlockReason } from '@/lib/alphaOmegaAdvisoryParse';
 import { isSpeedfloorShadowRow } from '@/lib/alphaOmegaPaper/isSpeedfloorShadowRow';
@@ -127,11 +129,14 @@ function TradeIdentityCells({
         )}
       </td>
       <td className="px-3 py-2 text-xs">
-        <span
-          className={`rounded px-1.5 py-0.5 text-xs font-medium ${decisionBadgeClass(tradeRow.decision)}`}
-        >
-          {tradeRow.decision === 'EXECUTED' ? 'TAKEN' : tradeRow.decision}
-        </span>
+        <div className="flex flex-wrap items-center gap-1">
+          <span
+            className={`rounded px-1.5 py-0.5 text-xs font-medium ${decisionBadgeClass(tradeRow.decision)}`}
+          >
+            {aoTradeDecisionChipLabel(tradeRow.decision, tradeRow.broker_id)}
+          </span>
+          <AoTradeVenueChip brokerId={tradeRow.broker_id} />
+        </div>
       </td>
       <td className="px-3 py-2 text-xs">
         <Phase2LaneAdvisoryBadge display={advisoryDisplay} />

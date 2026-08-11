@@ -2,9 +2,12 @@
 
 import type { BridgeTradeLogRow } from '@/lib/types';
 import { formatActivityIsoTimestamp } from '@/components/activity/activityFormat';
+import { AlphaOmegaTradeIdsSection } from '@/components/omegaPhase2/AlphaOmegaTradeIdsSection';
+import { AoTradeVenueChip } from '@/components/omegaPhase2/AoTradeVenueChip';
 import { Phase2LaneAdvisoryBadge } from '@/components/omegaPhase2/Phase2LaneAdvisoryBadge';
 import { AlphaOmegaPaperEconomicsSection } from '@/components/omegaPhase2/AlphaOmegaPaperEconomicsSection';
 import { formatAlphaOmegaBlockReason } from '@/lib/alphaOmegaAdvisoryParse';
+import { resolveAoTradeVenueKind } from '@/lib/aoTradeVenueLabel';
 import { isSpeedfloorShadowRow } from '@/lib/alphaOmegaPaper/isSpeedfloorShadowRow';
 import type { SpeedfloorPaperOutcome } from '@/lib/alphaOmegaPaper/paperSimTypes';
 import { formatCloseReason } from '@/lib/formatCloseReason';
@@ -56,6 +59,7 @@ function DrawerHeader({
   onClose: () => void;
 }) {
   const isLong = tradeRow.direction === 'long' || tradeRow.direction === 'LONG';
+  const isPaper = resolveAoTradeVenueKind(tradeRow.broker_id) === 'paper';
   return (
     <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
       <div>
@@ -63,6 +67,14 @@ function DrawerHeader({
         <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
           {isLong ? 'LONG' : 'SHORT'} · {tradeRow.pair}
         </h2>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <AoTradeVenueChip brokerId={tradeRow.broker_id} />
+          {isPaper ? (
+            <span className="text-[11px] text-violet-700 dark:text-violet-300">
+              Shadow paper only — not live risk
+            </span>
+          ) : null}
+        </div>
       </div>
       <button
         type="button"
@@ -105,7 +117,7 @@ function DrawerBody({
           loading={paperLoading}
         />
       ) : null}
-      <IdsSection tradeRow={tradeRow} />
+      <AlphaOmegaTradeIdsSection tradeRow={tradeRow} />
     </div>
   );
 }
@@ -160,27 +172,6 @@ function EconomicsSection({ tradeRow }: { tradeRow: BridgeTradeLogRow }) {
         </div>
       </dl>
     </section>
-  );
-}
-
-function IdsSection({ tradeRow }: { tradeRow: BridgeTradeLogRow }) {
-  return (
-    <>
-      <section>
-        <p className="text-[11px] uppercase tracking-wide text-slate-500">Ids</p>
-        <p className="mt-1 break-all font-mono text-[11px] text-slate-600 dark:text-slate-400">
-          signal {tradeRow.signal_id}
-        </p>
-      </section>
-      {tradeRow.lane_advisory ? (
-        <section>
-          <p className="text-[11px] uppercase tracking-wide text-slate-500">Raw advisory</p>
-          <p className="mt-1 break-all font-mono text-[11px] text-slate-500">
-            {tradeRow.lane_advisory}
-          </p>
-        </section>
-      ) : null}
-    </>
   );
 }
 
