@@ -1,7 +1,7 @@
 import {
   LANE_B_BLOCK_PHASE2_DIST,
   LANE_B_BLOCK_R1_FLIP,
-} from './omegaLaneBConstants.js';
+} from './omegaLaneBConstants';
 import {
   ALPHAOMEGA_ADVISORY_DISABLED,
   ALPHAOMEGA_ADVISORY_ENTRY_PREFIX,
@@ -20,7 +20,7 @@ import {
   isAlphaOmegaSpeedBandAdvisory,
   isAlphaOmegaSpeedFloorAdvisory,
   parseAlphaOmegaFoundingMeta,
-} from './alphaOmegaAdvisoryParse.js';
+} from './alphaOmegaAdvisoryParse';
 
 export type Phase2AdvisoryKind =
   | 'crack_entry'
