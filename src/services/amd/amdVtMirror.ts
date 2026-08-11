@@ -1,11 +1,8 @@
 /**
- * AMD -> VT Markets mirror leg (same MetaApi account as AO, magic 88005).
- * Kill-switched via bridge_config amd_vt_mirror_enabled (default OFF) and the
- * engine_amd -> vtmarkets_ao_live bridge_link (ships inactive). Sizing is
- * independent of AO and of AMD-on-OANDA: shared AMD risk formula against VT
- * equity, then amd_vt_size_multiplier (default 0.05 for the 0.01-lot
- * validation phase). Runs only after a confirmed OANDA fill; failures are
- * logged and never affect the OANDA book.
+ * AMD VT peer leg (same MetaApi account as AO, magic 88005).
+ * Kill-switched via amd_vt_mirror_enabled; requires active engine_amd→VT link
+ * and healthy AO VT route. Sized independently via amd_vt_size_multiplier.
+ * Peer of the OANDA leg (Promise.allSettled fan-out) — not a post-fill mirror.
  */
 
 import { randomUUID } from 'crypto';
@@ -17,6 +14,8 @@ import { loadExecutionRoutes } from '../broker/brokerLinkService.js';
 import type { EngineBrokerRoute } from '../broker/brokerLinkService.js';
 import type { AmdDistributionOrderPlan, AmdTradeDirection } from './buildAmdDistributionOrderPlan.js';
 import { AMD_PIP_TRAIL_PIPS } from './amdTrailConstants.js';
+import { hasAmdVenueExecutedToday } from './amdVenueExecutedToday.js';
+import { isAoVtRouteHealthy } from './isAoVtRouteHealthy.js';
 import {
   amdEffectiveEngineWeight,
   computeAmdRiskAmount,
@@ -60,19 +59,20 @@ export async function loadAmdVtSizeMultiplier(supabase: SupabaseClient): Promise
   return parsed;
 }
 
-export interface AmdVtMirrorParams {
+export interface AmdVtLegParams {
   supabase: SupabaseClient;
   tag: string;
   direction: AmdTradeDirection;
-  /** amd_state audit fields copied onto the VT log row. */
   amdRow: Record<string, unknown>;
-  /** OANDA plan — entry/SL prices and risk inputs reused for the VT leg. */
   plan: AmdDistributionOrderPlan;
   exitStrategy: string;
   todayStr: string;
 }
 
-async function findVtRoute(supabase: SupabaseClient): Promise<EngineBrokerRoute | null> {
+/** @deprecated Use AmdVtLegParams — kept for call-site clarity during rename. */
+export type AmdVtMirrorParams = AmdVtLegParams;
+
+async function findAmdVtRoute(supabase: SupabaseClient): Promise<EngineBrokerRoute | null> {
   const routes = await loadExecutionRoutes(supabase, ENGINE_ID);
   return routes.find((route) => route.brokerId === AMD_VT_BROKER_ID) ?? null;
 }
@@ -100,8 +100,34 @@ function sizeVtUnits(
   return direction === 'long' ? units : -units;
 }
 
+export async function writeAmdVtBlockedLog(
+  params: Pick<AmdVtLegParams, 'supabase' | 'tag' | 'direction' | 'amdRow' | 'plan'>,
+  reason: string,
+): Promise<void> {
+  const { supabase, tag, direction, amdRow, plan } = params;
+  const { error } = await supabase.from('bridge_trade_log').insert({
+    signal_id: randomUUID(),
+    engine_id: ENGINE_ID,
+    broker_id: AMD_VT_BROKER_ID,
+    pair: INSTRUMENT,
+    direction: direction.toUpperCase(),
+    stop_loss: plan.hardSlPrice,
+    signal_received_at: new Date().toISOString(),
+    decision: 'BLOCKED',
+    block_reason: reason,
+    status: 'pending',
+    amd_tag: tag,
+    amd_evaluated_at: amdRow.evaluated_at,
+    layer4_d1_bias: amdRow.layer4_d1_bias,
+    daily_bias_alignment: amdRow.daily_bias_alignment,
+  });
+  if (error) {
+    logError('[AmdVtLeg] BLOCKED log insert failed', { reason, error: error.message });
+  }
+}
+
 async function persistVtOpenTrade(
-  params: AmdVtMirrorParams,
+  params: AmdVtLegParams,
   vtEquity: number,
   vtSignedUnits: number,
   vtSizeMultiplier: number,
@@ -112,7 +138,7 @@ async function persistVtOpenTrade(
   const riskAmount =
     computeAmdRiskAmount(vtEquity, plan.weight, plan.sizeMultiplier, BASELINE_RISK_PCT) *
     vtSizeMultiplier;
-  await supabase.from('bridge_trade_log').insert({
+  const { error } = await supabase.from('bridge_trade_log').insert({
     signal_id: randomUUID(),
     engine_id: ENGINE_ID,
     broker_id: AMD_VT_BROKER_ID,
@@ -141,16 +167,22 @@ async function persistVtOpenTrade(
     amd_pip_trail: AMD_PIP_TRAIL_PIPS,
     amd_hard_sl_pips: plan.hardSlPips,
   });
+  if (error) {
+    logError('[AmdVtLeg] EXECUTED log insert failed after fill', {
+      positionId,
+      error: error.message,
+    });
+  }
 }
 
 async function persistVtTrailState(
-  params: AmdVtMirrorParams,
+  params: AmdVtLegParams,
   fillPrice: number,
   positionId: string,
   timeGateUtcHour: number | null,
 ): Promise<void> {
   const { supabase, tag, direction, plan, exitStrategy, todayStr } = params;
-  await supabase.from('amd_trail_stop_state').insert({
+  const { error } = await supabase.from('amd_trail_stop_state').insert({
     oanda_trade_id: positionId,
     broker_id: AMD_VT_BROKER_ID,
     engine_id: ENGINE_ID,
@@ -165,27 +197,72 @@ async function persistVtTrailState(
     exit_strategy: exitStrategy,
     status: 'open',
   });
+  if (error) {
+    logError('[AmdVtLeg] trail state insert failed after fill', {
+      positionId,
+      error: error.message,
+    });
+  }
 }
 
-/**
- * Mirror an already-filled OANDA AMD entry onto VT. Non-fatal by design:
- * every failure path logs and returns without touching the OANDA book.
- */
-export async function mirrorAmdOrderToVt(
-  params: AmdVtMirrorParams,
+async function armAmdVtLeg(
+  params: AmdVtLegParams,
+): Promise<EngineBrokerRoute | null> {
+  const { supabase } = params;
+  if (!(await isAmdVtMirrorEnabled(supabase))) {
+    logInfo('[AmdVtLeg] amd_vt_mirror_enabled OFF — skipping VT leg');
+    return null;
+  }
+  if (await hasAmdVenueExecutedToday(supabase, AMD_VT_BROKER_ID, params.todayStr)) {
+    logInfo('[AmdVtLeg] Already EXECUTED today — skipping VT leg');
+    return null;
+  }
+  if (!(await isAoVtRouteHealthy(supabase))) {
+    logWarn('[AmdVtLeg] AO VT route unhealthy — BLOCKED');
+    await writeAmdVtBlockedLog(params, 'AO_VT_UNHEALTHY');
+    return null;
+  }
+  const route = await findAmdVtRoute(supabase);
+  if (!route) {
+    logWarn('[AmdVtLeg] no active engine_amd->VT route — BLOCKED');
+    await writeAmdVtBlockedLog(params, 'AMD_VT_ROUTE_INACTIVE');
+    return null;
+  }
+  return route;
+}
+
+async function finalizeAmdVtFill(
+  params: AmdVtLegParams,
+  vtEquity: number,
+  vtSignedUnits: number,
+  vtSizeMultiplier: number,
+  positionId: string,
+  fillPrice: number,
   timeGateUtcHour: number | null,
 ): Promise<void> {
-  const { supabase, tag, direction, plan } = params;
-  if (!(await isAmdVtMirrorEnabled(supabase))) return;
-  const route = await findVtRoute(supabase);
-  if (!route) {
-    logWarn('[AmdVtMirror] enabled but no active engine_amd->VT route — skipping');
-    return;
-  }
-  const vtSizeMultiplier = await loadAmdVtSizeMultiplier(supabase);
+  const { tag, direction } = params;
+  logInfo('[AmdVtLeg] VT peer filled', { positionId, fillPrice, tag, direction });
+  await persistVtOpenTrade(
+    params,
+    vtEquity,
+    vtSignedUnits,
+    vtSizeMultiplier,
+    fillPrice,
+    positionId,
+  );
+  await persistVtTrailState(params, fillPrice, positionId, timeGateUtcHour);
+}
+
+async function submitAmdVtOrder(
+  params: AmdVtLegParams,
+  route: EngineBrokerRoute,
+  timeGateUtcHour: number | null,
+): Promise<void> {
+  const { tag, direction, plan } = params;
+  const vtSizeMultiplier = await loadAmdVtSizeMultiplier(params.supabase);
   const vtEquity = (await route.broker.getAccountSummary()).equity;
   const vtSignedUnits = sizeVtUnits(vtEquity, vtSizeMultiplier, plan, direction);
-  logInfo('[AmdVtMirror] Placing VT mirror order', {
+  logInfo('[AmdVtLeg] Placing VT peer order', {
     tag,
     direction,
     vtEquity,
@@ -204,18 +281,41 @@ export async function mirrorAmdOrderToVt(
   const fillTx = orderResult.orderFillTransaction;
   const positionId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id ?? null;
   if (!positionId) {
-    logError('[AmdVtMirror] VT order failed — no position id', { orderResult });
+    logError('[AmdVtLeg] VT order failed — no position id', { orderResult });
+    await writeAmdVtBlockedLog(params, 'MT5_ORDER_ERROR: no position id');
     return;
   }
   const fillPrice = fillTx?.price != null ? Number(fillTx.price) : plan.entryPrice;
-  logInfo('[AmdVtMirror] VT mirror filled', { positionId, fillPrice, tag, direction });
-  await persistVtOpenTrade(
+  await finalizeAmdVtFill(
     params,
     vtEquity,
     vtSignedUnits,
     vtSizeMultiplier,
-    fillPrice,
     positionId,
+    fillPrice,
+    timeGateUtcHour,
   );
-  await persistVtTrailState(params, fillPrice, positionId, timeGateUtcHour);
+}
+
+/**
+ * Place AMD on VT as an independent peer leg. Failures never touch OANDA.
+ * Every arming/order miss (except kill-switch OFF / already EXECUTED) writes BLOCKED.
+ */
+export async function placeAmdVtLeg(
+  params: AmdVtLegParams,
+  timeGateUtcHour: number | null,
+): Promise<void> {
+  const route = await armAmdVtLeg(params);
+  if (!route) return;
+  await submitAmdVtOrder(params, route, timeGateUtcHour);
+}
+
+/**
+ * @deprecated Use placeAmdVtLeg — sequential mirror name retained for grep safety.
+ */
+export async function mirrorAmdOrderToVt(
+  params: AmdVtLegParams,
+  timeGateUtcHour: number | null,
+): Promise<void> {
+  await placeAmdVtLeg(params, timeGateUtcHour);
 }

@@ -34,9 +34,9 @@ The AO gate removed 30 of 77 fills; removed fills were 25% winners vs 39% baseli
 ## What was built
 
 1. **AO AMD-day gate** — `src/core/alphaOmega/alphaOmegaAmdDayGate.ts`, wired into both AO entry paths (multi-broker fan-out + Lane B crack side-path). Blocks only when today's `amd_state.amd_tag = 'AMD_FAILED'` AND signal time ≥ tag write time. Fail-open on any read problem. Shadow-logs `would_skip` advisories while OFF. Block reason: `ALPHAOMEGA_AMD_DAY_GATE`.
-2. **AMD → VT mirror** — `src/services/amd/amdVtMirror.ts`. After a confirmed OANDA fill: sizes against live VT equity (shared AMD risk formula × `amd_vt_size_multiplier`), places via the MetaApi broker adapter with broker-side SL, magic **88005**, writes its own `bridge_trade_log` + `amd_trail_stop_state` rows on `vtmarkets_ao_live`. Failures never touch the OANDA book.
+2. **AMD dual-book fan-out (AO-style peers)** — `submitAmdDualBook` → `Promise.allSettled` via `settleBrokerFanOutTasks`. OANDA (`placeAmdOandaLeg`) and VT (`placeAmdVtLeg`) place together. VT sizes against live VT equity × `amd_vt_size_multiplier`, MetaApi magic **88005**, own `bridge_trade_log` + `amd_trail_stop_state` on `vtmarkets_ao_live`. One venue failing does not unwind the other. VT arming also requires healthy AO VT route (`isAoVtRouteHealthy`). VT misses write `BLOCKED` (not silent).
 3. **Venue-aware exits** — `src/services/amd/amdVenueOps.ts` + reworked `amdTrailingStopMonitor.ts`: per-broker open-id snapshots, venue-routed closes and closed-trade details. A failed venue snapshot skips its rows for the cycle (never false-flags "externally closed"). Decision price stays OANDA mid for both venues. All exit logic applies identically to both books.
-4. **Safety hardening** — `hasExecutedToday` scoped to `oanda_amd_demo`; engine-aware magic in `brokerFactory` (AO 88004 / AMD 88005 on the shared account); Activity ledger exclusion now engine-aware (AMD VT fills visible); `engine_id='omega'` filters on AO close-log lookups and dashboard `fetchTradeLogStatus`.
+4. **Safety hardening** — per-venue once-per-day EXECUTED guards (`hasAmdVenueExecutedToday`); day gate is `hasAmdEntryWorkRemaining` (allows VT-only retry if OANDA already filled); engine-aware magic in `brokerFactory` (AO 88004 / AMD 88005); Activity ledger exclusion engine-aware (AMD VT fills visible); `engine_id='omega'` filters on AO close-log lookups and dashboard `fetchTradeLogStatus`.
 5. **Dashboard (Phase 2 panel)** — master **Combined Stack** toggle (writes the three keys below together; honest MIXED state) + individual toggles: AO AMD-day gate, AMD dead-trade abort, AMD trail split 6/4.
 
 ## Config keys (all default OFF / safe)
@@ -44,7 +44,7 @@ The AO gate removed 30 of 77 fills; removed fills were 25% winners vs 39% baseli
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `alpha_omega_amd_day_gate_enabled` | false | AO skips AMD_FAILED-day entries after 10:31 UTC tag |
-| `amd_vt_mirror_enabled` | false | AMD mirrors entries onto VT (also needs active `engine_amd`→`vtmarkets_ao_live` link) |
+| `amd_vt_mirror_enabled` | false | AMD VT peer leg enabled (also needs active `engine_amd`→`vtmarkets_ao_live` link + healthy AO VT route) |
 | `amd_vt_size_multiplier` | 0.05 | VT-leg-only sizing knob (0.01–2 valid; ~0.01 lots in validation) |
 | `amd_dead_trade_abort_enabled` (072) | false | Master switch member |
 | `amd_trail_split_enabled` (072) | false | Master switch member |

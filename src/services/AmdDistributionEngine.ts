@@ -1,32 +1,18 @@
 /**
- * AMD Distribution Engine — one OANDA trade per day at tag entry hour.
- * Pip-based hard SL on OANDA; exit via amdTrailingStopMonitor (not Omega trail).
+ * AMD Distribution Engine — one dual-book decision per day at tag entry hour.
+ * OANDA + VT fan out via submitAmdDualBook; exits via amdTrailingStopMonitor.
  */
 
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../connectors/supabase.js';
-import {
-  fetchCandleRange,
-  placeMarketOrder,
-} from '../connectors/oanda.js';
 import { logInfo, logError } from '../utils/logger.js';
-import { sendTradeExecutedAlert } from './telegram/alertTradeExecution.js';
-import {
-  buildAmdDistributionOrderPlan,
-  type AmdDistributionOrderPlan,
-} from './amd/buildAmdDistributionOrderPlan.js';
+import { buildAmdDistributionOrderPlan } from './amd/buildAmdDistributionOrderPlan.js';
+import { hasAmdEntryWorkRemaining } from './amd/hasAmdEntryWorkRemaining.js';
 import { loadAmdAsianCloseFilterEnabled } from './amd/loadAmdAsianCloseFilterEnabled.js';
-import {
-  AMD_BROKER_ID,
-  resolveAmdOandaAccountId,
-} from './amd/resolveAmdOandaAccountId.js';
-import { AMD_PIP_TRAIL_PIPS } from './amd/amdTrailConstants.js';
-import {
-  computeAmdRiskAmount,
-  resolveAmdSizeMultiplier,
-} from './amd/resolveAmdSizeMultiplier.js';
-import { mirrorAmdOrderToVt } from './amd/amdVtMirror.js';
+import { AMD_BROKER_ID } from './amd/resolveAmdOandaAccountId.js';
+import { resolveAmdSizeMultiplier } from './amd/resolveAmdSizeMultiplier.js';
+import { submitAmdDualBook } from './amd/submitAmdDualBook.js';
 
 const TAG_ENTRY_HOUR: Record<string, number> = {
   AMD_COMPRESSION_BREAKOUT: 10,
@@ -42,21 +28,10 @@ const TAGS_REQUIRING_AMD_CONFIRMED = new Set([
 ]);
 
 const TAG_HARD_EXIT_HOUR: Record<string, number> = {
-  // AMD_NONE: tight 30-min window validated (+67%
-  //   with gate). Hard exit at H11 is correct.
   AMD_NONE: 11,
-  // AMD_TEXTBOOK: marginal pip loss (-7%) but
-  //   +11pp win rate improvement. Keep gate.
   AMD_TEXTBOOK: 13,
-  // AMD_COMPRESSION: gate removed (-25% damage).
-  //   Trail runs freely. Hard exit only as safety.
   AMD_COMPRESSION_BREAKOUT: 16,
-  // AMD_FAILED: gate removed (-90% damage).
-  //   D1 direction on trending days produces
-  //   large moves that extend past H12.
   AMD_FAILED: 16,
-  // AMD_SHIFTED: gate removed (-55% damage).
-  //   Trail runs freely until 16:00 UTC.
   AMD_SHIFTED: 16,
 };
 
@@ -66,7 +41,6 @@ const TAG_TIME_GATE_HOUR: Record<string, number | null> = {
 
 const INSTRUMENT = 'AUD_USD';
 const ENGINE_ID = 'engine_amd';
-const BASELINE_RISK_PCT = 0.02;
 
 type AmdStateRow = Record<string, unknown>;
 type TradeDirection = 'long' | 'short';
@@ -120,19 +94,6 @@ async function loadTodayAmdState(todayStr: string): Promise<AmdStateRow | null> 
   return data as unknown as AmdStateRow;
 }
 
-async function hasExecutedToday(todayStr: string): Promise<boolean> {
-  // Scoped to the OANDA book: the VT mirror leg writes its own EXECUTED row
-  // on vtmarkets_ao_live and must not trip the once-per-day gate.
-  const { count } = await supabaseDb()
-    .from('bridge_trade_log')
-    .select('id', { count: 'exact', head: true })
-    .eq('engine_id', ENGINE_ID)
-    .eq('broker_id', AMD_BROKER_ID)
-    .eq('decision', 'EXECUTED')
-    .gte('created_at', `${todayStr}T00:00:00Z`);
-  return (count ?? 0) > 0;
-}
-
 async function hasBlockedToday(
   todayStr: string,
   blockReason: string,
@@ -172,16 +133,6 @@ async function isNewsBlackout(): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-function parseFillFromOrder(orderResult: Awaited<ReturnType<typeof placeMarketOrder>>): {
-  tradeId: string | null;
-  fillPrice: number | null;
-} {
-  const fillTx = orderResult.orderFillTransaction;
-  const tradeId = fillTx?.tradeOpened?.tradeID ?? fillTx?.id ?? null;
-  const fillPrice = fillTx?.price != null ? Number(fillTx.price) : null;
-  return { tradeId, fillPrice };
-}
-
 async function writeBlockedLog(
   reason: string,
   tag: string,
@@ -189,15 +140,14 @@ async function writeBlockedLog(
   stopLoss: number,
   direction: string,
 ): Promise<void> {
-  const receivedAt = new Date().toISOString();
-  await supabaseDb().from('bridge_trade_log').insert({
+  const { error } = await supabaseDb().from('bridge_trade_log').insert({
     signal_id: randomUUID(),
     engine_id: ENGINE_ID,
     broker_id: AMD_BROKER_ID,
     pair: INSTRUMENT,
     direction,
     stop_loss: stopLoss,
-    signal_received_at: receivedAt,
+    signal_received_at: new Date().toISOString(),
     decision: 'BLOCKED',
     block_reason: reason,
     status: 'pending',
@@ -206,165 +156,11 @@ async function writeBlockedLog(
     layer4_d1_bias: amdRow.layer4_d1_bias,
     daily_bias_alignment: amdRow.daily_bias_alignment,
   });
-}
-
-async function persistOpenTrade(
-  tag: string,
-  direction: TradeDirection,
-  amdRow: AmdStateRow,
-  fillPrice: number,
-  tradeId: string,
-  exitStrategy: string,
-  plan: AmdDistributionOrderPlan,
-): Promise<void> {
-  const receivedAt = new Date().toISOString();
-  const riskAmount = computeAmdRiskAmount(
-    plan.equity,
-    plan.weight,
-    plan.sizeMultiplier,
-    BASELINE_RISK_PCT,
-  );
-  await supabaseDb().from('bridge_trade_log').insert({
-    signal_id: randomUUID(),
-    engine_id: ENGINE_ID,
-    broker_id: AMD_BROKER_ID,
-    pair: INSTRUMENT,
-    direction: direction.toUpperCase(),
-    stop_loss: plan.hardSlPrice,
-    entry_price: fillPrice,
-    fill_price: fillPrice,
-    units: plan.signedUnits,
-    oanda_trade_id: tradeId,
-    signal_received_at: receivedAt,
-    decision: 'EXECUTED',
-    status: 'open',
-    account_equity_at_signal: plan.equity,
-    risk_amount: riskAmount,
-    amd_tag: tag,
-    amd_evaluated_at: amdRow.evaluated_at,
-    layer4_d1_bias: amdRow.layer4_d1_bias,
-    daily_bias_alignment: amdRow.daily_bias_alignment,
-    direction_source: 'amd_auto_direction',
-    reversal_confirmed: amdRow.reversal_confirmed,
-    auto_direction_reason: amdRow.auto_direction_reason,
-    amd_size_multiplier: plan.sizeMultiplier,
-    amd_entry_hour: new Date().getUTCHours(),
-    amd_exit_strategy: exitStrategy,
-    amd_pip_trail: AMD_PIP_TRAIL_PIPS,
-    amd_hard_sl_pips: plan.hardSlPips,
-  });
-}
-
-async function persistTrailState(
-  tag: string,
-  direction: TradeDirection,
-  fillPrice: number,
-  hardSlPrice: number,
-  tradeId: string,
-  exitStrategy: string,
-  todayStr: string,
-): Promise<void> {
-  await supabaseDb().from('amd_trail_stop_state').insert({
-    oanda_trade_id: tradeId,
-    broker_id: AMD_BROKER_ID,
-    engine_id: ENGINE_ID,
-    direction,
-    fill_price: fillPrice,
-    hard_sl_price: hardSlPrice,
-    trail_pip_distance: AMD_PIP_TRAIL_PIPS,
-    peak_favorable_price: fillPrice,
-    time_gate_utc_hour: TAG_TIME_GATE_HOUR[tag] ?? null,
-    trade_date: todayStr,
-    amd_tag: tag,
-    exit_strategy: exitStrategy,
-    status: 'open',
-  });
-}
-
-async function submitAmdOrder(
-  tag: string,
-  direction: TradeDirection,
-  amdRow: AmdStateRow,
-  plan: AmdDistributionOrderPlan,
-  todayStr: string,
-): Promise<void> {
-  const amdAccountId = resolveAmdOandaAccountId();
-  const exitStrategy = tag === 'AMD_NONE' ? 'S1' : plan.exitStrategy;
-  logInfo('[AmdDistribution] Placing order', {
-    tag,
-    direction,
-    entryPrice: plan.entryPrice,
-    hardSlPrice: plan.hardSlPrice,
-    units: plan.signedUnits,
-    sizeMultiplier: plan.sizeMultiplier,
-    exitStrategy,
-  });
-  const orderResult = await placeMarketOrder(
-    {
-      instrument: INSTRUMENT,
-      units: plan.signedUnits,
-      stopLossPrice: plan.hardSlPrice.toFixed(5),
-    },
-    10_000,
-    amdAccountId,
-  );
-  const { tradeId, fillPrice: oandaFill } = parseFillFromOrder(orderResult);
-  if (!tradeId) {
-    logError('[AmdDistribution] OANDA order failed — no tradeId', { orderResult });
-    await writeBlockedLog(
-      'OANDA_ERROR: no tradeId',
-      tag,
-      amdRow,
-      plan.hardSlPrice,
-      direction.toUpperCase(),
-    );
-    return;
-  }
-  const fillPrice = oandaFill ?? plan.entryPrice;
-  logInfo('[AmdDistribution] Order filled', { tradeId, fillPrice, tag, direction });
-  await persistOpenTrade(tag, direction, amdRow, fillPrice, tradeId, exitStrategy, plan);
-  void sendTradeExecutedAlert({
-    oandaInstrument: INSTRUMENT,
-    direction: direction.toUpperCase(),
-    fillPrice,
-    stopLoss: plan.hardSlPrice,
-    takeProfit: null,
-    filledUnits: Math.abs(plan.signedUnits),
-    amdTag: tag,
-    amdSizeMultiplier: plan.sizeMultiplier,
-    directionSource: 'auto',
-    engineId: ENGINE_ID,
-  }).catch(() => {});
-  await persistTrailState(tag, direction, fillPrice, plan.hardSlPrice, tradeId, exitStrategy, todayStr);
-  try {
-    await mirrorAmdOrderToVt(
-      { supabase: supabaseDb(), tag, direction, amdRow, plan, exitStrategy, todayStr },
-      TAG_TIME_GATE_HOUR[tag] ?? null,
-    );
-  } catch (mirrorErr) {
-    logError('[AmdVtMirror] VT mirror failed — OANDA book unaffected', {
-      err: String(mirrorErr),
+  if (error) {
+    logError('[AmdDistribution] BLOCKED log insert failed', {
+      reason,
+      error: error.message,
     });
-  }
-  try {
-    const now = new Date();
-    const preFrom = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-    const preTo = now.toISOString();
-    const h1From = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
-    const [preM5, preH1] = await Promise.all([
-      fetchCandleRange(INSTRUMENT, preFrom, preTo, 'M5'),
-      fetchCandleRange(INSTRUMENT, h1From, preTo, 'H1'),
-    ]);
-    await supabaseDb()
-      .from('bridge_trade_log')
-      .update({
-        pre_entry_candles: preM5,
-        h1_session_candles: preH1,
-      })
-      .eq('oanda_trade_id', tradeId)
-      .eq('engine_id', ENGINE_ID);
-  } catch {
-    // non-fatal — candle capture never blocks trade logging
   }
 }
 
@@ -376,13 +172,19 @@ async function runExecution(
   todayStr: string,
 ): Promise<void> {
   const sizeMultiplier = resolveAmdSizeMultiplier(amdRow.amd_size_multiplier);
-  const plan = await buildAmdDistributionOrderPlan(
-    direction,
-    weight,
-    sizeMultiplier,
-  );
+  const plan = await buildAmdDistributionOrderPlan(direction, weight, sizeMultiplier);
   if (!plan) return;
-  await submitAmdOrder(tag, direction, amdRow, plan, todayStr);
+  const exitStrategy = tag === 'AMD_NONE' ? 'S1' : plan.exitStrategy;
+  await submitAmdDualBook({
+    supabase: supabaseDb(),
+    tag,
+    direction,
+    amdRow,
+    plan,
+    exitStrategy,
+    todayStr,
+    timeGateUtcHour: TAG_TIME_GATE_HOUR[tag] ?? null,
+  });
 }
 
 async function passesExecutionGates(
@@ -405,8 +207,7 @@ async function passesExecutionGates(
         const biasPct = amdRow.asian_close_position_pct as number | null;
         const blockReason =
           `ASIAN_CLOSE_DISAGREE: auto=${autoDirection} bias=${biasSignal} pct=${biasPct ?? 'null'}`;
-        const alreadyBlocked = await hasBlockedToday(todayStr, blockReason);
-        if (!alreadyBlocked) {
+        if (!(await hasBlockedToday(todayStr, blockReason))) {
           logInfo(`[AmdDistribution] BLOCKED ${blockReason}`);
           await writeBlockedLog(blockReason, tag, amdRow, 0.635, autoDirection.toUpperCase());
         }
@@ -420,8 +221,8 @@ async function passesExecutionGates(
     logInfo('[AmdDistribution] amd_state not evaluated today — skipping');
     return { ok: false };
   }
-  if (await hasExecutedToday(todayStr)) {
-    logInfo('[AmdDistribution] Already traded today — skipping');
+  if (!(await hasAmdEntryWorkRemaining(supabaseDb(), todayStr))) {
+    logInfo('[AmdDistribution] All enabled venues already EXECUTED today — skipping');
     return { ok: false };
   }
   const engineRow = await loadEngineRow();
