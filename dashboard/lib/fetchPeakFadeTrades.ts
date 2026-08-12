@@ -12,5 +12,5 @@ export async function fetchPeakFadeTrades(): Promise<PeakFadeTradeRow[]> {
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) throw new Error(error.message);
-  return (data ?? []) as PeakFadeTradeRow[];
+  return (data ?? []) as unknown as PeakFadeTradeRow[];
 }
