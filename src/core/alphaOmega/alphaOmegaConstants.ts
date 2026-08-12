@@ -204,3 +204,13 @@ export function isOmegaLaneBBroker(brokerId: string | null | undefined): boolean
   if (!brokerId) return false;
   return (OMEGA_AO_BROKER_IDS as readonly string[]).includes(brokerId);
 }
+
+/** True for Shadow AO paper broker — never route to live OANDA/MT5. */
+export function isOmegaAoShadowBroker(brokerId: string | null | undefined): boolean {
+  return brokerId === OMEGA_AO_SHADOW_BROKER_ID;
+}
+
+/** Synthetic paper ticket ids (`shadow-…`) must never hit broker trade APIs. */
+export function isShadowPaperTradeId(tradeId: string | null | undefined): boolean {
+  return typeof tradeId === 'string' && tradeId.startsWith('shadow-');
+}

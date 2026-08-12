@@ -6,7 +6,10 @@ import { createMt5Broker } from './mt5Broker.js';
 import { createOandaBroker } from './oandaBroker.js';
 import { resolveMt5SymbolSuffix } from './mt5SymbolSuffix.js';
 import type { BrokerClient, BrokerClientConfig, BrokerType } from './types.js';
-import { OMEGA_AO_VT_BROKER_ID } from '../../core/alphaOmega/alphaOmegaConstants.js';
+import {
+  OMEGA_AO_SHADOW_BROKER_ID,
+  OMEGA_AO_VT_BROKER_ID,
+} from '../../core/alphaOmega/alphaOmegaConstants.js';
 
 export interface BridgeBrokerRow {
   broker_id: string;
@@ -92,6 +95,13 @@ export function createBrokerClient(
   engineId: string,
 ): BrokerClient | null {
   const brokerType = brokerRow.broker_type as BrokerType;
+  // Paper brokers are DB-only — never coerce to OANDA (ao_shadow_paper).
+  if (
+    brokerRow.broker_type === 'paper' ||
+    brokerRow.broker_id === OMEGA_AO_SHADOW_BROKER_ID
+  ) {
+    return null;
+  }
   if (brokerType === 'mt5' && !isMt5GloballyEnabled()) return null;
 
   if (brokerType === 'mt5') {

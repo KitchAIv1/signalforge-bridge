@@ -2,6 +2,7 @@
 
 import { fetchCompletedCandles } from '../../connectors/oanda.js';
 import type { BrokerClient } from '../../connectors/broker/types.js';
+import { clampOandaToIso } from '../../utils/oandaCandleToIso.js';
 import type { PeakFadeM5Bar } from './peakFadeD1.js';
 
 const LOOKBACK_MS = 10 * 24 * 60 * 60 * 1000;
@@ -29,7 +30,7 @@ function mapCandles(
 }
 
 export async function loadPeakFadeM5FromOanda(pair: string): Promise<PeakFadeM5Bar[]> {
-  const toISO = new Date().toISOString();
+  const toISO = clampOandaToIso(new Date().toISOString());
   const fromISO = new Date(Date.now() - LOOKBACK_MS).toISOString();
   const candles = await fetchCompletedCandles(pair, 'M5', fromISO, toISO);
   return mapCandles(candles);
@@ -39,7 +40,7 @@ export async function loadPeakFadeM5FromBroker(
   broker: BrokerClient,
   pair: string,
 ): Promise<PeakFadeM5Bar[]> {
-  const toISO = new Date().toISOString();
+  const toISO = clampOandaToIso(new Date().toISOString());
   const fromISO = new Date(Date.now() - LOOKBACK_MS).toISOString();
   const instrument = broker.toBrokerInstrument(pair);
   const candles = await broker.fetchCompletedCandles(instrument, 'M5', fromISO, toISO);

@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createBrokerClient } from '../../connectors/broker/brokerFactory.js';
 import type { BrokerClient } from '../../connectors/broker/types.js';
 import { createOandaBroker } from '../../connectors/broker/oandaBroker.js';
+import { isOmegaAoShadowBroker } from '../../core/alphaOmega/alphaOmegaConstants.js';
 import { logWarn } from '../../utils/logger.js';
 
 export async function resolveBrokerForLogRow(
@@ -14,6 +15,12 @@ export async function resolveBrokerForLogRow(
   engineId: string,
 ): Promise<BrokerClient> {
   const resolvedId = brokerId ?? 'oanda_practice';
+  if (isOmegaAoShadowBroker(resolvedId)) {
+    const message = `Paper broker ${resolvedId} has no live venue — refuse OANDA fallback`;
+    logWarn('[resolveBrokerForLogRow] ' + message, { brokerId: resolvedId, engineId });
+    throw new Error(message);
+  }
+
   const { data } = await supabase
     .from('bridge_brokers')
     .select('broker_id, broker_type, account_id, is_active, symbol_suffix')
@@ -31,6 +38,12 @@ export async function resolveBrokerForLogRow(
     if (data.broker_type === 'mt5') {
       const message =
         `MT5 broker ${resolvedId} unavailable (MT5_ENABLED / account UUID / METAAPI_TOKEN)`;
+      logWarn('[resolveBrokerForLogRow] ' + message, { brokerId: resolvedId, engineId });
+      throw new Error(message);
+    }
+    // Fail closed for paper — never fall through to oanda_practice.
+    if (data.broker_type === 'paper') {
+      const message = `Paper broker ${resolvedId} unavailable for live venue ops`;
       logWarn('[resolveBrokerForLogRow] ' + message, { brokerId: resolvedId, engineId });
       throw new Error(message);
     }

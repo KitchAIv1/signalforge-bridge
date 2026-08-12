@@ -21,7 +21,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { logInfo } from '../utils/logger.js';
 import { resolveBrokerForLogRow } from './broker/resolveBrokerForLogRow.js';
 import { closeTradeViaBroker } from '../monitoring/brokerTradeLifecycle.js';
-import { isOmegaLaneBBroker } from '../core/alphaOmega/alphaOmegaConstants.js';
+import {
+  isOmegaAoShadowBroker,
+  isOmegaLaneBBroker,
+  isShadowPaperTradeId,
+} from '../core/alphaOmega/alphaOmegaConstants.js';
 
 export async function closeAllOpenOmegaPositions(
   supabase: SupabaseClient,
@@ -54,6 +58,12 @@ export async function closeAllOpenOmegaPositions(
       const brokerId = logRow.broker_id as string | null | undefined;
       if (isOmegaLaneBBroker(brokerId)) {
         logInfo('[Omega] Skipping Lane B position — managed by ALPHAOMEGA exit logic', {
+          oanda_trade_id: oid,
+        });
+        continue;
+      }
+      if (isOmegaAoShadowBroker(brokerId) || isShadowPaperTradeId(oid)) {
+        logInfo('[Omega] Skipping Shadow AO paper — DB-only close path', {
           oanda_trade_id: oid,
         });
         continue;

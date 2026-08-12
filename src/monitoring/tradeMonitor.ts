@@ -26,7 +26,11 @@ import {
   runTrailingStopCheck,
 } from './trailingStopMonitor.js';
 import { getTrailEnabled } from './trailingStopSupport.js';
-import { isOmegaLaneBBroker } from '../core/alphaOmega/alphaOmegaConstants.js';
+import {
+  isOmegaAoShadowBroker,
+  isOmegaLaneBBroker,
+  isShadowPaperTradeId,
+} from '../core/alphaOmega/alphaOmegaConstants.js';
 import { clearLaneBPositionStateAfterExternalClose } from '../core/alphaOmega/clearAlphaOmegaPositionState.js';
 import {
   cleanupOrphanedTp2FloorStates,
@@ -113,6 +117,10 @@ export async function runTradeMonitor(
     }
     const tid = row.oanda_trade_id as string;
     const brokerId = row.broker_id as string | null | undefined;
+    // Shadow AO paper is DB-only — never reconcile via OANDA/MT5.
+    if (isOmegaAoShadowBroker(brokerId) || isShadowPaperTradeId(tid)) {
+      continue;
+    }
     const venueOpenIds = openIdsForLogRow(openTradeIndex, brokerId);
     const openTime = row.signal_received_at as string;
     const engine = engineById.get(row.engine_id as string);

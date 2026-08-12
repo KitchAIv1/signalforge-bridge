@@ -7,6 +7,7 @@ import type { OpenTrade } from '../connectors/broker/types.js';
 import { createOandaBroker } from '../connectors/broker/oandaBroker.js';
 import { createBrokerClient } from '../connectors/broker/brokerFactory.js';
 import { getOpenTrades as getOandaOpenTrades } from '../connectors/oanda.js';
+import { isOmegaAoShadowBroker } from '../core/alphaOmega/alphaOmegaConstants.js';
 
 const OANDA_DEFAULT = 'oanda_practice';
 
@@ -82,6 +83,10 @@ export async function buildBrokerOpenTradeIndex(
 
   for (const [brokerId, engineId] of brokerEnginePairs) {
     if (brokerId === OANDA_DEFAULT) continue;
+    if (isOmegaAoShadowBroker(brokerId)) {
+      byBroker.set(brokerId, new Set());
+      continue;
+    }
     byBroker.set(brokerId, await fetchBrokerOpenIds(supabase, brokerId, engineId));
   }
 

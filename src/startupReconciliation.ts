@@ -9,6 +9,10 @@ import { getOpenTrades, getTradeById } from './connectors/oanda.js';
 import { prePopulateDedupFromLog } from './core/conflictResolver.js';
 import { computeDerivedFields, resultFromPnl } from './monitoring/tradeMonitorHelpers.js';
 import { resolveAmdOandaAccountId } from './services/amd/resolveAmdOandaAccountId.js';
+import {
+  isOmegaAoShadowBroker,
+  isShadowPaperTradeId,
+} from './core/alphaOmega/alphaOmegaConstants.js';
 
 interface OpenLogRow {
   id: string;
@@ -37,6 +41,7 @@ function resolveReconcileAccountId(
   amdAccountId: string | undefined,
 ): string | null | undefined {
   if (isMt5BrokerId(brokerId)) return null;
+  if (isOmegaAoShadowBroker(brokerId)) return null;
   if (engineId === 'engine_amd') return amdAccountId;
   if (brokerId === 'oanda_phase2_demo') {
     return resolvePhase2AccountId() ?? null;
@@ -149,6 +154,13 @@ async function reverseReconcileOpenRow(
 ): Promise<void> {
   const oandaTradeId = row.oanda_trade_id;
   if (!oandaTradeId) return;
+  if (isShadowPaperTradeId(oandaTradeId) || isOmegaAoShadowBroker(row.broker_id)) {
+    console.log(
+      `[Reconciliation] Skipping shadow paper open row ${oandaTradeId}` +
+        ` broker=${row.broker_id ?? 'null'}`,
+    );
+    return;
+  }
 
   const accountId = resolveReconcileAccountId(row.broker_id, row.engine_id, amdAccountId);
   if (accountId === null) {

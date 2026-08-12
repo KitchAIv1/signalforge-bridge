@@ -4,6 +4,7 @@
 
 import type { BrokerClient } from '../../connectors/broker/types.js';
 import { fetchCompletedCandles, getAccountSummary } from '../../connectors/oanda.js';
+import { clampOandaToIso } from '../../utils/oandaCandleToIso.js';
 import { getSupabaseClient } from '../../connectors/supabase.js';
 import { sendTradeExecutedAlert } from '../telegram/alertTradeExecution.js';
 import {
@@ -31,7 +32,7 @@ async function fetchClosesFromBroker(
   broker: BrokerClient,
   pair: string,
 ): Promise<number[]> {
-  const toISO = new Date().toISOString();
+  const toISO = clampOandaToIso(new Date().toISOString());
   const fromISO = new Date(Date.now() - CANDLE_LOOKBACK_MS).toISOString();
   const instrument = broker.toBrokerInstrument(pair);
   const candles = await broker.fetchCompletedCandles(instrument, 'M5', fromISO, toISO);
@@ -39,7 +40,7 @@ async function fetchClosesFromBroker(
 }
 
 async function fetchClosesOanda(pair: string): Promise<number[]> {
-  const toISO = new Date().toISOString();
+  const toISO = clampOandaToIso(new Date().toISOString());
   const fromISO = new Date(Date.now() - CANDLE_LOOKBACK_MS).toISOString();
   const candles = await fetchCompletedCandles(pair, 'M5', fromISO, toISO);
   return candles.map((candle) => parseFloat(candle.mid.c)).filter(Number.isFinite);
