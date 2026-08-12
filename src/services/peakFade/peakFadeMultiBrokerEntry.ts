@@ -15,6 +15,7 @@ import { loadPeakFadeM5FromBroker, loadPeakFadeM5FromOanda } from './peakFadeCan
 import { peakFadeLog, peakFadeWarn } from './peakFadeLogger.js';
 import { checkPeakFadeNewsBlackout } from './peakFadeNewsGate.js';
 import { placeAndRecordPeakFadeOpen } from './peakFadePlaceOrder.js';
+import { logPeakFadeIdleTick } from './peakFadeStatusLog.js';
 import { evaluatePeakFadeSetup } from './peakFadeStrategy.js';
 import type { PeakFadeConfig, PeakFadeSetup } from './peakFadeTypes.js';
 import { todayUtcString } from './peakFadeTypes.js';
@@ -57,7 +58,10 @@ export async function runPeakFadeEntryForAllBrokers(cfg: PeakFadeConfig): Promis
     return;
   }
   const needing = await routesNeedingEntry(cfg, routes);
-  if (!needing.length) return;
+  if (!needing.length) {
+    logPeakFadeIdleTick('all linked books already seated or cool-down');
+    return;
+  }
 
   const news = await checkPeakFadeNewsBlackout(cfg, cfg.pair);
   if (news.blocked) {
@@ -69,7 +73,10 @@ export async function runPeakFadeEntryForAllBrokers(cfg: PeakFadeConfig): Promis
   }
 
   const setup = await resolveSetup(cfg);
-  if (!setup) return;
+  if (!setup) {
+    logPeakFadeIdleTick('no D1 extreme + push setup on last M5');
+    return;
+  }
 
   const tradeDate = todayUtcString();
   for (const route of needing) {

@@ -10,11 +10,15 @@ import { isPeakFadeConfigEnabled } from './peakFadeConfigGate.js';
 import { runPeakFadeEntryForAllBrokers } from './peakFadeMultiBrokerEntry.js';
 import { runPeakFadeExitForAllBrokers } from './peakFadeMultiBrokerExit.js';
 import { runPeakFadeMaeWatch } from './peakFadeMaeWatch.js';
+import { logPeakFadeConfigGateOnce } from './peakFadeStatusLog.js';
 import { loadPeakFadeConfig } from './peakFadeTypes.js';
 
 export async function runMonitors(): Promise<void> {
   if (!isPeakFadeEnvEnabled()) return;
-  if (!(await isPeakFadeConfigEnabled())) return;
+  if (!(await isPeakFadeConfigEnabled())) {
+    logPeakFadeConfigGateOnce();
+    return;
+  }
   const cfg = loadPeakFadeConfig();
   await runPeakFadeExitForAllBrokers(cfg);
   await runPeakFadeMaeWatch(cfg);
