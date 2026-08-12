@@ -42,6 +42,7 @@ import {
   hardClose as fadeHardClose,
   runMonitors as fadeRunMonitors,
 } from './services/audusdFade/FadeEngine.js';
+import { runMonitors as peakFadeRunMonitors } from './services/peakFade/PeakFadeEngine.js';
 import { runPdlSweepOutcome } from './services/pdlSweepDetector/pdlSweepOutcomeService.js';
 import { PdlWindowEngine } from './services/pdlWindow/PdlWindowEngine.js';
 import { runPdlDetectThenEntry } from './services/pdlWindow/runPdlDetectThenEntry.js';
@@ -352,6 +353,23 @@ async function main(): Promise<void> {
       `[AudFade] Engine registered — AUDUSD_FADE_ENABLED=true | OANDA account=${
         fadeAccount ?? 'SHARED (AUDUSD_FADE_OANDA_ACCOUNT_ID unset — risks cross-engine netting)'
       }`,
+    );
+  }
+
+  // Peak Fade — D1 extreme fade, TP9 no SL, high-impact news T-2h/T+1h.
+  // Dual gate: PEAK_FADE_ENABLED=true AND bridge_config peak_fade_enabled=true.
+  // Isolated demos via bridge_links; VT fan-out ready (magic 88006). Default OFF.
+  if (process.env.PEAK_FADE_ENABLED === 'true') {
+    setInterval(() => {
+      void peakFadeRunMonitors().catch((e) =>
+        console.error('[PeakFade] Monitor error:', e),
+      );
+    }, 30000);
+    const peakAccount = process.env.PEAK_FADE_OANDA_ACCOUNT_ID;
+    logInfo(
+      `[PeakFade] Engine registered — env ON | needs bridge_config peak_fade_enabled | OANDA=${
+        peakAccount ?? 'UNSET (set PEAK_FADE_OANDA_ACCOUNT_ID)'
+      } | magic=88006 | TP=9 | no SL | news=HIGH T-2h/T+1h`,
     );
   }
 

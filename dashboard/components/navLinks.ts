@@ -17,6 +17,7 @@ export const NAV_ROUTE_LINKS: NavRouteLink[] = [
   { href: '/pdl-sweep', label: 'PDL Sweep' },
   { href: '/asian-session', label: 'Asian Session' },
   { href: '/audusd-fade', label: 'AUDUSD Fade' },
+  { href: '/peak-fade', label: 'Peak Fade' },
   { href: '/calendar', label: 'Calendar' },
   { href: '/health', label: 'Health' },
   { href: '/intelligence', label: 'Intelligence' },

@@ -20,6 +20,7 @@ export interface BridgeBrokerRow {
 const MT5_BROKER_ACCOUNT_ENV: Record<string, string> = {
   vtmarkets_omega_demo: 'METAAPI_OMEGA_ACCOUNT_ID',
   vtmarkets_fade_demo: 'METAAPI_FADE_ACCOUNT_ID',
+  vtmarkets_peak_fade_demo: 'METAAPI_PEAK_FADE_ACCOUNT_ID',
   [OMEGA_AO_VT_BROKER_ID]: 'METAAPI_AO_ACCOUNT_ID',
 };
 
@@ -27,6 +28,7 @@ const ENGINE_MAGIC: Record<string, number> = {
   omega: 88001,
   audusd_fade: 88002,
   pdl_window: 88003,
+  peak_fade: 88006,
 };
 
 /** Distinct magic for AO-on-MT5 vs classic omega RAW VT (88001). */
@@ -41,6 +43,10 @@ function resolveOandaAccountId(engineId: string, brokerId?: string): string | un
   // Share Fade's dedicated OANDA account — Fade behavior unchanged.
   if (engineId === 'audusd_fade' || engineId === 'pdl_window') {
     return process.env.AUDUSD_FADE_OANDA_ACCOUNT_ID ?? process.env.OANDA_ACCOUNT_ID;
+  }
+  // Peak Fade dedicated account — never share AO/Fade/AMD books.
+  if (engineId === 'peak_fade') {
+    return process.env.PEAK_FADE_OANDA_ACCOUNT_ID ?? undefined;
   }
   return process.env.OANDA_ACCOUNT_ID;
 }
