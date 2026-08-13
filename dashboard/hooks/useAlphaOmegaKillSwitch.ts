@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { ALPHAOMEGA_ENABLED_CONFIG_KEY } from '@/lib/omegaLaneBConstants';
+import { persistAlphaOmegaKillSwitch } from '@/lib/persistAlphaOmegaKillSwitch';
 
 function parseBool(raw: unknown): boolean {
   return raw === true || raw === 'true';
@@ -32,14 +33,10 @@ export function useAlphaOmegaKillSwitch() {
     setToggleError(null);
     setIsSaving(true);
     const next = !enabled;
-    const supabase = getSupabase();
-    const { error } = await supabase
-      .from('bridge_config')
-      .update({ config_value: next, updated_at: new Date().toISOString() })
-      .eq('config_key', ALPHAOMEGA_ENABLED_CONFIG_KEY);
+    const persistError = await persistAlphaOmegaKillSwitch(next);
     setIsSaving(false);
-    if (error) {
-      setToggleError(error.message);
+    if (persistError) {
+      setToggleError(persistError);
       return;
     }
     setEnabled(next);

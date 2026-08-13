@@ -12,6 +12,7 @@ import { isForexMarketOpen } from '../../utils/time.js';
 import { ALPHAOMEGA_ENABLED_CONFIG_KEY } from './alphaOmegaConstants.js';
 import { trackFireAgainstOpenPositions } from './alphaOmegaPositionTracking.js';
 import {
+  idlePersistedStreakState,
   recordFireAndDetectCrack,
   type CrackEvent,
 } from './alphaOmegaStreakTracker.js';
@@ -67,7 +68,10 @@ export async function observeAlphaOmegaFire(
   if (!isOmegaEnginePayload(payload)) return EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
   if (!shouldObserveAlphaOmegaFire()) return EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
   try {
-    if (!(await isAlphaOmegaEnabled(supabase))) return EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
+    if (!(await isAlphaOmegaEnabled(supabase))) {
+      await idlePersistedStreakState(supabase);
+      return EMPTY_ALPHAOMEGA_FIRE_OUTCOME;
+    }
     return await recordObservedOmegaFire(supabase, payload);
   } catch (err) {
     logWarn('[AlphaOmega] early fire observe failed — continuing', {

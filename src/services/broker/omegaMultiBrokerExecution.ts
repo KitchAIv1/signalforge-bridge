@@ -318,7 +318,13 @@ async function resolveLaneAdvisory(
   routeEquity: number,
 ): Promise<string | null | 'BLOCKED_SKIP'> {
   if (!isLaneB) return null;
-  if (!alphaOmegaEnabled) return 'ALPHAOMEGA_DISABLED_FALLBACK';
+  if (!alphaOmegaEnabled) {
+    logInfo('[Omega] Lane B skipped — AO disabled (no legacy fallback)', {
+      brokerId,
+      signalId: params.signalId,
+    });
+    return 'BLOCKED_SKIP';
+  }
 
   const direction = normalizeAlphaOmegaDirection(params.norm.direction);
   const gate = evaluateAlphaOmegaEntryGate({

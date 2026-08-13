@@ -213,6 +213,24 @@ export async function saveStreakState(
   }
 }
 
+function isIdleStreakState(state: StreakState): boolean {
+  return (
+    state.currentStreakLength === 0 &&
+    !state.armed &&
+    state.currentStreakDirection == null &&
+    state.lastProcessedSignalId == null
+  );
+}
+
+/** Drop frozen armed/partial streak so a later AO enable cannot crack from it. */
+export async function idlePersistedStreakState(
+  supabase: SupabaseClient,
+): Promise<void> {
+  const state = await loadStreakState(supabase);
+  if (isIdleStreakState(state)) return;
+  await saveStreakState(supabase, emptyStreakState());
+}
+
 /**
  * Load → process one fire → persist. Idempotent on duplicate signal_id.
  * Kill switch read here so pure tests stay side-effect free.

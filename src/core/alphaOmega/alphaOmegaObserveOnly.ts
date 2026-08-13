@@ -1,7 +1,8 @@
 /**
  * AO-observe-only signals: matched Omega fires suppressed from Trail by
  * engine-omega bridge exec-dedup (15m after any omega EXECUTED).
- * Counts toward streak / opposing / backstop; may Lane-B crack-enter; never Trail.
+ * Live streak / crack must not count these beeps. Shadow AO may still observe.
+ * Never Trail.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -10,10 +11,8 @@ import type { BridgeConfig, BridgeEngineRow } from '../../types/config.js';
 import type { ActiveAmdState } from '../../services/amdDetector/amdStateService.js';
 import type { ActiveRegimeState } from '../../services/RegimeStateService.js';
 import type { DecisionType } from '../../types/signals.js';
-import { logInfo, logWarn } from '../../utils/logger.js';
+import { logInfo } from '../../utils/logger.js';
 import { ALPHAOMEGA_OBSERVE_DEDUPED_REASON } from './alphaOmegaConstants.js';
-import { observeAlphaOmegaFire } from './alphaOmegaFireObserver.js';
-import { maybeEnterLaneBOnCrack } from './alphaOmegaLaneBCrackEntry.js';
 import { observeAlphaOmegaShadowFire } from './alphaOmegaShadowFireObserver.js';
 import {
   isAoObserveOnlyPayload,
@@ -41,8 +40,6 @@ type AuditAttacher = (
   directionMode: string,
 ) => void;
 
-const noopAuditAttach: AuditAttacher = () => undefined;
-
 export interface HandleAoObserveOnlyArgs {
   supabase: SupabaseClient;
   payload: SignalInsertPayload;
@@ -56,42 +53,16 @@ export interface HandleAoObserveOnlyArgs {
 }
 
 /**
- * Observe fire into AO streak/position tracking; optional Lane B crack entry.
- * Never runs Omega Trail / multi-broker RAW fan-out.
+ * Log the exec-dedup beep; do not feed live AO streak or Lane B crack.
+ * Shadow AO remains isolated and may still count the fire.
  */
 export async function handleAoObserveOnlySignal(
   args: HandleAoObserveOnlyArgs,
 ): Promise<void> {
-  const fireOutcome = await observeAlphaOmegaFire(args.supabase, args.payload);
-  // Additive: matched observe-dedup fires also feed Shadow AO streak (isolated).
   await observeAlphaOmegaShadowFire(args.supabase, args.payload, {
     source: 'matched',
   });
-  const engine = args.engines.find((row) => row.engine_id === 'omega');
   const decisionLatencyMs = Date.now() - args.receivedAt.getTime();
-
-  let crackEntered = false;
-  try {
-    crackEntered = await maybeEnterLaneBOnCrack({
-      supabase: args.supabase,
-      payload: args.payload,
-      signalId: args.signalId,
-      config: args.config,
-      engine,
-      fireOutcome,
-      decisionLatencyMs,
-      cachedAccountEquity: args.cachedAccountEquity,
-      openTradeCount: 0,
-      buildTradeLogRow: args.buildTradeLogRow as never,
-      attachOmegaAuditFields: args.attachOmegaAuditFields ?? noopAuditAttach,
-    });
-  } catch (err) {
-    logWarn('[AlphaOmega] observe-only Lane B crack failed — streak kept', {
-      signalId: args.signalId,
-      error: String(err),
-    });
-  }
-
   await args.supabase.from('bridge_trade_log').insert(
     args.buildTradeLogRow(
       args.payload,
@@ -103,11 +74,7 @@ export async function handleAoObserveOnlySignal(
       undefined,
     ),
   );
-
-  logInfo('[AlphaOmega] Observe-only exec-dedup fire handled', {
+  logInfo('[AlphaOmega] Observe-only fire ignored for live streak', {
     signalId: args.signalId,
-    observed: fireOutcome.observed,
-    crack: fireOutcome.crackEvent != null,
-    crackEntered,
   });
 }

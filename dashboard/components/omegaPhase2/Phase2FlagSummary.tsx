@@ -51,7 +51,7 @@ export function Phase2FlagSummary() {
 }
 
 function BannerCopy({ enabled }: { enabled: boolean }) {
-  const modeLabel = enabled ? 'ENFORCE' : 'DISABLED — legacy fallback';
+  const modeLabel = enabled ? 'ENFORCE' : 'DISABLED — Lane B flat';
   return (
     <div>
       <p className="font-medium text-amber-800 dark:text-amber-200">
